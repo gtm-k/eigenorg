@@ -1,0 +1,14 @@
+target/
+www/pkg/
+node_modules/
+.staging/
+.codex-review/
+.remember/
+tools/calibrate/
+PRD*
+VISION*
+PLAN*
+PREMORTEM*
+BACKLOG*
+bash.exe.stackdump
+*.stackdump
