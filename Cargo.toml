@@ -1,0 +1,22 @@
+[package]
+name = "eigenorg"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Browser-native organizational-dynamics simulator engine (Rust -> wasm)."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# wasm-bindgen is target-gated so the engine core stays wasm-free and
+# `cargo test` runs native with zero wasm dependencies (PLAN P2).
+# Pinned exact: wasm-pack downloads the wasm-bindgen CLI matching this
+# crate version — a range here would let the CLI/crate pair drift (PREMORTEM T4).
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.126"
+
+# wasm-opt disabled initially (PLAN P2): first make the toolchain boringly
+# reproducible on Windows + CI; enable optimization later if the size budget needs it.
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
