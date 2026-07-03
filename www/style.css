@@ -1,0 +1,91 @@
+/* eigenorg — walking-skeleton styles.
+   Deliberately minimal: the DESIGN.md (Linear) token pass happens at P5. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+  color: #1a1a1f;
+  background: #fafafa;
+}
+
+main {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin: 0 0 0.25rem;
+}
+
+.tagline {
+  margin: 0 0 2rem;
+  color: #55555e;
+}
+
+.panel {
+  background: #ffffff;
+  border: 1px solid #e4e4e9;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.panel h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem;
+}
+
+.status {
+  margin: 0;
+}
+
+.status .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-top: 1px solid #f0f0f3;
+}
+
+.status .row:first-child {
+  border-top: none;
+}
+
+.status dt {
+  flex: 1 1 16rem;
+  color: #55555e;
+}
+
+.status dd {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.status dd.ok {
+  color: #0a7a33;
+}
+
+.status dd.error {
+  color: #b3261e;
+}
+
+.note {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: #55555e;
+}
+
+.chart-box {
+  position: relative;
+  width: 100%;
+  height: 260px;
+}
