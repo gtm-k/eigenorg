@@ -1,0 +1,79 @@
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+  # Push trigger stays disabled until launch; restored at P9 alongside the
+  # publish step below (Pages does not serve private repos on the Free plan).
+  # push:
+  #   branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build www/ artifact (publish inert until P9)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install wasm-pack (locked; cached by rust-cache)
+        run: |
+          set -o pipefail
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install --locked wasm-pack
+          fi
+          wasm-pack --version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm ci (source for the vendored Chart.js bundle)
+        run: |
+          set -o pipefail
+          npm ci
+
+      - name: Build site via scripts/build.sh
+        run: |
+          set -o pipefail
+          bash scripts/build.sh
+
+      - name: Assert deploy artifact is complete (PREMORTEM T2)
+        run: |
+          set -o pipefail
+          test -f www/index.html
+          test -f www/pkg/eigenorg_bg.wasm
+          test ! -f www/pkg/.gitignore
+          test -f www/vendor/chart.umd.min.js
+          test -f www/.nojekyll
+
+      - name: Upload built site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: www
+          path: www/
+          include-hidden-files: true # .nojekyll must ship
+
+      # ENABLE AT P9 FLIP
+      # The publish step below stays commented until the user flips the repo
+      # public at P9 (>=3 days before the launch post). Enabling it earlier
+      # does nothing useful: GitHub Pages does not serve private repos on the
+      # Free plan (PLAN decision log, round 1).
+      # - name: Deploy to gh-pages
+      #   uses: peaceiris/actions-gh-pages@v4
+      #   with:
+      #     github_token: ${{ secrets.GITHUB_TOKEN }}
+      #     publish_dir: ./www
+      #     publish_branch: gh-pages
