@@ -714,7 +714,7 @@
       "type": "parameter",
       "id": "aiThroughputBoostOrg",
       "plainLanguage": "AI makes the routine work it touches about 25% faster at org level.",
-      "formula": "routine execution allocation *= aiThroughputBoostOrg when AI active (M11)",
+      "formula": "routine execution allocation *= (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) when AI active - uniform expected-value factor, no per-task share draw (M11(a))",
       "tier": "editorial-heuristic",
       "limitation": "Deliberately conservative; vendor-reported gains are usually task-level, not org-level.",
       "anchor": "Editorial, conservative relative to vendor claims",

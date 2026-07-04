@@ -184,11 +184,13 @@ if (meta === null) fail("no eigenorg:meta block found");
 if (parameters.length === 0) fail("no parameter blocks found");
 if (goldens.length === 0) fail("no golden blocks found");
 
-// Fence guard: a fence that OPENS with "json eigenorg:" but that the strict block regex
-// did NOT capture (a mistyped kind like ":golde", a malformed/missing close fence, or two
-// blocks sharing one closing fence) would otherwise drop silently. The count of opening
-// markers must equal the number of captured blocks.
-const looseFenceCount = (source.match(/^```json eigenorg:/gm) || []).length;
+// Fence guard: a fence that OPENS with an "eigenorg:" tag but that the strict block regex
+// did NOT capture (a mistyped kind like ":golde", a missing "json" info-string, a
+// malformed/missing close fence, or two blocks sharing one closing fence) would otherwise
+// drop silently. The loose scan matches ANY opening fence carrying the eigenorg: tag
+// (info-string optional) so a fence missing the "json" tag is caught rather than dropped.
+// The count of opening markers must equal the number of captured blocks.
+const looseFenceCount = (source.match(/^```.*\beigenorg:/gm) || []).length;
 const strictFenceCount = 1 /* meta */ + parameters.length + mechanics.length + goldens.length;
 if (looseFenceCount !== strictFenceCount) {
   fail(`fence guard: ${looseFenceCount} eigenorg fences open but only ${strictFenceCount} blocks were captured - a malformed or mistyped fence dropped silently`);

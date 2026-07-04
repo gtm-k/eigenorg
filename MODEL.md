@@ -71,7 +71,7 @@ The atomic unit of work is a **task**. A task has: `class` (routine | complex | 
 (points completed), `layerIndex` (current prioritization layer), `serviceRemaining`
 (days left at current layer), `age` (steps since arrival), and `overrideCount`.
 
-**States** (six): `queued(l)` for l = 1..L, `inProgress`, `review` (team sim only),
+**States** (five, plus the *(created)* arrival pseudo-state used by T1/T2 below): `queued(l)` for l = 1..L, `inProgress`, `review` (team sim only),
 `blocked`, `done`. **Every transition:**
 
 | # | From | To | Trigger |
@@ -152,9 +152,12 @@ configs may override any value):
 
 `{ headcountStart (4–500), headcountGrowthPerStep (0–2 people/step),
 topology: "flat"|"hierarchical"|"pods"|"federated", hierarchyDepth D (1–6),
-ownershipLayers L (1–5), modality: "asyncFirst"|"meetingHeavy",
-structuralHealth SH (1–10), misalignment m₀ (0–1, optional — default derived from SH,
-§4 M5), aiInjection: { enabled, atStep } }`.
+ownershipLayers L (1–5), layerTypes (optional, length L, each
+"humanPm"|"humanDirector"|"aiAgent"|"committee" — default all "humanPm", §9.9),
+modality: "asyncFirst"|"meetingHeavy", structuralHealth SH (1–10),
+misalignment m₀ (0–1, optional — default derived from SH, §4 M5),
+initialBacklog (int 0–500, optional, default 0 — standing backlog present at t=0, §4 M18),
+aiInjection: { enabled, atStep } }`.
 
 Headcount at step t: `n(t) = round(headcountStart + headcountGrowthPerStep × t)`.
 Team partition by topology: flat → 1 team; pods/federated → `T = ceil(n / teamPodTargetSize)`;
@@ -534,8 +537,9 @@ reproducibility contract (§8).
    `meetingOverheadPct`.
 2. **Recovery windows.** Expire windows whose duration has elapsed; compute
    `M_recovery(t)` (M10).
-3. **Arrivals.** Draw arrival count (M18), then per task: class, effort. If AI is active
-   and class == novel: draw brittleness (M9); on event the task enters `blocked` (T2) and
+3. **Arrivals.** Draw arrival count (M18), then per task: class, effort. If class == novel
+   and `novelExposure > 0` (M11 — org injection active OR an aiAgent-typed layer present):
+   draw brittleness (M9/M11); on event the task enters `blocked` (T2) and
    opens a recovery window (M10); else it enters `queued(1)` (T1) with a service draw
    (M6, x `M_recovery`, x the org routine-routing factor per M11 when AI is active).
 4. **Unblock.** Tasks whose block has elapsed move `blocked -> queued(1)` (T8) with a
@@ -549,8 +553,8 @@ reproducibility contract (§8).
    on override apply T7.
 7. **Execution.** `P_eff = n * orgExecPointsPerPersonPerStep * (1 - tau)`. Allocate to
    `inProgress` tasks FIFO, up to `maxPointsPerTaskPerStep` each, until exhausted;
-   routine allocations x `aiThroughputBoostOrg` on the `aiRoutineShareOrg` share when AI
-   is active (M11). Tasks with `progress >= effort` complete (T6).
+   routine allocations x the uniform factor `(1 + aiRoutineShareOrg·(aiThroughputBoostOrg−1))`
+   when AI is active (M11(a); no per-task draw). Tasks with `progress >= effort` complete (T6).
 8. **Cohesion.** Update per M12 using `E(t-1)`. The `cohesionTeamAvg` series (and the
    cohesion term inside `E(t)`) reports the PRE-update value — the update takes effect
    from step t+1 (see Appendix A). The same convention applies to the team sim.
@@ -600,7 +604,7 @@ to more override draws. **Boundedness:** the override probability per task-step 
 ranges — the `min(1, ·)` clamp is load-bearing, because `o_raw` reaches
 `overrideBaseRate_max · (L−1)_max · (1 + overrideMisalignmentGain_max · 1) ·
 (1 + distortionOverrideCoupling_max · distortionPerHumanLayer_max · (D−1)_max) =
-0.05 · 4 · 3 · (1 + 1 · 0.15 · 5) = 1.05 > 1` at the in-range corner. Progress loss per
+0.05 · 4 · (1 + 4·1) · (1 + 1 · 0.15 · 5) = 0.05 · 4 · 5 · 1.75 = 1.75 > 1` at the in-range corner. Progress loss per
 override is bounded by `wipResetFraction`, and each layer's capacity caps pipeline flow —
 the loop amplifies latency but cannot diverge: latency is bounded by queue length, which
 is bounded by cumulative arrivals (at most linear growth in t in overloaded configs).
@@ -625,9 +629,13 @@ diverge under any config; cohesion is pulled toward a finite structural target a
 `cohesionEntropyCoupling · (100 − entropyStressThreshold)/10 ≤
 cohesionEntropyCoupling_max · (100 − entropyStressThreshold_min)/10 = 0.4 · 6 = 2.4`
 points/step. **Settling** holds unconditionally, but the resting point depends on the
-regime: at the defaults (and wherever the max-entropy drain is below the recovery pull
-from the floor, i.e. `cohesionEntropyCoupling · (100 − entropyStressThreshold)/10 <
-cohesionRecoveryRate · cohesionBase`) the pair settles at an **interior** fixed point; at
+regime: at the defaults (and wherever the max-entropy drain stays below the recovery pull
+toward the structural target, `cohesionRecoveryRate · target(t)`, whose own ceiling is
+`cohesionRecoveryRate · cohesionBase` because `target(t) ≤ cohesionBase`) the pair settles
+at an **interior** fixed point — so the closed-form test
+`cohesionEntropyCoupling · (100 − entropyStressThreshold)/10 < cohesionRecoveryRate · cohesionBase`
+is **necessary but not sufficient** for interiority (it compares against the ceiling, not the
+actual `target(t)`, which the size/AI penalties can lower); at
 extreme in-range corners (high coupling, low threshold, low recovery rate) the drain can
 exceed the recovery pull and cohesion settles at its clamped **floor (0)** — still bounded,
 still settling (a constant floor trivially satisfies the trailing-window settling
@@ -671,22 +679,27 @@ p10 = p50 = p90. Downstream phases must consume THIS list — no other output li
 | `wip` | items | queued + inProgress + blocked |
 | `overrideRate` | events/step | raw |
 | `cumulativeOverrides` | events | running total (robust carrier for sparse-event predicates) |
-| `brittlenessRate` | events/step | raw; 0 unless AI active |
-| `cumulativeBrittleness` | events | running total; 0 unless AI active |
+| `brittlenessRate` | events/step | raw; 0 unless AI is active or an aiAgent-typed layer is present (M11) |
+| `cumulativeBrittleness` | events | running total; 0 unless AI is active or an aiAgent-typed layer is present (M11) |
 | `cohesionTeamAvg` | index 0–100 | mean team cohesion, M12 |
 | `healthGap` | points | `cohesionTeamAvg − orgHealth` (healthy-teams-sick-org divergence) |
 
 **Org non-series blocks:** `perLayer` — for each layer l:
 `{layer, layerType, meanLatencyDays, meanQueue, utilization, overrideShare, distortion,
-bottleneck}`, with every field given a computable rule (M10 definability):
+bottleneck}`, with every field given a fully computable rule (no field is left to engine
+discretion):
 
 - `layerType` — the layer's type from `org.layerTypes[l−1]` (`humanPm` when `layerTypes`
   is absent).
 - `meanLatencyDays` — mean, over tasks that **enter layer l during the final 20 steps**,
   of the service time drawn for that layer:
   `Triangular(decisionLatencyPerLayerDays) × M_recovery × layerLatencyFactor(type_l)`
-  (× the routine AI-routing factor when org injection is active, M11); if no task enters
-  layer l in the window, it reports `L`'s structural minimum `mean(decisionLatencyPerLayerDays) × layerLatencyFactor(type_l)`.
+  (× the routine AI-routing factor when org injection is active, M11), **including — at
+  layer L only — the escalation surcharge (M6) actually drawn for that task**, since the
+  measured mean reports the whole drawn service time at the seat. If no task enters
+  layer l in the window, it reports layer l's structural minimum
+  `mean(decisionLatencyPerLayerDays) × layerLatencyFactor(type_l)` (the escalation
+  surcharge, a stochastic add-on, is excluded from this floor).
 - `meanQueue` — mean over the final 20 steps of `count(tasks in queued(l))`.
 - `utilization` — mean over the final 20 steps of `moved_l / cap_l` (tasks advanced out
   of layer l that step divided by that step's capacity; capped at 1).
@@ -1171,7 +1184,7 @@ require explicit maintainer review before they land.
 { "id": "aiThroughputBoostOrg", "value": 1.25, "range": [1.1, 1.5], "distribution": "point", "unit": "multiplier",
   "anchor": "Editorial, conservative relative to vendor claims", "tier": "editorial-heuristic",
   "limitation": "Deliberately conservative; vendor-reported gains are usually task-level, not org-level.",
-  "formula": "routine execution allocation *= aiThroughputBoostOrg when AI active (M11)",
+  "formula": "routine execution allocation *= (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) when AI active - uniform expected-value factor, no per-task share draw (M11(a))",
   "plainLanguage": "AI makes the routine work it touches about 25% faster at org level." }
 ```
 
@@ -2141,7 +2154,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cumThroughput@hollow / cumThroughput@humanPm", "comparator": "ratioAbove",
   "predicate": "Across the early window (steps 8-14) the hollow team's cumulative throughput averages at least 8% above the human-PM team's - work accelerates initially.",
   "bound": 1.08, "tolerance": 0.05, "step": [8, 14], "instrument": "meanPath",
-  "rationale": "The seductive first fortnight, before the edge cases arrive. Re-anchored (round-1 H3) from the single step t=10 - where the ratio of small-integer cumulative medians jumps discretely (1.000 -> 1.14 with nothing between) - to the mean of the pointwise ratio over [8,14], a continuous carrier that no longer straddles a knife-edge under the Monte-Carlo p50 semantics." }
+  "rationale": "The seductive first fortnight, before the edge cases arrive. Re-anchored from the single step t=10 - where the ratio of small-integer cumulative medians jumps discretely (1.000 -> 1.14 with nothing between) - to the mean of the pointwise ratio over [8,14], a continuous carrier that no longer straddles a knife-edge under the Monte-Carlo p50 semantics." }
 ```
 
 ```json eigenorg:golden
@@ -2199,7 +2212,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "decisionLatency@aiMiddle / decisionLatency@allHuman", "comparator": "ratioBelow",
   "predicate": "With an AI agent in the middle approval seat, settled first-pass decision latency runs at most 0.9x the all-human stack's - the routing acceleration is real.",
   "bound": 0.9, "tolerance": 0.05, "step": [50, 59], "instrument": "meanPath",
-  "rationale": "P6 configurator acceptance, half 1: an aiAgent layer's low layerLatencyFactor and higher layerCapacityFactor (§9.9) speed the routine majority through the stack." }
+  "rationale": "P6 configurator acceptance, half 1: decisionLatency here is the all-class org first-pass latency, and routine work - the ~60% majority of the mix (taskMixRoutineOrg) - is the dominant driver of the aggregate drop; an aiAgent layer's low layerLatencyFactor and higher layerCapacityFactor (§9.9) speed that routine majority through the stack." }
 ```
 
 ```json eigenorg:golden
@@ -2246,7 +2259,8 @@ this section wins.
 - `validate()` rejects (**authoring-time validation**, for a config authored by a user or
   the UI): unknown fields, NaN/Inf anywhere, out-of-range structural values,
   `paramOverrides` keys not present in `model/params.json`, override values (or triangular
-  modes) outside the parameter's declared `range`, and `cost.enabled == true` (v1).
+  modes) outside the parameter's declared `range`, triangular triples that violate
+  `min ≤ mode ≤ max`, and `cost.enabled == true` (v1).
 - **Joint constraints** (also enforced by `validate()`): when `paramOverrides` sets any
   entropy weight, the five weights (`entropyWeightCoordination`, `…Latency`, `…Cohesion`,
   `…Brittleness`, `…Wip`) must still sum to 1 ± 0.001; `taskMixRoutineOrg +
@@ -2254,12 +2268,12 @@ this section wins.
   `workStream.mix` fractions must sum to 1 ± 0.001; and, when `org.layerTypes` is present,
   its length must equal `org.ownershipLayers` and every entry must be one of
   `humanPm | humanDirector | aiAgent | committee` (§9.9).
-- **Replay validation is looser than authoring validation (share-URL contract, H2).** A
+- **Replay validation is looser than authoring validation (share-URL contract).** A
   share-URL replay supplies `paramOverrides = resolvedParams`, the FULL effective
   coefficient set captured at run time (§12.4). Range membership is an **authoring-time**
   check only: replay validates structure and type (every key exists in
-  `model/params.json`; each value is a number or a `[min,mode,max]` triple; NaN/Inf
-  rejected; joint constraints above still hold) but **does NOT re-check current-range
+  `model/params.json`; each value is a number or a `[min,mode,max]` triple with
+  `min ≤ mode ≤ max`; NaN/Inf rejected; joint constraints above still hold) but **does NOT re-check current-range
   membership**, because a post-lock maintainer-reviewed amendment can narrow a range so that a value
   that was in-range when the link was created now sits outside it — and the promise is
   that an old link replays its embedded numbers exactly. See §12.5.
@@ -2294,7 +2308,7 @@ this section wins.
 | `seed` | u64 | Monte Carlo master seed |
 | `iterations` | int 50–5000, default 500 | |
 | `horizon` | int 10–600, default 60 | steps |
-| `paramOverrides` | map `paramId → number \| [min,mode,max]`, optional | **applied by the engine in v1** (UI sliders are v2); keys must exist in params.json; values must sit within the declared range |
+| `paramOverrides` | map `paramId → number \| [min,mode,max]`, optional | **applied by the engine in v1** (UI sliders are v2); keys must exist in params.json. Authored configs enforce the current declared range; full-set `resolvedParams` replays (share URLs) validate structure/type + joint constraints only, bypassing range membership (§12.1/§12.5) |
 | `cost` | `{ "enabled": false }`, optional | **reserved v2 block**; `enabled: true` → typed NotImplemented error |
 | `org.headcountStart` | int 4–500 | |
 | `org.headcountGrowthPerStep` | number 0–2 | people/step |
@@ -2365,7 +2379,7 @@ pre-reserved v2 hooks; `org.layerTypes` (§9.9) is an additive optional field wh
 reproduces the pre-existing all-`humanPm` behavior. Unknown **major** schema versions are
 rejected gracefully by the UI with an upgrade message.
 
-**Range changes vs replay (H2).** A parameter's `range` is authoring-time metadata, not
+**Range changes vs replay.** A parameter's `range` is authoring-time metadata, not
 part of the reproducibility contract. A maintainer-reviewed amendment may narrow or shift a range;
 share URLs created before the change still replay, because replay validates the embedded
 `resolvedParams` structurally/by type only and skips current-range membership (§12.1).
@@ -2388,11 +2402,13 @@ The value embedded in the link — not today's range — is what reproduces. Aut
 
 **Every amendment that changes any extracted artifact bumps modelVersion (at least MINOR)**
 and appends a §14 changelog row. **CI pairing gate (P3 wires; P1 defines):** CI recomputes
-`sha256(model/params.json)` AND `sha256(model/goldens.json)` and fails unless the §14
-changelog table contains a row whose `modelVersion` equals the meta-block declaration AND
-whose `params.json sha256` and `goldens.json sha256` both equal the recomputed hashes.
-Pairing both artifacts (not params.json alone) is what makes a tolerance-only amendment
-detectable at the gate. The changelog table IS the declaration format.
+`sha256(model/params.json)`, `sha256(model/goldens.json)` AND `sha256(www/assumptions.json)`
+and fails unless the §14 changelog table contains a row whose `modelVersion` equals the
+meta-block declaration AND whose `params.json sha256`, `goldens.json sha256`, and
+`assumptions.json sha256` all equal the recomputed hashes. Pairing all three artifacts (not
+params.json alone) is what catches both a tolerance-only amendment — which touches
+goldens.json but not params.json — and a mechanic-formula edit that materializes only in
+`www/assumptions.json`. The changelog table IS the declaration format.
 
 ### 12.7 Generated artifacts (extraction contract)
 
@@ -2477,9 +2493,9 @@ Structural limitations (also surfaced per-mechanic in the drawer):
 
 ## 14. Changelog
 
-| modelVersion | date | params.json sha256 | goldens.json sha256 | changes |
-|---|---|---|---|---|
-| 1.0.0 | 2026-07-04 | `f559bd7b6ab851acc7d16b2369f49f0c99e5c86ac06a289d9382cc7f89d8fbbb` | `1621262ad1b74535afd9a5f0539f68e159b4201b40aaf47ec02fdd0d72f9b1aa` | Initial model: unified org/team spec with per-layer ownership typing (§9.9), 6 calibrated scenarios, 34 golden assertions, extraction pipeline. |
+| modelVersion | date | params.json sha256 | goldens.json sha256 | assumptions.json sha256 | changes |
+|---|---|---|---|---|---|
+| 1.0.0 | 2026-07-04 | `9b2ce2421c1a13c06dacae001914f5ea4bb6427e44e47c9afcb0fa5d77a080fb` | `3581b470fe333b7a56ad3c8bbb64d9b6d0616e9228355c3460f727dd84aa0173` | `147ec8b99e5e3d2c2593bd7ac763483b0f66418492370d0b824e3a701f6140d6` | Initial model: unified org/team spec with per-layer ownership typing (§9.9), 6 calibrated scenarios, 34 golden assertions, extraction pipeline. |
 
 ---
 

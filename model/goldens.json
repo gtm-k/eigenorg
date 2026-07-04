@@ -348,7 +348,7 @@
         14
       ],
       "instrument": "meanPath",
-      "rationale": "The seductive first fortnight, before the edge cases arrive. Re-anchored (round-1 H3) from the single step t=10 - where the ratio of small-integer cumulative medians jumps discretely (1.000 -> 1.14 with nothing between) - to the mean of the pointwise ratio over [8,14], a continuous carrier that no longer straddles a knife-edge under the Monte-Carlo p50 semantics."
+      "rationale": "The seductive first fortnight, before the edge cases arrive. Re-anchored from the single step t=10 - where the ratio of small-integer cumulative medians jumps discretely (1.000 -> 1.14 with nothing between) - to the mean of the pointwise ratio over [8,14], a continuous carrier that no longer straddles a knife-edge under the Monte-Carlo p50 semantics."
     },
     {
       "id": "hmBrittlenessSpike",
@@ -435,7 +435,7 @@
         59
       ],
       "instrument": "meanPath",
-      "rationale": "P6 configurator acceptance, half 1: an aiAgent layer's low layerLatencyFactor and higher layerCapacityFactor (§9.9) speed the routine majority through the stack."
+      "rationale": "P6 configurator acceptance, half 1: decisionLatency here is the all-class org first-pass latency, and routine work - the ~60% majority of the mix (taskMixRoutineOrg) - is the dominant driver of the aggregate drop; an aiAgent layer's low layerLatencyFactor and higher layerCapacityFactor (§9.9) speed that routine majority through the stack."
     },
     {
       "id": "lcNovelBrittleRises",
