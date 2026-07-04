@@ -664,6 +664,22 @@
     },
     {
       "type": "parameter",
+      "id": "distortionOverrideCoupling",
+      "plainLanguage": "The more the story got garbled on its way up, the more likely the top layer overrides the call.",
+      "formula": "override probability *= (1 + distortionOverrideCoupling * distortion) (M8)",
+      "tier": "editorial-heuristic",
+      "limitation": "Tuned, not measured; couples two editorial quantities.",
+      "anchor": "Editorial",
+      "value": 0.5,
+      "range": [
+        0,
+        1
+      ],
+      "unit": "gain",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
       "id": "metricSmoothingAlpha",
       "plainLanguage": "How quickly the displayed latency and entropy react to what just happened versus the recent past.",
       "formula": "x_ema(t) = alpha*x(t) + (1-alpha)*x_ema(t-1) (M13; decisionLatency series)",
@@ -718,7 +734,7 @@
       "tier": "editorial-heuristic",
       "limitation": "Relief assumes agents are wired into clear ownership - which is exactly what low-SH orgs lack.",
       "anchor": "Editorial: AI routing/summarizing relieves coordination in structurally healthy orgs",
-      "value": 0.3,
+      "value": 0.35,
       "range": [
         0.05,
         0.35
@@ -782,7 +798,7 @@
       "tier": "editorial-heuristic",
       "limitation": "Assumes guardrails actually exist at high SH.",
       "anchor": "Editorial: healthy orgs keep humans in the loop, catching most agent failures",
-      "value": 0.25,
+      "value": 0.2,
       "range": [
         0.2,
         0.5
@@ -1050,7 +1066,7 @@
       "tier": "industry-report",
       "limitation": "Survey-based perception data; magnitude scaled editorially to the 0-100 index.",
       "anchor": "WEF (2026) and AMCIS 2025: AI-heavy teams report weaker co-worker connections",
-      "value": 18,
+      "value": 15,
       "range": [
         10,
         30
@@ -1613,7 +1629,7 @@
       "type": "mechanic",
       "id": "decisionPipeline",
       "plainLanguage": "Every approval layer adds waiting: around 2-3 working days each just for its own look, plus queueing when the layer is busy. Higher layers have less bandwidth (a VP reviews fewer things per day than a team lead), so queues form at the top. Decisions that cut across teams with unclear ownership get escalated and wait extra days. Three layers turn a same-week decision into a two-week one.",
-      "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10). Layer l advances at most cap_l tasks/step (fractional accumulator): cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1). On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L.",
+      "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10). Layer l advances at most cap_l tasks/step: cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) (x the M11 AI approval-bandwidth multiplier when AI is active). Capacity is use-it-or-lose-it: the fractional accumulator carries at most the sub-1 remainder between steps (acc = min(acc + cap_l - moved, 1)) - idle days never bank whole approvals. On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L.",
       "citations": [
         "SI Labs (2026). Why Hierarchies Slow Down Companies - five approval layers, ~3 days per layer, 15 working days to a decision. https://www.si-labs.com/en/articles/slow-decisions/",
         "Baker, N. R. et al. (1975). Diffuse decision-making in hierarchical organizations. Management Science 21(6) - empirical multi-layer decision delay."
@@ -1668,7 +1684,7 @@
       "type": "mechanic",
       "id": "brittlenessRecovery",
       "plainLanguage": "When an AI agent hits a case beyond its ceiling, the failure does not just cost that one task. If a named human owns recovery, the mess is contained: a day or two, small slowdown. If nobody owns recovery, everything nearby slows down 1.5-2.5x for the next 3-5 days while people figure out whose problem it is.",
-      "formula": "A brittleness event blocks the affected task for Triangular(recoveryDuration*) steps (rounded, min 1) and opens a recovery window: while any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned), duration ~ Triangular(recoveryDurationUnownedSteps). Owned: multiplier = recoveryLatencyMultiplierOwned, duration ~ Triangular(recoveryDurationOwnedSteps).",
+      "formula": "A brittleness event draws ONE duration d ~ Triangular(recoveryDurationUnownedSteps | recoveryDurationOwnedSteps), rounded to whole steps (min 1), shared by the task block and the recovery window; the window is active for steps [t_event, t_event + d). While any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned). Owned: multiplier = recoveryLatencyMultiplierOwned (point value, no draw).",
       "citations": [
         "eigenorg PRD red-team finding (2026): Failure Recovery Owner assignment; unowned high-AI-coverage functions apply a 1.5-2.5x latency multiplier for 3-5 steps after a brittleness event.",
         "HatchWorks (2025). AI agent design best practices - agent failure modes on novel inputs."
@@ -1682,7 +1698,7 @@
       "type": "mechanic",
       "id": "aiTaskTypeCapability",
       "plainLanguage": "AI agents are genuinely faster on routine work - routing, triage, standard execution. On novel, ambiguous, high-stakes work their capability collapses: they misroute, stall, or fail, unless a human co-owns the judgment. Research on hybrid teams finds human+AI outperforming fully autonomous agent teams by roughly 69% on complex tasks - so the model rewards keeping humans on judgment functions and penalizes hollowing them out.",
-      "formula": "Team sim: if any AI covers prioritization, routine service time *= aiRoutineLatencyFactor; if nobody covers prioritization, service *= uncoveredPrioritizationFactor. Execution: routine progress *= (1 + aiExecShare * (aiRoutineAdvantage - 1)); novel progress *= (humanExecShare + aiExecShare * aiNovelEffectiveness). Novel arrivals take the AI failure probability (M9) when AI is assigned to prioritization and no human is assigned to prioritization; when a human covers prioritization the probability is humanNovelFailureBase. Quality: for complex/novel tasks with zero human judgment coverage, the judgment contribution is divided by hybridVsAutonomousAdvantage (M16). Org sim: AI injection multiplies routine execution allocations by aiThroughputBoostOrg on the aiRoutineShareOrg share of routine work, AND multiplies routine-task service draws by (1 - (1 - aiRoutineLatencyFactor) * reliefRamp(SH)), reliefRamp = clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) - AI routing accelerates routine decisions only in structurally healthy orgs.",
+      "formula": "Team sim: if any AI covers prioritization, routine service time *= aiRoutineLatencyFactor; if nobody covers prioritization, service *= uncoveredPrioritizationFactor. Execution: routine progress *= (1 + aiExecShare * (aiRoutineAdvantage - 1)); novel progress *= (humanExecShare + aiExecShare * aiNovelEffectiveness). Novel arrivals take the AI failure probability (M9) when AI is assigned to prioritization and no human is assigned to prioritization; when a human covers prioritization the probability is humanNovelFailureBase. Quality: for complex/novel tasks with zero human judgment coverage, the judgment contribution is divided by hybridVsAutonomousAdvantage (M16). Org sim: AI injection (a) multiplies routine execution allocations by aiThroughputBoostOrg on the aiRoutineShareOrg share of routine work, (b) multiplies routine-task service draws by (1 - (1 - aiRoutineLatencyFactor) * reliefRamp(SH)), reliefRamp = clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) - AI routing accelerates routine decisions only in structurally healthy orgs - and (c) multiplies every decision layer's capacity by (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) at ANY Structural Health: AI agents add mechanical routing/approval bandwidth regardless of structure; what depends on SH is the QUALITY of that routing (brittleness, M9) and the coordination relief - work reaches broken structure faster, which is the 'faster' in Faster Dysfunction.",
       "citations": [
         "e-discoveryteam.com (2025). Stanford/Carnegie study: hybrid human-AI teams beat fully autonomous agents by 68.7% on complex tasks. https://e-discoveryteam.com/2025/12/01/",
         "TechXplore (2024). Researchers test human vs AI-human hybrid teams in dynamic tasks.",
@@ -1778,7 +1794,7 @@
       "type": "mechanic",
       "id": "taskEffortAndMix",
       "plainLanguage": "Work arrives continuously, sized in effort points where 1 point is roughly one focused person-day for an average performer. Routine items are small and predictable; novel items are big and uncertain - and they are the ones AI handles worst.",
-      "formula": "Org sim arrivals per step = taskArrivalPerPersonPerStep * n(t) (fractional accumulator; Bernoulli remainder in MC). Class ~ {routine: taskMixRoutineOrg, complex: taskMixComplexOrg, novel: 1 - routine - complex}. Team sim: arrivals and mix from workStream config. Effort ~ Triangular(taskEffortRoutine | taskEffortComplex | taskEffortNovel) by class. Team sim stakes: high with probability workStream.highStakesShare.",
+      "formula": "Org sim arrivals per step = taskArrivalPerPersonPerStep * n(t) (fractional accumulator; Bernoulli remainder in MC); at t = 0 the arrival count is additionally increased by org.initialBacklog (default 0) - a standing backlog the org starts with; backlog tasks draw class/effort/service exactly like arrivals. Class ~ {routine: taskMixRoutineOrg, complex: taskMixComplexOrg, novel: 1 - routine - complex}. Team sim: arrivals and mix from workStream config. Effort ~ Triangular(taskEffortRoutine | taskEffortComplex | taskEffortNovel) by class. Team sim stakes: high with probability workStream.highStakesShare.",
       "citations": [
         "eigenorg model definition (2026)."
       ],

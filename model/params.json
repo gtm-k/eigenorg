@@ -623,6 +623,21 @@
       "plainLanguage": "Every human-to-human relay of context loses about 8% of the signal."
     },
     {
+      "id": "distortionOverrideCoupling",
+      "value": 0.5,
+      "range": [
+        0,
+        1
+      ],
+      "distribution": "point",
+      "unit": "gain",
+      "anchor": "Editorial",
+      "tier": "editorial-heuristic",
+      "limitation": "Tuned, not measured; couples two editorial quantities.",
+      "formula": "override probability *= (1 + distortionOverrideCoupling * distortion) (M8)",
+      "plainLanguage": "The more the story got garbled on its way up, the more likely the top layer overrides the call."
+    },
+    {
       "id": "metricSmoothingAlpha",
       "value": 0.3,
       "range": [
@@ -669,7 +684,7 @@
     },
     {
       "id": "aiCoordinationRelief",
-      "value": 0.3,
+      "value": 0.35,
       "range": [
         0.05,
         0.35
@@ -729,7 +744,7 @@
     },
     {
       "id": "aiGuardrailedHighSH",
-      "value": 0.25,
+      "value": 0.2,
       "range": [
         0.2,
         0.5
@@ -981,7 +996,7 @@
     },
     {
       "id": "cohesionAiPenalty",
-      "value": 18,
+      "value": 15,
       "range": [
         10,
         30

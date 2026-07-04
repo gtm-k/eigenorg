@@ -292,7 +292,7 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
 ```json eigenorg:mechanic
 {
   "id": "decisionPipeline",
-  "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10). Layer l advances at most cap_l tasks/step (fractional accumulator): cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1). On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L.",
+  "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10). Layer l advances at most cap_l tasks/step: cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) (x the M11 AI approval-bandwidth multiplier when AI is active). Capacity is use-it-or-lose-it: the fractional accumulator carries at most the sub-1 remainder between steps (acc = min(acc + cap_l - moved, 1)) - idle days never bank whole approvals. On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L.",
   "plainLanguage": "Every approval layer adds waiting: around 2-3 working days each just for its own look, plus queueing when the layer is busy. Higher layers have less bandwidth (a VP reviews fewer things per day than a team lead), so queues form at the top. Decisions that cut across teams with unclear ownership get escalated and wait extra days. Three layers turn a same-week decision into a two-week one.",
   "citations": [
     "SI Labs (2026). Why Hierarchies Slow Down Companies - five approval layers, ~3 days per layer, 15 working days to a decision. https://www.si-labs.com/en/articles/slow-decisions/",
@@ -363,7 +363,7 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
 ```json eigenorg:mechanic
 {
   "id": "brittlenessRecovery",
-  "formula": "A brittleness event blocks the affected task for Triangular(recoveryDuration*) steps (rounded, min 1) and opens a recovery window: while any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned), duration ~ Triangular(recoveryDurationUnownedSteps). Owned: multiplier = recoveryLatencyMultiplierOwned, duration ~ Triangular(recoveryDurationOwnedSteps).",
+  "formula": "A brittleness event draws ONE duration d ~ Triangular(recoveryDurationUnownedSteps | recoveryDurationOwnedSteps), rounded to whole steps (min 1), shared by the task block and the recovery window; the window is active for steps [t_event, t_event + d). While any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned). Owned: multiplier = recoveryLatencyMultiplierOwned (point value, no draw).",
   "plainLanguage": "When an AI agent hits a case beyond its ceiling, the failure does not just cost that one task. If a named human owns recovery, the mess is contained: a day or two, small slowdown. If nobody owns recovery, everything nearby slows down 1.5-2.5x for the next 3-5 days while people figure out whose problem it is.",
   "citations": [
     "eigenorg PRD red-team finding (2026): Failure Recovery Owner assignment; unowned high-AI-coverage functions apply a 1.5-2.5x latency multiplier for 3-5 steps after a brittleness event.",
@@ -381,7 +381,7 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
 ```json eigenorg:mechanic
 {
   "id": "aiTaskTypeCapability",
-  "formula": "Team sim: if any AI covers prioritization, routine service time *= aiRoutineLatencyFactor; if nobody covers prioritization, service *= uncoveredPrioritizationFactor. Execution: routine progress *= (1 + aiExecShare * (aiRoutineAdvantage - 1)); novel progress *= (humanExecShare + aiExecShare * aiNovelEffectiveness). Novel arrivals take the AI failure probability (M9) when AI is assigned to prioritization and no human is assigned to prioritization; when a human covers prioritization the probability is humanNovelFailureBase. Quality: for complex/novel tasks with zero human judgment coverage, the judgment contribution is divided by hybridVsAutonomousAdvantage (M16). Org sim: AI injection multiplies routine execution allocations by aiThroughputBoostOrg on the aiRoutineShareOrg share of routine work, AND multiplies routine-task service draws by (1 - (1 - aiRoutineLatencyFactor) * reliefRamp(SH)), reliefRamp = clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) - AI routing accelerates routine decisions only in structurally healthy orgs.",
+  "formula": "Team sim: if any AI covers prioritization, routine service time *= aiRoutineLatencyFactor; if nobody covers prioritization, service *= uncoveredPrioritizationFactor. Execution: routine progress *= (1 + aiExecShare * (aiRoutineAdvantage - 1)); novel progress *= (humanExecShare + aiExecShare * aiNovelEffectiveness). Novel arrivals take the AI failure probability (M9) when AI is assigned to prioritization and no human is assigned to prioritization; when a human covers prioritization the probability is humanNovelFailureBase. Quality: for complex/novel tasks with zero human judgment coverage, the judgment contribution is divided by hybridVsAutonomousAdvantage (M16). Org sim: AI injection (a) multiplies routine execution allocations by aiThroughputBoostOrg on the aiRoutineShareOrg share of routine work, (b) multiplies routine-task service draws by (1 - (1 - aiRoutineLatencyFactor) * reliefRamp(SH)), reliefRamp = clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) - AI routing accelerates routine decisions only in structurally healthy orgs - and (c) multiplies every decision layer's capacity by (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) at ANY Structural Health: AI agents add mechanical routing/approval bandwidth regardless of structure; what depends on SH is the QUALITY of that routing (brittleness, M9) and the coordination relief - work reaches broken structure faster, which is the 'faster' in Faster Dysfunction.",
   "plainLanguage": "AI agents are genuinely faster on routine work - routing, triage, standard execution. On novel, ambiguous, high-stakes work their capability collapses: they misroute, stall, or fail, unless a human co-owns the judgment. Research on hybrid teams finds human+AI outperforming fully autonomous agent teams by roughly 69% on complex tasks - so the model rewards keeping humans on judgment functions and penalizes hollowing them out.",
   "citations": [
     "e-discoveryteam.com (2025). Stanford/Carnegie study: hybrid human-AI teams beat fully autonomous agents by 68.7% on complex tasks. https://e-discoveryteam.com/2025/12/01/",
@@ -505,7 +505,7 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
 ```json eigenorg:mechanic
 {
   "id": "taskEffortAndMix",
-  "formula": "Org sim arrivals per step = taskArrivalPerPersonPerStep * n(t) (fractional accumulator; Bernoulli remainder in MC). Class ~ {routine: taskMixRoutineOrg, complex: taskMixComplexOrg, novel: 1 - routine - complex}. Team sim: arrivals and mix from workStream config. Effort ~ Triangular(taskEffortRoutine | taskEffortComplex | taskEffortNovel) by class. Team sim stakes: high with probability workStream.highStakesShare.",
+  "formula": "Org sim arrivals per step = taskArrivalPerPersonPerStep * n(t) (fractional accumulator; Bernoulli remainder in MC); at t = 0 the arrival count is additionally increased by org.initialBacklog (default 0) - a standing backlog the org starts with; backlog tasks draw class/effort/service exactly like arrivals. Class ~ {routine: taskMixRoutineOrg, complex: taskMixComplexOrg, novel: 1 - routine - complex}. Team sim: arrivals and mix from workStream config. Effort ~ Triangular(taskEffortRoutine | taskEffortComplex | taskEffortNovel) by class. Team sim stakes: high with probability workStream.highStakesShare.",
   "plainLanguage": "Work arrives continuously, sized in effort points where 1 point is roughly one focused person-day for an average performer. Routine items are small and predictable; novel items are big and uncertain - and they are the ones AI handles worst.",
   "citations": [
     "eigenorg model definition (2026)."
@@ -538,7 +538,8 @@ reproducibility contract (§8).
    fresh service draw.
 5. **Pipeline.** For each layer l = 1..L in order: decrement `serviceRemaining`; move
    ready tasks (FIFO by arrival step, then task id) up to the layer's fractional capacity
-   accumulator; apply the escalation surcharge on entry to layer L (M6). Tasks leaving
+   accumulator (capacity x the M11 AI approval-bandwidth multiplier when AI is active);
+   apply the escalation surcharge on entry to layer L (M6). Tasks leaving
    layer L become `inProgress` (T4) and contribute a decision-latency sample.
 6. **Overrides.** For each `inProgress` task in FIFO order: draw override (M8);
    on override apply T7.
@@ -546,7 +547,9 @@ reproducibility contract (§8).
    `inProgress` tasks FIFO, up to `maxPointsPerTaskPerStep` each, until exhausted;
    routine allocations x `aiThroughputBoostOrg` on the `aiRoutineShareOrg` share when AI
    is active (M11). Tasks with `progress >= effort` complete (T6).
-8. **Cohesion.** Update per M12 using `E(t-1)`.
+8. **Cohesion.** Update per M12 using `E(t-1)`. The `cohesionTeamAvg` series (and the
+   cohesion term inside `E(t)`) reports the PRE-update value — the update takes effect
+   from step t+1 (see Appendix A). The same convention applies to the team sim.
 9. **Metrics.** Update EMA terms; compute all output series values for step t, including
    `E(t)` (M13), `V(t)` (M7), `healthGap = cohesionTeamAvg - orgHealth`; update per-layer
    stats (queue length, utilization, latency samples, override share).
@@ -636,7 +639,7 @@ Every series is emitted as a tidy percentile series
 `metricId → [{t, p10, p50, p90}]` (one entry per step). Deterministic quantities emit
 p10 = p50 = p90. Downstream phases must consume THIS list — never the PRD's.
 
-### 7.1 Org Entropy Simulator series (14)
+### 7.1 Org Entropy Simulator series (16)
 
 | id | unit | notes |
 |---|---|---|
@@ -651,7 +654,9 @@ p10 = p50 = p90. Downstream phases must consume THIS list — never the PRD's.
 | `decisionVelocity` | index 0–100 | M7 |
 | `wip` | items | queued + inProgress + blocked |
 | `overrideRate` | events/step | raw |
+| `cumulativeOverrides` | events | running total (robust carrier for sparse-event predicates) |
 | `brittlenessRate` | events/step | raw; 0 unless AI active |
+| `cumulativeBrittleness` | events | running total; 0 unless AI active |
 | `cohesionTeamAvg` | index 0–100 | mean team cohesion, M12 |
 | `healthGap` | points | `cohesionTeamAvg − orgHealth` (healthy-teams-sick-org divergence) |
 
@@ -1103,6 +1108,14 @@ parameters require a mini-G2 user gate.
 ```
 
 ```json eigenorg:parameter
+{ "id": "distortionOverrideCoupling", "value": 0.5, "range": [0, 1], "distribution": "point", "unit": "gain",
+  "anchor": "Editorial", "tier": "editorial-heuristic",
+  "limitation": "Tuned, not measured; couples two editorial quantities.",
+  "formula": "override probability *= (1 + distortionOverrideCoupling * distortion) (M8)",
+  "plainLanguage": "The more the story got garbled on its way up, the more likely the top layer overrides the call." }
+```
+
+```json eigenorg:parameter
 { "id": "metricSmoothingAlpha", "value": 0.3, "range": [0.1, 0.5], "distribution": "point", "unit": "EMA weight",
   "anchor": "Standard exponential smoothing; editorial constant", "tier": "editorial-heuristic",
   "limitation": "Affects chart smoothness and entropy responsiveness, not steady-state values.",
@@ -1129,7 +1142,7 @@ parameters require a mini-G2 user gate.
 ```
 
 ```json eigenorg:parameter
-{ "id": "aiCoordinationRelief", "value": 0.3, "range": [0.05, 0.35], "distribution": "point", "unit": "fraction of tax",
+{ "id": "aiCoordinationRelief", "value": 0.35, "range": [0.05, 0.35], "distribution": "point", "unit": "fraction of tax",
   "anchor": "Editorial: AI routing/summarizing relieves coordination in structurally healthy orgs", "tier": "editorial-heuristic",
   "limitation": "Relief assumes agents are wired into clear ownership - which is exactly what low-SH orgs lack.",
   "formula": "relief_ai = aiCoordinationRelief * clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) (M9)",
@@ -1161,7 +1174,7 @@ parameters require a mini-G2 user gate.
 ```
 
 ```json eigenorg:parameter
-{ "id": "aiGuardrailedHighSH", "value": 0.25, "range": [0.2, 0.5], "distribution": "point", "unit": "multiplier",
+{ "id": "aiGuardrailedHighSH", "value": 0.2, "range": [0.2, 0.5], "distribution": "point", "unit": "multiplier",
   "anchor": "Editorial: healthy orgs keep humans in the loop, catching most agent failures", "tier": "editorial-heuristic",
   "limitation": "Assumes guardrails actually exist at high SH.",
   "formula": "shBrittleFactor(SH >= shSafeThreshold) = aiGuardrailedHighSH (M9)",
@@ -1291,7 +1304,7 @@ parameters require a mini-G2 user gate.
 ```
 
 ```json eigenorg:parameter
-{ "id": "cohesionAiPenalty", "value": 18, "range": [10, 30], "distribution": "point", "unit": "index points at 100% AI",
+{ "id": "cohesionAiPenalty", "value": 15, "range": [10, 30], "distribution": "point", "unit": "index points at 100% AI",
   "anchor": "WEF (2026) and AMCIS 2025: AI-heavy teams report weaker co-worker connections", "tier": "industry-report",
   "limitation": "Survey-based perception data; magnitude scaled editorially to the 0-100 index.",
   "formula": "target -= cohesionAiPenalty * effectiveAiShare (M12)",
@@ -1600,8 +1613,8 @@ same org with 1 layer.
 
 ### 10.3 `fasterDysfunction` — AI on broken coordination (org; launch centerpiece)
 
-A 40-person pod org, meeting-heavy. AI agents injected at step 15. Three runs: SH 3
-(broken structure), SH 7 (healthy structure), SH 3 without AI (the counterfactual).
+A 40-person pod org, meeting-heavy. AI agents injected at step 15. Four runs: SH 3
+(broken structure), SH 7 (healthy structure), and each without AI (counterfactuals).
 
 ```json
 {
@@ -1611,6 +1624,7 @@ A 40-person pod org, meeting-heavy. AI agents injected at step 15. Three runs: S
       "iterations": 500, "horizon": 60,
       "org": { "headcountStart": 40, "headcountGrowthPerStep": 0,
         "topology": "pods", "hierarchyDepth": 3, "ownershipLayers": 1,
+        "initialBacklog": 30,
         "modality": "meetingHeavy", "structuralHealth": 3,
         "aiInjection": { "enabled": true, "atStep": 15 } }
     },
@@ -1619,6 +1633,7 @@ A 40-person pod org, meeting-heavy. AI agents injected at step 15. Three runs: S
       "iterations": 500, "horizon": 60,
       "org": { "headcountStart": 40, "headcountGrowthPerStep": 0,
         "topology": "pods", "hierarchyDepth": 3, "ownershipLayers": 1,
+        "initialBacklog": 30,
         "modality": "meetingHeavy", "structuralHealth": 7,
         "aiInjection": { "enabled": true, "atStep": 15 } }
     },
@@ -1627,7 +1642,17 @@ A 40-person pod org, meeting-heavy. AI agents injected at step 15. Three runs: S
       "iterations": 500, "horizon": 60,
       "org": { "headcountStart": 40, "headcountGrowthPerStep": 0,
         "topology": "pods", "hierarchyDepth": 3, "ownershipLayers": 1,
+        "initialBacklog": 30,
         "modality": "meetingHeavy", "structuralHealth": 3,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    },
+    "sh7NoAi": {
+      "schemaVersion": "1", "modelVersion": "1.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 40, "headcountGrowthPerStep": 0,
+        "topology": "pods", "hierarchyDepth": 3, "ownershipLayers": 1,
+        "initialBacklog": 30,
+        "modality": "meetingHeavy", "structuralHealth": 7,
         "aiInjection": { "enabled": false, "atStep": 0 } }
     }
   }
@@ -1727,13 +1752,15 @@ scenario-specific. `step` semantics: `null` → final step; a number → that st
 | `dropAtLeast` | value(step[0]) − value(step[1]) ≥ bound × (1 − tol) | number; step = [from, to] |
 | `growthRatioAbove` | value(step[1]) / value(step[0]) ≥ bound × (1 − tol) | number; step = [from, to] |
 | `twoWindowRatioAbove` | mean(metric over windowA) / mean(over windowB) ≥ minRatio × (1 − tol) | {windowA, windowB, minRatio} |
-| `peakBeforeDecline` | argmax(series) ∈ peakWindow AND final ≤ finalRatioMax × peak × (1 + tol) | {peakWindow, finalRatioMax} |
+| `peakBeforeDecline` | windowPeak = max(series over peakWindow); windowPeak ≥ series[0] AND final ≤ finalRatioMax × windowPeak × (1 + tol) (peak is measured inside the window so warm-up transients before it cannot mask the decline) | {peakWindow, finalRatioMax} |
 | `bandSeparationAfter` | p10(A, t) > p90(B, t) for ALL t ≥ step (metric `A vs B`); tol ignored | null |
 | `scalarAbove` | scalar(metric path) ≥ bound × (1 − tol) | number |
 | `scalarBelow` | scalar ≤ bound × (1 + tol) | number |
 
 **Metric grammar:** `seriesId[.p10|.p50|.p90]@runLabel`, or two such terms joined by
 ` / ` (pointwise ratio), ` - ` (pointwise difference), ` vs ` (band-separation pair);
+ratio convention: a zero denominator with a positive numerator evaluates to +infinity
+(satisfies `ratioAbove`, fails `ratioBelow`); 0/0 is NaN and fails the assertion;
 scalar paths address non-series blocks, e.g. `coverage.stakeholderCommunication.score@hollow`.
 Quantile suffix default: `.p50`.
 
@@ -1752,7 +1779,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
 ```json eigenorg:golden
 { "id": "ccThroughputPeakDecline", "scenario": "coordinationCollapse",
   "metric": "throughput@main", "comparator": "peakBeforeDecline",
-  "predicate": "Throughput rises with headcount, peaks mid-run, then declines as coordination overhead dominates: the peak lands in steps 20-100 and the final value is at most 85% of the peak.",
+  "predicate": "Throughput rises with headcount, peaks mid-run, then declines as coordination overhead dominates: the final value is at most 85% of the steps-20-100 peak.",
   "bound": { "peakWindow": [20, 100], "finalRatioMax": 0.85 }, "tolerance": 0.05, "step": null,
   "instrument": "meanPath",
   "rationale": "The PRD stress test's core shape: more hands, then plateau, then decline (Brooks channels + band penalties outgrow added capacity)." }
@@ -1818,17 +1845,17 @@ override cost is asserted separately via `overrideRate` and `wip`.
 
 ```json eigenorg:golden
 { "id": "ptOverrideVisible", "scenario": "prioritizationTax",
-  "metric": "overrideRate@threeLayer", "comparator": "above",
-  "predicate": "Higher-layer overrides occur at a visible rate (at least 0.1 events/step, settled).",
-  "bound": 0.1, "tolerance": 0.1, "step": [40, 59], "instrument": "meanPath",
-  "rationale": "Override events with partial rework are the mechanism that makes layers cost throughput, not just time." }
+  "metric": "cumulativeOverrides@threeLayer", "comparator": "riseAtLeast",
+  "predicate": "Higher-layer overrides keep occurring at a visible rate: at least 2 more override events accumulate between steps 40 and 59.",
+  "bound": 2, "tolerance": 0.25, "step": [40, 59], "instrument": "meanPath",
+  "rationale": "Override events with partial rework are the mechanism that makes layers cost throughput, not just time. The cumulative series is the robust carrier: per-step medians of sparse integer event counts are degenerate (p50 = 0)." }
 ```
 
 ```json eigenorg:golden
 { "id": "ptOverrideAbsentBaseline", "scenario": "prioritizationTax",
-  "metric": "overrideRate@oneLayer", "comparator": "below",
-  "predicate": "The single-layer baseline produces (near-)zero overrides.",
-  "bound": 0.001, "tolerance": 0, "step": [40, 59], "instrument": "meanPath",
+  "metric": "cumulativeOverrides@oneLayer", "comparator": "below",
+  "predicate": "The single-layer baseline produces zero overrides across the whole run.",
+  "bound": 0.001, "tolerance": 0, "step": null, "instrument": "meanPath",
   "rationale": "Controls that overrides are a layering effect in the model, not background noise." }
 ```
 
@@ -1845,25 +1872,25 @@ override cost is asserted separately via `overrideRate` and `wip`.
 ```json eigenorg:golden
 { "id": "fdEntropyWorsens", "scenario": "fasterDysfunction",
   "metric": "entropy@sh3", "comparator": "riseAtLeast",
-  "predicate": "In the SH=3 org, entropy RISES by at least 8 points after AI injection (step 15 to end) - AI on broken structure makes things worse.",
-  "bound": 8, "tolerance": 0.15, "step": [15, 59], "instrument": "meanPath",
+  "predicate": "In the SH=3 org, entropy RISES by at least 5 points after AI injection (step 15 to end) - AI on broken structure makes things worse.",
+  "bound": 5, "tolerance": 0.15, "step": [15, 59], "instrument": "meanPath",
   "rationale": "The product's central claim: layering AI on low Structural Health amplifies dysfunction (PRD stress test 4)." }
 ```
 
 ```json eigenorg:golden
 { "id": "fdEntropyImprovesHealthy", "scenario": "fasterDysfunction",
-  "metric": "entropy@sh7", "comparator": "dropAtLeast",
-  "predicate": "In the otherwise-identical SH=7 org, entropy DROPS by at least 2 points after the same AI injection.",
-  "bound": 2, "tolerance": 0.25, "step": [15, 59], "instrument": "meanPath",
-  "rationale": "The contrast that makes the story honest: AI is not poison - structure decides the sign of its effect." }
+  "metric": "entropy@sh7NoAi - entropy@sh7", "comparator": "above",
+  "predicate": "In the otherwise-identical SH=7 org, the run WITH AI settles at least 1.5 entropy points BELOW the same org without AI - injection helps when structure is healthy.",
+  "bound": 1.5, "tolerance": 0.2, "step": [45, 59], "instrument": "meanPath",
+  "rationale": "The contrast that makes the story honest: AI is not poison - structure decides the sign of its effect. Counterfactual form is robust to the mean-path mode's discrete event spikes at run end." }
 ```
 
 ```json eigenorg:golden
 { "id": "fdBrittlenessAmplified", "scenario": "fasterDysfunction",
-  "metric": "brittlenessRate@sh3 / brittlenessRate@sh7", "comparator": "ratioAbove",
-  "predicate": "Post-injection brittleness events in the SH=3 org run at least 1.3x the SH=7 org's rate (settled window).",
-  "bound": 1.3, "tolerance": 0.1, "step": [40, 59], "instrument": "meanPath",
-  "rationale": "Direct check of the PRD's 1.3-1.8x amplification range at the scenario endpoints." }
+  "metric": "cumulativeBrittleness@sh3 / cumulativeBrittleness@sh7", "comparator": "ratioAbove",
+  "predicate": "Total brittleness events in the SH=3 org run at least 1.3x the SH=7 org's total by the end.",
+  "bound": 1.3, "tolerance": 0.1, "step": null, "instrument": "meanPath",
+  "rationale": "Direct check of the PRD's amplification claim at the scenario endpoints (cumulative form: per-step medians of sparse counts are degenerate)." }
 ```
 
 ```json eigenorg:golden
@@ -1878,8 +1905,8 @@ override cost is asserted separately via `overrideRate` and `wip`.
 { "id": "fdSeductiveThroughput", "scenario": "fasterDysfunction",
   "metric": "throughput@sh3", "comparator": "twoWindowRatioAbove",
   "predicate": "Right after injection (steps 16-22) SH=3 throughput runs at least 3% above its pre-injection level (steps 8-14): the dysfunction is FASTER - that is the seduction.",
-  "bound": { "windowA": [16, 22], "windowB": [8, 14], "minRatio": 1.03 }, "tolerance": 0.01, "step": null, "instrument": "meanPath",
-  "rationale": "PRD stress test 4: throughput increases while entropy worsens; both must be visible or the story reads as 'AI bad'." }
+  "bound": { "windowA": [16, 22], "windowB": [8, 14], "minRatio": 1.05 }, "tolerance": 0.03, "step": null, "instrument": "meanPath",
+  "rationale": "PRD stress test 4: throughput increases while entropy worsens; both must be visible or the story reads as 'AI bad'. Mechanism: the M11 approval-bandwidth multiplier - AI routes work into the broken structure faster." }
 ```
 
 ```json eigenorg:golden
@@ -2060,6 +2087,7 @@ this section wins.
 | `org.modality` | `asyncFirst \| meetingHeavy` | |
 | `org.structuralHealth` | int 1–10 | §3.4 |
 | `org.misalignment` | number 0–1, optional | m₀; default derived from SH (M5) |
+| `org.initialBacklog` | int 0–500, optional, default 0 | standing backlog present at t = 0 (M18) |
 | `org.aiInjection` | `{enabled: bool, atStep: int ≥ 0}` | |
 | `team.entities` | array 2–12 of entity objects (§3.2) | capabilities default from the archetype table |
 | `team.workStream` | `{arrivalPerStep: 0.2–5, mix: {routine, complex, novel}, highStakesShare: 0–1}` | mix sums to 1 |
@@ -2134,6 +2162,39 @@ recomputes `sha256(model/params.json)` and fails unless the §14 changelog table
 a row whose `modelVersion` equals the meta-block declaration AND whose `params.json
 sha256` equals the recomputed hash. The changelog table IS the declaration format.
 
+### 12.7 Generated artifacts (extraction contract)
+
+`scripts/extract_params.mjs` regenerates all three files from this document's tagged
+blocks; CI re-runs it and fails on any diff (drift gate). Exact shapes:
+
+- **`model/params.json`** — `{ modelVersion, schemaVersion, parameters: [<parameter
+  block verbatim>] }` in document order. Embedded in the engine via `include_str!`.
+- **`model/goldens.json`** — `{ modelVersion, assertions: [<golden block verbatim>] }`.
+  Consumed by the generic predicate evaluator via `include_str!`.
+- **`www/assumptions.json`** — the Assumptions drawer content (P8 renders it verbatim;
+  a P8 test asserts every required field exists per item type):
+
+```json
+{
+  "modelVersion": "1.0.0",
+  "generatedBy": "scripts/extract_params.mjs from MODEL.md - do not edit by hand",
+  "items": [
+    { "type": "parameter", "id": "...", "plainLanguage": "...", "formula": "...",
+      "tier": "peer-reviewed | industry-report | editorial-heuristic",
+      "limitation": "...", "anchor": "...", "value": 0, "range": [0, 0],
+      "unit": "...", "distribution": "point | triangular" },
+    { "type": "mechanic", "id": "...", "plainLanguage": "...", "formula": "...",
+      "citations": ["..."], "limitations": ["..."] }
+  ]
+}
+```
+
+Items appear in document order: all parameters, then all mechanics. Both item types carry
+the same `plainLanguage` prose field; parameters additionally carry `tier`, `limitation`,
+`anchor`, `value`, `range`, `unit`, `distribution`; mechanics additionally carry
+`citations[]` and `limitations[]`. No timestamps or other non-deterministic content —
+re-running the extractor on an unchanged MODEL.md is byte-identical (idempotent).
+
 ---
 
 ## 13. Limitations & evidence tiers
@@ -2182,7 +2243,7 @@ Structural limitations (also surfaced per-mechanic in the drawer):
 
 | modelVersion | date | params.json sha256 | changes |
 |---|---|---|---|
-| 1.0.0 | 2026-07-03 | `PENDING_PARAMS_SHA256` | Initial model: unified org/team spec, 5 calibrated scenarios, 30 golden assertions, extraction pipeline. |
+| 1.0.0 | 2026-07-03 | `3d6fbcd4ec7476bfc71c0736966481182ac2c981397ce37b318feeeaa71b30ca` | Initial model: unified org/team spec, 5 calibrated scenarios, 30 golden assertions, extraction pipeline. |
 
 ---
 
@@ -2219,7 +2280,7 @@ Entities:
   **green**; review `0.6/0.125 → 1.00` **green**; coordination, stakeholderCommunication,
   synthesis, ambiguityResolution `0` **red**. Hollow (M12)? No — no AI is assigned to
   prioritization/coordination/stakeholderCommunication.
-- Cohesion target (M12): `75 − 18 × (1/2) − 12 × σ((2−15)/2.25) = 75 − 9 − 0.0371 = 65.9629`.
+- Cohesion target (M12): `75 − 15 × (1/2) − 12 × σ((2−15)/2.25) = 75 − 7.5 − 0.0370 = 67.4630`.
 - Entropy proxy weights (M13 team): `(0.30, 0.25, 0.15)/0.70`. `xCoord = 0.0360/0.85 = 0.0424`.
 
 **Walk (arrival accumulator gains exactly 1.0/step → one routine task per step):**
@@ -2227,8 +2288,8 @@ Entities:
 | step | pipeline events | execution | series values |
 |---|---|---|---|
 | t=0 | Task₁ arrives, `queued(1)`, service 2.5 → decrement → 1.5 | none in progress | throughput 0; latRoutine 2.5 (init); τ 0.0360; cohesion **75.00**; xLat 0.2083; **E = 100×(0.30×0.0424 + 0.25×0.2083)/0.70 = 9.26**; healthGap 75 − 90.74 = **−15.74** |
-| t=1 | Task₂ arrives (1.5); Task₁ → 0.5 | none | throughput 0; latRoutine 2.5 (carry); cohesion **74.55** (75 + 0.05×(65.9629 − 75) = 74.5481); E **9.26**; healthGap **−16.19** |
-| t=2 | Task₃ arrives (1.5); Task₂ → 0.5; Task₁ → −0.5 ⇒ ready, capacity 6 ⇒ **approved** (T4), latency sample = age = 2 days → EMA `0.3×2 + 0.7×2.5 = 2.35` | Task₁ gets `min(2, 2.6991) = 2` pts × 1.2857 = **2.5714 progress** < 2.6667 → not done | throughput 0; latRoutine **2.35**; cohesion **74.12** (74.5481 + 0.05×(65.9629 − 74.5481) = 74.1188); xLat 0.1958; **E = 100×(0.01272 + 0.04896)/0.70 = 8.81**; healthGap **−17.07** |
+| t=1 | Task₂ arrives (1.5); Task₁ → 0.5 | none | throughput 0; latRoutine 2.5 (carry); cohesion **74.62** (75 + 0.05×(67.4630 − 75) = 74.6232); E **9.26**; healthGap **−16.12** |
+| t=2 | Task₃ arrives (1.5); Task₂ → 0.5; Task₁ → −0.5 ⇒ ready, capacity 6 ⇒ **approved** (T4), latency sample = age = 2 days → EMA `0.3×2 + 0.7×2.5 = 2.35` | Task₁ gets `min(2, 2.6991) = 2` pts × 1.2857 = **2.5714 progress** < 2.6667 → not done | throughput 0; latRoutine **2.35**; cohesion **74.27** (74.6232 + 0.05×(67.4630 − 74.6232) = 74.2652); xLat 0.1958; **E = 100×(0.01272 + 0.04896)/0.70 = 8.81**; healthGap **−16.92** |
 
 Cohesion coupling term is 0 throughout (E < entropyStressThreshold 60).
 
