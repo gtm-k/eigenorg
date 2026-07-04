@@ -148,7 +148,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, '127.0.0.1', () => {
   console.log(`eigenorg dev server (Pages-subpath emulation, case-strict)`);
   console.log(`  serving ${ROOT}`);
   console.log(`  open    http://localhost:${PORT}${SUBPATH}/`);

@@ -107,7 +107,7 @@ jobs:
       - name: node --test (skips cleanly while no JS tests exist)
         run: |
           set -o pipefail
-          if find . -path ./node_modules -prune -o -type f \( -name "*.test.js" -o -name "*.test.mjs" \) -print | grep -q .; then
+          if find . -path ./node_modules -prune -o -type f \( -name "*.test.js" -o -name "*.test.mjs" \) -print -quit | grep -q .; then
             npm test
           else
             echo "no JS test files yet — skipping"
