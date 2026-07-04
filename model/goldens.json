@@ -1,0 +1,429 @@
+{
+  "modelVersion": "1.0.0",
+  "assertions": [
+    {
+      "id": "ccThroughputPeakDecline",
+      "scenario": "coordinationCollapse",
+      "metric": "throughput@main",
+      "comparator": "peakBeforeDecline",
+      "predicate": "Throughput rises with headcount, peaks mid-run, then declines as coordination overhead dominates: the peak lands in steps 20-100 and the final value is at most 85% of the peak.",
+      "bound": {
+        "peakWindow": [
+          20,
+          100
+        ],
+        "finalRatioMax": 0.85
+      },
+      "tolerance": 0.05,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "The PRD stress test's core shape: more hands, then plateau, then decline (Brooks channels + band penalties outgrow added capacity)."
+    },
+    {
+      "id": "ccCoordinationTaxFinal",
+      "scenario": "coordinationCollapse",
+      "metric": "coordinationTax@main",
+      "comparator": "above",
+      "predicate": "By the end of the run the org spends at least 40% of its capacity on coordination.",
+      "bound": 0.4,
+      "tolerance": 0.05,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "At 25 people flat + meeting-heavy, channel load per person (12 channels each) must visibly dominate capacity."
+    },
+    {
+      "id": "ccCohesionErosion",
+      "scenario": "coordinationCollapse",
+      "metric": "cohesionTeamAvg@main",
+      "comparator": "below",
+      "predicate": "Cohesion degrades below 65 after the ~15-person band is crossed.",
+      "bound": 65,
+      "tolerance": 0.05,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "The PRD stress test: cohesion starts degrading as the 15-member inner-circle threshold is crossed."
+    },
+    {
+      "id": "ccEntropyRise",
+      "scenario": "coordinationCollapse",
+      "metric": "entropy@main",
+      "comparator": "riseAtLeast",
+      "predicate": "Entropy rises by at least 18 points over the run.",
+      "bound": 18,
+      "tolerance": 0.15,
+      "step": [
+        0,
+        119
+      ],
+      "instrument": "meanPath",
+      "rationale": "Scaling 12 to 25 with zero structural change must register as a large, visible entropy shift."
+    },
+    {
+      "id": "ccEntropyFloorMc",
+      "scenario": "coordinationCollapse",
+      "metric": "entropy.p10@main",
+      "comparator": "above",
+      "predicate": "Even the luckiest 10% of Monte Carlo runs end above 40 entropy - the degradation is structural, not noise.",
+      "bound": 40,
+      "tolerance": 0.05,
+      "step": null,
+      "instrument": "monteCarlo",
+      "rationale": "Band-level check that the collapse is robust across seeds, not a mean-path artifact."
+    },
+    {
+      "id": "ptLatencyBand",
+      "scenario": "prioritizationTax",
+      "metric": "decisionLatency@threeLayer",
+      "comparator": "within",
+      "predicate": "A routine decision under a 3-layer stack takes 6-9 working days (settled mean over the last 10 steps).",
+      "bound": [
+        6,
+        9
+      ],
+      "tolerance": 0.08,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "SI Labs pattern: 2-3 days per layer x 3 layers = 6-9 working days for a decision that should take hours."
+    },
+    {
+      "id": "ptLatencyRatio",
+      "scenario": "prioritizationTax",
+      "metric": "decisionLatency@threeLayer / decisionLatency@oneLayer",
+      "comparator": "ratioAbove",
+      "predicate": "Three layers make decisions at least 2.2x slower than one layer in the same org.",
+      "bound": 2.2,
+      "tolerance": 0.1,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "The tax is relative: same org, same work, only the ownership stack differs."
+    },
+    {
+      "id": "ptWipRatio",
+      "scenario": "prioritizationTax",
+      "metric": "wip@threeLayer / wip@oneLayer",
+      "comparator": "ratioAbove",
+      "predicate": "The 3-layer org carries at least 1.5x the work-in-progress of the 1-layer org - items stack up waiting for approval.",
+      "bound": 1.5,
+      "tolerance": 0.1,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "WIP accumulation is the visible symptom of approval queues (PRD stress test 3)."
+    },
+    {
+      "id": "ptOverrideVisible",
+      "scenario": "prioritizationTax",
+      "metric": "overrideRate@threeLayer",
+      "comparator": "above",
+      "predicate": "Higher-layer overrides occur at a visible rate (at least 0.1 events/step, settled).",
+      "bound": 0.1,
+      "tolerance": 0.1,
+      "step": [
+        40,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "Override events with partial rework are the mechanism that makes layers cost throughput, not just time."
+    },
+    {
+      "id": "ptOverrideAbsentBaseline",
+      "scenario": "prioritizationTax",
+      "metric": "overrideRate@oneLayer",
+      "comparator": "below",
+      "predicate": "The single-layer baseline produces (near-)zero overrides.",
+      "bound": 0.001,
+      "tolerance": 0,
+      "step": [
+        40,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "Controls that overrides are a layering effect in the model, not background noise."
+    },
+    {
+      "id": "ptLatencyTailMc",
+      "scenario": "prioritizationTax",
+      "metric": "decisionLatency.p90@threeLayer",
+      "comparator": "below",
+      "predicate": "Even the slowest 10% of runs keep settled routine latency under 16 working days - the model does not explode.",
+      "bound": 16,
+      "tolerance": 0.1,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "monteCarlo",
+      "rationale": "Tail sanity: queueing variance widens but does not diverge at 0.92 top-layer utilization."
+    },
+    {
+      "id": "fdEntropyWorsens",
+      "scenario": "fasterDysfunction",
+      "metric": "entropy@sh3",
+      "comparator": "riseAtLeast",
+      "predicate": "In the SH=3 org, entropy RISES by at least 8 points after AI injection (step 15 to end) - AI on broken structure makes things worse.",
+      "bound": 8,
+      "tolerance": 0.15,
+      "step": [
+        15,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "The product's central claim: layering AI on low Structural Health amplifies dysfunction (PRD stress test 4)."
+    },
+    {
+      "id": "fdEntropyImprovesHealthy",
+      "scenario": "fasterDysfunction",
+      "metric": "entropy@sh7",
+      "comparator": "dropAtLeast",
+      "predicate": "In the otherwise-identical SH=7 org, entropy DROPS by at least 2 points after the same AI injection.",
+      "bound": 2,
+      "tolerance": 0.25,
+      "step": [
+        15,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "The contrast that makes the story honest: AI is not poison - structure decides the sign of its effect."
+    },
+    {
+      "id": "fdBrittlenessAmplified",
+      "scenario": "fasterDysfunction",
+      "metric": "brittlenessRate@sh3 / brittlenessRate@sh7",
+      "comparator": "ratioAbove",
+      "predicate": "Post-injection brittleness events in the SH=3 org run at least 1.3x the SH=7 org's rate (settled window).",
+      "bound": 1.3,
+      "tolerance": 0.1,
+      "step": [
+        40,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "Direct check of the PRD's 1.3-1.8x amplification range at the scenario endpoints."
+    },
+    {
+      "id": "fdSeparability",
+      "scenario": "fasterDysfunction",
+      "metric": "entropy@sh3 vs entropy@sh7",
+      "comparator": "bandSeparationAfter",
+      "predicate": "From step 35 onward, the SH=3 entropy band (p10) sits strictly above the SH=7 band (p90) at the default seed - the before/after visual is separable, not two overlapping fuzzy bands.",
+      "bound": null,
+      "tolerance": 0,
+      "step": 35,
+      "instrument": "monteCarlo",
+      "rationale": "Pre-mortem A3: the launch-centerpiece chart must be visually unambiguous, golden-asserted rather than hoped for."
+    },
+    {
+      "id": "fdSeductiveThroughput",
+      "scenario": "fasterDysfunction",
+      "metric": "throughput@sh3",
+      "comparator": "twoWindowRatioAbove",
+      "predicate": "Right after injection (steps 16-22) SH=3 throughput runs at least 3% above its pre-injection level (steps 8-14): the dysfunction is FASTER - that is the seduction.",
+      "bound": {
+        "windowA": [
+          16,
+          22
+        ],
+        "windowB": [
+          8,
+          14
+        ],
+        "minRatio": 1.03
+      },
+      "tolerance": 0.01,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "PRD stress test 4: throughput increases while entropy worsens; both must be visible or the story reads as 'AI bad'."
+    },
+    {
+      "id": "fdWorseThanNothing",
+      "scenario": "fasterDysfunction",
+      "metric": "entropy@sh3 - entropy@sh3NoAi",
+      "comparator": "above",
+      "predicate": "By the settled window, the SH=3 org WITH AI carries at least 5 more entropy points than the same org that did nothing.",
+      "bound": 5,
+      "tolerance": 0.2,
+      "step": [
+        45,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "The punchline in counterfactual form: on broken structure, injecting AI is worse than not acting."
+    },
+    {
+      "id": "dcTeamsStayHealthy",
+      "scenario": "dunbarCliff",
+      "metric": "cohesionTeamAvg@main",
+      "comparator": "above",
+      "predicate": "Per-pod cohesion stays healthy (>= 65) all the way to 8 pods - each pod is fine.",
+      "bound": 65,
+      "tolerance": 0.05,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "The 'healthy teams' half of the healthy-teams-sick-org insight (PRD stress test 5)."
+    },
+    {
+      "id": "dcOrgEntropyRises",
+      "scenario": "dunbarCliff",
+      "metric": "entropy@main",
+      "comparator": "riseAtLeast",
+      "predicate": "Org-level entropy rises by at least 15 points as pods multiply.",
+      "bound": 15,
+      "tolerance": 0.2,
+      "step": [
+        0,
+        119
+      ],
+      "instrument": "meanPath",
+      "rationale": "The 'sick org' half: inter-pod channels and unscaled decision structure dominate."
+    },
+    {
+      "id": "dcHealthGapWidens",
+      "scenario": "dunbarCliff",
+      "metric": "healthGap@main",
+      "comparator": "riseAtLeast",
+      "predicate": "The gap between team cohesion and org health widens by at least 12 points - the two lines visibly diverge on one chart.",
+      "bound": 12,
+      "tolerance": 0.2,
+      "step": [
+        0,
+        119
+      ],
+      "instrument": "meanPath",
+      "rationale": "PRD red-team fix: the Multi-Level Health divergence is the shareable insight and must be structural."
+    },
+    {
+      "id": "dcInterTeamExplosion",
+      "scenario": "dunbarCliff",
+      "metric": "interTeamChannels@main",
+      "comparator": "growthRatioAbove",
+      "predicate": "Inter-pod channels grow at least 6x while pod count grows 2.67x - superlinear coordination surface.",
+      "bound": 6,
+      "tolerance": 0.1,
+      "step": [
+        0,
+        119
+      ],
+      "instrument": "meanPath",
+      "rationale": "Quadratic pair growth plus rising misalignment is the cliff mechanism; 6x >> 2.67x proves superlinearity."
+    },
+    {
+      "id": "dcHealthGapMc",
+      "scenario": "dunbarCliff",
+      "metric": "healthGap.p10@main",
+      "comparator": "above",
+      "predicate": "Even in the luckiest 10% of runs the final team-vs-org health gap exceeds 8 points.",
+      "bound": 8,
+      "tolerance": 0.2,
+      "step": null,
+      "instrument": "monteCarlo",
+      "rationale": "The divergence must survive Monte Carlo noise to be chart-worthy."
+    },
+    {
+      "id": "hmRoutineLatencyDrops",
+      "scenario": "hollowMiddle",
+      "metric": "decisionLatencyRoutine@hollow / decisionLatencyRoutine@humanPm",
+      "comparator": "ratioBelow",
+      "predicate": "The AI prioritization agent routes routine work at most 0.6x the human PM's latency - the acceleration is real.",
+      "bound": 0.6,
+      "tolerance": 0.1,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "PRD stress test 2: initial acceleration on routine prioritization is what makes the Hollow Middle tempting."
+    },
+    {
+      "id": "hmEarlyThroughputBoost",
+      "scenario": "hollowMiddle",
+      "metric": "cumThroughput@hollow / cumThroughput@humanPm",
+      "comparator": "ratioAbove",
+      "predicate": "By step 10 the hollow team has shipped at least 15% more items - work accelerates initially.",
+      "bound": 1.15,
+      "tolerance": 0.05,
+      "step": 10,
+      "instrument": "meanPath",
+      "rationale": "The seductive first fortnight, before the edge cases arrive."
+    },
+    {
+      "id": "hmBrittlenessSpike",
+      "scenario": "hollowMiddle",
+      "metric": "cumulativeBrittleness@hollow / cumulativeBrittleness@humanPm",
+      "comparator": "ratioAbove",
+      "predicate": "Total brittleness events in the hollow team run at least 2x the human-PM team by the end.",
+      "bound": 2,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (PRD stress test 2)."
+    },
+    {
+      "id": "hmStakeholderGap",
+      "scenario": "hollowMiddle",
+      "metric": "coverage.stakeholderCommunication.score@hollow",
+      "comparator": "scalarBelow",
+      "predicate": "Stakeholder Communication coverage is at most 0.5 (red) in the hollow team - the function the AI cannot actually do.",
+      "bound": 0.5,
+      "tolerance": 0,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "PRD: the function coverage map must show Stakeholder Communication under-covered when the human PM is removed."
+    },
+    {
+      "id": "hmExecutionCovered",
+      "scenario": "hollowMiddle",
+      "metric": "coverage.execution.score@hollow",
+      "comparator": "scalarAbove",
+      "predicate": "Execution coverage stays at least 0.8 (green) - the hollow team's problem is not capacity.",
+      "bound": 0.8,
+      "tolerance": 0,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "PRD: Execution and routine prioritization stay green while judgment functions go red - that contrast is the insight."
+    },
+    {
+      "id": "hmCohesionErosion",
+      "scenario": "hollowMiddle",
+      "metric": "cohesion@humanPm - cohesion@hollow",
+      "comparator": "above",
+      "predicate": "The hollow team ends at least 8 cohesion points below the human-PM team.",
+      "bound": 8,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "Front-line teams lose the human relationship layer of their PM (PRD stress test 2; WEF/AMCIS cohesion findings)."
+    },
+    {
+      "id": "hmTaxDrops",
+      "scenario": "hollowMiddle",
+      "metric": "coordinationTax@hollow / coordinationTax@humanPm",
+      "comparator": "ratioBelow",
+      "predicate": "The hollow team pays strictly less coordination tax (ratio <= 0.995) - AI routing has lower handoff friction.",
+      "bound": 0.995,
+      "tolerance": 0,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "PRD stress test 2: coordination tax drops for routine routing - part of why the trap works."
+    },
+    {
+      "id": "hmBrittlenessFloorMc",
+      "scenario": "hollowMiddle",
+      "metric": "cumulativeBrittleness.p50@hollow",
+      "comparator": "above",
+      "predicate": "The median Monte Carlo run sees at least 1.5 brittleness events over 60 steps - the failures are not a tail scare-story.",
+      "bound": 1.5,
+      "tolerance": 0,
+      "step": null,
+      "instrument": "monteCarlo",
+      "rationale": "Median-run realism for the brittleness narrative."
+    }
+  ]
+}
