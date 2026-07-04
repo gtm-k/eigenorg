@@ -191,6 +191,17 @@
   execution stays green, but stakeholder communication and ambiguity resolution go
   red — those functions didn't disappear with the role, they just stopped being done.</figcaption></div>
 
+  <h3>Plus one — the prioritization configurator</h3>
+  <p>The app lets you stack 1–5 approval layers and pick who sits in each seat: a human PM,
+  a human director, an <strong>AI prioritization agent</strong>, or a committee. A sixth
+  test scenario locks the behavior that keeps this honest. Take a 3-layer stack and swap
+  <em>only</em> the middle seat from a human PM to an AI agent: settled routine decision
+  latency drops to about <strong>0.87×</strong> (the agent clears routine approvals fast and
+  adds bandwidth) — but novel-task <strong>brittleness rises from zero to ~4 events</strong>
+  over the run, because a novel case now hits an AI router with no human judgment behind it.
+  Same speed-up, same trap as the Hollow Middle, now as a knob you can turn. Both numbers are
+  golden-tested at the default coefficients.</p>
+
   <h2>5 · How honest is this model?</h2>
   <div class="card warn">
     <p><strong>What the model is NOT:</strong> a prediction of your org. No simulation this
@@ -198,28 +209,33 @@
   </div>
   <div class="card good">
     <p><strong>What it IS:</strong> the well-supported <em>shapes</em> of organizational
-    physics, wired together and made explorable. Every number in the model carries one of
-    three evidence labels, visible in the app's Assumptions drawer:</p>
+    physics, wired together and made explorable. Each label says where the <em>number
+    itself</em> comes from — not just the direction of the effect:</p>
     <ul>
-      <li><strong>peer-reviewed</strong> — the mechanism direction comes from published
-      research (Brooks' channel math, 1975; Conway's mirroring, empirically confirmed by
-      Harvard/Microsoft studies). Honest disclosure: <em>zero coefficient values</em> in
-      v1 are peer-reviewed point estimates — the directions are, the exact numbers aren't.</li>
-      <li><strong>industry-report</strong> — numbers from named industry research
-      (2–3 days per approval layer; the ~5/15/50/150 cognitive bands — which are
-      themselves contested, and the model says so).</li>
-      <li><strong>editorial-heuristic</strong> — adjustable defaults we chose so the
-      mechanics behave plausibly, including the famous "hybrid teams beat autonomous
-      agents by 68.7%" figure (one lab study; treat with care) and the 1.3–1.8×
-      faster-dysfunction amplification (practitioner reports, not controlled studies).</li>
+      <li><strong>peer-reviewed</strong> — the number (not merely the direction) comes
+      from peer-reviewed work. Honest disclosure: <em>zero</em> coefficient values in v1
+      qualify. Several mechanism <em>directions</em> rest on peer-reviewed work (Brooks'
+      channel math, 1975; Conway's mirroring, empirically confirmed by Harvard/Microsoft
+      studies), but no coefficient value does — and the drawer says so per number.</li>
+      <li><strong>industry-report</strong> — the number comes from named industry research
+      or established practice (2–3 days per approval layer; the ~5/15/50/150 cognitive
+      bands — which are themselves contested, and the model says so).</li>
+      <li><strong>editorial-heuristic</strong> — an adjustable default we chose so the
+      mechanic behaves plausibly; the direction may still be well-supported even when the
+      magnitude is ours. This includes the "hybrid teams beat autonomous agents by 68.7%"
+      figure (one lab study; treat with care), the 1.3–1.8× faster-dysfunction
+      amplification (practitioner reports, not controlled studies), and cases like the
+      meeting-heavy multiplier where the research supports the direction but the exact
+      number is editorial.</li>
     </ul>
     <p>Every coefficient is adjustable via config. The full spec — every formula, every
-    limitation, every test — is one public file, <code>MODEL.md</code>, and everything you
-    just read was machine-generated and machine-verified from it.</p>
+    limitation, every test — is one public file, <code>MODEL.md</code>. The prose on this
+    page is written by hand, but the numbers and charts are machine-generated and
+    test-enforced from that file.</p>
   </div>
 
   <p class="muted" style="margin-top:40px">Generated from MODEL.md v1.0.0 · plots from the
-  pre-lock calibration harness (500 iterations, seed 42) · all 30 golden assertions pass on
+  pre-lock calibration harness (500 iterations, seed 42) · all 34 golden assertions pass on
   the published default coefficients.</p>
 </main>
 </body>

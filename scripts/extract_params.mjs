@@ -16,6 +16,15 @@ const modelPath = join(repoRoot, "MODEL.md");
 
 const TIERS = new Set(["peer-reviewed", "industry-report", "editorial-heuristic"]);
 const INSTRUMENTS = new Set(["meanPath", "monteCarlo"]);
+// The generic evaluator's comparator vocabulary (MODEL.md §11.1) - the only comparators
+// a golden may name. A typo'd comparator would otherwise reach the engine unvalidated.
+const COMPARATORS = new Set([
+  "above", "below", "within", "ratioAbove", "ratioBelow", "riseAtLeast", "dropAtLeast",
+  "growthRatioAbove", "twoWindowRatioAbove", "peakBeforeDecline", "bandSeparationAfter",
+  "scalarAbove", "scalarBelow",
+]);
+// Comparators whose `step` MUST be a [from, to] window pair (the evaluator reads both ends).
+const WINDOW_STEP_COMPARATORS = new Set(["riseAtLeast", "dropAtLeast", "growthRatioAbove"]);
 const PARAM_KEYS = ["id", "value", "range", "distribution", "unit", "anchor", "tier", "limitation", "formula", "plainLanguage"];
 const MECHANIC_KEYS = ["id", "formula", "plainLanguage", "citations", "limitations"];
 const GOLDEN_KEYS = ["id", "scenario", "metric", "predicate", "comparator", "bound", "tolerance", "step", "instrument", "rationale"];
@@ -24,6 +33,62 @@ const GOLDEN_KEYS = ["id", "scenario", "metric", "predicate", "comparator", "bou
 function fail(msg) {
   console.error(`extract_params: ${msg}`);
   process.exit(1);
+}
+
+/** @param {unknown} x @returns {x is number} */
+function isNum(x) {
+  return typeof x === "number" && Number.isFinite(x);
+}
+
+/** @param {unknown} x @returns {x is [number, number]} numeric [from, to] window */
+function isNumPair(x) {
+  return Array.isArray(x) && x.length === 2 && isNum(x[0]) && isNum(x[1]);
+}
+
+/**
+ * Validate a golden's `bound` shape against its comparator (MODEL.md §11.1).
+ * @param {unknown} id @param {string} cmp @param {unknown} bound
+ */
+function checkBound(id, cmp, bound) {
+  if (cmp === "within") {
+    if (!isNumPair(bound)) fail(`golden ${id}: 'within' bound must be [lo, hi] of numbers`);
+    else if (bound[0] > bound[1]) fail(`golden ${id}: 'within' bound lo ${bound[0]} > hi ${bound[1]}`);
+    return;
+  }
+  if (cmp === "bandSeparationAfter") {
+    if (bound !== null) fail(`golden ${id}: 'bandSeparationAfter' bound must be null`);
+    return;
+  }
+  if (cmp === "twoWindowRatioAbove" || cmp === "peakBeforeDecline") {
+    if (bound === null || typeof bound !== "object" || Array.isArray(bound)) {
+      fail(`golden ${id}: '${cmp}' bound must be an object`);
+    }
+    const b = /** @type {Record<string, unknown>} */ (bound);
+    if (cmp === "twoWindowRatioAbove") {
+      if (!isNumPair(b.windowA) || !isNumPair(b.windowB) || !isNum(b.minRatio)) {
+        fail(`golden ${id}: 'twoWindowRatioAbove' bound needs windowA:[a,b], windowB:[a,b], minRatio`);
+      }
+    } else if (!isNumPair(b.peakWindow) || !isNum(b.finalRatioMax)) {
+      fail(`golden ${id}: 'peakBeforeDecline' bound needs peakWindow:[a,b], finalRatioMax`);
+    }
+    return;
+  }
+  // above|below|ratioAbove|ratioBelow|riseAtLeast|dropAtLeast|growthRatioAbove|scalarAbove|scalarBelow
+  if (!isNum(bound)) fail(`golden ${id}: '${cmp}' bound must be a finite number`);
+}
+
+/**
+ * Validate a golden's `step` shape against its comparator (MODEL.md §11.1).
+ * @param {unknown} id @param {string} cmp @param {unknown} step
+ */
+function checkStep(id, cmp, step) {
+  if (WINDOW_STEP_COMPARATORS.has(cmp)) {
+    if (!isNumPair(step)) fail(`golden ${id}: '${cmp}' step must be a [from, to] window`);
+  } else if (cmp === "bandSeparationAfter") {
+    if (!isNum(step)) fail(`golden ${id}: 'bandSeparationAfter' step must be a step number`);
+  } else if (!(step === null || isNum(step) || isNumPair(step))) {
+    fail(`golden ${id}: step must be null (final), a number, or a [a, b] window`);
+  }
 }
 
 /**
@@ -71,10 +136,31 @@ for (const match of source.matchAll(fence)) {
     requireKeys(obj, PARAM_KEYS, "parameter");
     if (typeof obj.tier !== "string" || !TIERS.has(obj.tier)) fail(`parameter ${obj.id}: invalid tier ${JSON.stringify(obj.tier)}`);
     if (obj.distribution !== "point" && obj.distribution !== "triangular") fail(`parameter ${obj.id}: invalid distribution`);
-    if (obj.distribution === "triangular" && (!Array.isArray(obj.value) || obj.value.length !== 3)) {
-      fail(`parameter ${obj.id}: triangular value must be [min, mode, max]`);
+    // range must be a numeric [lo, hi] with lo <= hi
+    if (!Array.isArray(obj.range) || obj.range.length !== 2 || !isNum(obj.range[0]) || !isNum(obj.range[1])) {
+      fail(`parameter ${obj.id}: range must be [lo, hi] of finite numbers`);
     }
-    if (!Array.isArray(obj.range) || obj.range.length !== 2) fail(`parameter ${obj.id}: range must be [lo, hi]`);
+    const [lo, hi] = obj.range;
+    if (lo > hi) fail(`parameter ${obj.id}: range lo ${lo} exceeds hi ${hi}`);
+    if (obj.distribution === "point") {
+      // point value must be a finite number sitting inside the declared range
+      if (!isNum(obj.value)) fail(`parameter ${obj.id}: point value must be a finite number`);
+      if (obj.value < lo || obj.value > hi) {
+        fail(`parameter ${obj.id}: default ${obj.value} outside declared range [${lo}, ${hi}]`);
+      }
+    } else {
+      // triangular value = [min, mode, max], numeric and ordered; range constrains the MODE (§9)
+      if (!Array.isArray(obj.value) || obj.value.length !== 3 || !obj.value.every(isNum)) {
+        fail(`parameter ${obj.id}: triangular value must be [min, mode, max] of finite numbers`);
+      }
+      const [tmin, tmode, tmax] = obj.value;
+      if (!(tmin <= tmode && tmode <= tmax)) {
+        fail(`parameter ${obj.id}: triangular must satisfy min <= mode <= max, got [${tmin}, ${tmode}, ${tmax}]`);
+      }
+      if (tmode < lo || tmode > hi) {
+        fail(`parameter ${obj.id}: triangular mode ${tmode} outside declared range [${lo}, ${hi}]`);
+      }
+    }
     parameters.push(obj);
   } else if (kind === "mechanic") {
     requireKeys(obj, MECHANIC_KEYS, "mechanic");
@@ -84,7 +170,12 @@ for (const match of source.matchAll(fence)) {
   } else {
     requireKeys(obj, GOLDEN_KEYS, "golden");
     if (typeof obj.instrument !== "string" || !INSTRUMENTS.has(obj.instrument)) fail(`golden ${obj.id}: invalid instrument`);
-    if (typeof obj.tolerance !== "number") fail(`golden ${obj.id}: tolerance must be a number`);
+    if (!isNum(obj.tolerance) || obj.tolerance < 0) fail(`golden ${obj.id}: tolerance must be a finite number >= 0`);
+    if (typeof obj.comparator !== "string" || !COMPARATORS.has(obj.comparator)) {
+      fail(`golden ${obj.id}: unknown comparator ${JSON.stringify(obj.comparator)} (not in the §11.1 vocabulary)`);
+    }
+    checkBound(obj.id, obj.comparator, obj.bound);
+    checkStep(obj.id, obj.comparator, obj.step);
     goldens.push(obj);
   }
 }
@@ -92,6 +183,16 @@ for (const match of source.matchAll(fence)) {
 if (meta === null) fail("no eigenorg:meta block found");
 if (parameters.length === 0) fail("no parameter blocks found");
 if (goldens.length === 0) fail("no golden blocks found");
+
+// Fence guard: a fence that OPENS with "json eigenorg:" but that the strict block regex
+// did NOT capture (a mistyped kind like ":golde", a malformed/missing close fence, or two
+// blocks sharing one closing fence) would otherwise drop silently. The count of opening
+// markers must equal the number of captured blocks.
+const looseFenceCount = (source.match(/^```json eigenorg:/gm) || []).length;
+const strictFenceCount = 1 /* meta */ + parameters.length + mechanics.length + goldens.length;
+if (looseFenceCount !== strictFenceCount) {
+  fail(`fence guard: ${looseFenceCount} eigenorg fences open but only ${strictFenceCount} blocks were captured - a malformed or mistyped fence dropped silently`);
+}
 
 /** @param {Record<string, unknown>[]} items @param {string} kind */
 function checkDuplicates(items, kind) {

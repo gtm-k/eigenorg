@@ -173,9 +173,9 @@
       ],
       "distribution": "point",
       "unit": "multiplier",
-      "anchor": "SI Labs (2026) meeting research: ~60% of meeting time produces no concrete output; design red-team range 1.4-1.6x",
-      "tier": "industry-report",
-      "limitation": "The 1.4-1.6x range is an inference from meeting-waste research, not a direct measurement of the multiplier.",
+      "anchor": "Direction from SI Labs (2026) meeting research (~60% of meeting time produces no concrete output); the 1.4-1.6x multiplier is an editorial default",
+      "tier": "editorial-heuristic",
+      "limitation": "The 1.4-1.6x range is an inference from meeting-waste research, not a direct measurement of the multiplier, so it is an editorial default.",
       "formula": "mu_modality = meetingHeavyMultiplier when modality == meetingHeavy (M4)",
       "plainLanguage": "Meeting-heavy cultures pay about one and a half times the coordination tax of async-first cultures."
     },
@@ -687,15 +687,15 @@
       "value": 0.35,
       "range": [
         0.05,
-        0.35
+        0.45
       ],
       "distribution": "point",
       "unit": "fraction of tax",
       "anchor": "Editorial: AI routing/summarizing relieves coordination in structurally healthy orgs",
       "tier": "editorial-heuristic",
-      "limitation": "Relief assumes agents are wired into clear ownership - which is exactly what low-SH orgs lack.",
+      "limitation": "Relief assumes agents are wired into clear ownership - which is exactly what low-SH orgs lack. Range extends above the default so calibration has upward headroom.",
       "formula": "relief_ai = aiCoordinationRelief * clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) (M9)",
-      "plainLanguage": "In a healthy org, AI trims up to a quarter of the coordination tax. In an unhealthy one: nothing."
+      "plainLanguage": "In a healthy org, AI trims up to about a third of the coordination tax. In an unhealthy one: nothing."
     },
     {
       "id": "aiNovelFailureBase",
@@ -1003,11 +1003,11 @@
       ],
       "distribution": "point",
       "unit": "index points at 100% AI",
-      "anchor": "WEF (2026) and AMCIS 2025: AI-heavy teams report weaker co-worker connections",
-      "tier": "industry-report",
-      "limitation": "Survey-based perception data; magnitude scaled editorially to the 0-100 index.",
+      "anchor": "Direction from WEF (2026) and AMCIS 2025 (AI-heavy teams report weaker co-worker connections); magnitude is an editorial default",
+      "tier": "editorial-heuristic",
+      "limitation": "The direction is survey-supported but the magnitude is scaled editorially to the 0-100 index, so this is an editorial default, not a reported figure.",
       "formula": "target -= cohesionAiPenalty * effectiveAiShare (M12)",
-      "plainLanguage": "The more teammates are agents, the weaker the human bonds get - about 20 points if the whole team were AI."
+      "plainLanguage": "The more teammates are agents, the weaker the human bonds get - about 15 points if the whole team were AI."
     },
     {
       "id": "cohesionHollownessPenalty",
@@ -1458,6 +1458,141 @@
       "limitation": "As teamPodTargetSize.",
       "formula": "T = ceil(n / hierarchicalTeamSize) for hierarchical (Sec 3.3)",
       "plainLanguage": "Hierarchies fan out at about seven people per manager."
+    },
+    {
+      "id": "layerLatencyFactorDirector",
+      "value": 1.2,
+      "range": [
+        1,
+        1.5
+      ],
+      "distribution": "point",
+      "unit": "multiplier",
+      "anchor": "Editorial: a senior/exec approval seat deliberates longer per item than a first-line PM",
+      "tier": "editorial-heuristic",
+      "limitation": "Seat behavior varies; a decisive director can be faster than a committee-run PM function.",
+      "formula": "service draw at a humanDirector layer *= layerLatencyFactorDirector (M6, §9.9)",
+      "plainLanguage": "A director seat sits on each decision about 20% longer than a baseline PM seat."
+    },
+    {
+      "id": "layerCapacityFactorDirector",
+      "value": 0.75,
+      "range": [
+        0.5,
+        1
+      ],
+      "distribution": "point",
+      "unit": "multiplier",
+      "anchor": "Editorial: senior seats review fewer items per day (span-of-attention), amplifying the top-of-stack queue",
+      "tier": "editorial-heuristic",
+      "limitation": "Some directors batch-approve; the reduction is an editorial default.",
+      "formula": "cap_l at a humanDirector layer *= layerCapacityFactorDirector (M6, §9.9)",
+      "plainLanguage": "A director seat processes about a quarter fewer decisions per day than a baseline PM seat."
+    },
+    {
+      "id": "layerLatencyFactorAiAgent",
+      "value": 0.4,
+      "range": [
+        0.2,
+        0.7
+      ],
+      "distribution": "point",
+      "unit": "multiplier",
+      "anchor": "Editorial: an AI prioritization agent clears a routing decision in a fraction of a human seat's time (consistent with aiRoutineLatencyFactor)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the routing genuinely is mechanical; the agent is no faster on genuinely ambiguous calls.",
+      "formula": "service draw at an aiAgent layer *= layerLatencyFactorAiAgent (M6, §9.9)",
+      "plainLanguage": "An AI agent seat clears approvals at roughly 40% of a human seat's time."
+    },
+    {
+      "id": "layerCapacityFactorAiAgent",
+      "value": 1.4,
+      "range": [
+        1.1,
+        1.8
+      ],
+      "distribution": "point",
+      "unit": "multiplier",
+      "anchor": "Editorial: an agent adds mechanical approval bandwidth at any Structural Health (M11(c) rationale, applied per-seat)",
+      "tier": "editorial-heuristic",
+      "limitation": "Bandwidth is a modeling proxy; a badly-integrated agent can add rework instead.",
+      "formula": "cap_l at an aiAgent layer *= layerCapacityFactorAiAgent (M6, §9.9)",
+      "plainLanguage": "An AI agent seat processes about 40% more decisions per day than a baseline PM seat."
+    },
+    {
+      "id": "layerDistortionFactorAiAgent",
+      "value": 0.3,
+      "range": [
+        0,
+        0.6
+      ],
+      "distribution": "point",
+      "unit": "multiplier",
+      "anchor": "Editorial: an agent relays context verbatim, so its layer garbles far less than a human hand-up",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the agent preserves nuance; over-summarizing agents can distort in their own way.",
+      "formula": "layerDistortionFactor(aiAgent) in layerDistortionMean → override distortion (M8, §9.9)",
+      "plainLanguage": "An AI agent seat loses only about a third of the context a human relay would - so it triggers fewer overrides."
+    },
+    {
+      "id": "layerNovelExposureAiAgent",
+      "value": 0.7,
+      "range": [
+        0.3,
+        1
+      ],
+      "distribution": "point",
+      "unit": "exposure fraction",
+      "anchor": "Editorial: an AI-owned prioritization seat routes novel work into the brittleness path much like an org-wide injection, scaled below 1 because a single seat is narrower than full injection",
+      "tier": "editorial-heuristic",
+      "limitation": "The single load-bearing coefficient that makes an AI middle layer riskier on novel work; deliberately adjustable.",
+      "formula": "novelExposure = max(injectionActive?1:0, max_l layerNovelExposure(type_l)); P(brittle) = aiNovelFailureBase * shBrittleFactor(SH) * novelExposure (M11/M9, §9.9)",
+      "plainLanguage": "Put an AI agent in an approval seat and about 70% of the AI novel-failure exposure of a full org-wide injection shows up - the routine speed-up comes bundled with novel brittleness."
+    },
+    {
+      "id": "layerLatencyFactorCommittee",
+      "value": 1.5,
+      "range": [
+        1.1,
+        2
+      ],
+      "distribution": "point",
+      "unit": "multiplier",
+      "anchor": "Editorial: committee decision-making is slow (scheduling, consensus)",
+      "tier": "editorial-heuristic",
+      "limitation": "A well-run committee with a decider can beat this; the default models the common slow case.",
+      "formula": "service draw at a committee layer *= layerLatencyFactorCommittee (M6, §9.9)",
+      "plainLanguage": "A committee seat sits on each decision about 50% longer than a baseline PM seat."
+    },
+    {
+      "id": "layerCapacityFactorCommittee",
+      "value": 0.6,
+      "range": [
+        0.4,
+        0.9
+      ],
+      "distribution": "point",
+      "unit": "multiplier",
+      "anchor": "Editorial: a committee meets periodically, so its per-day approval bandwidth is low",
+      "tier": "editorial-heuristic",
+      "limitation": "Standing committees with delegated sub-decisions can process more.",
+      "formula": "cap_l at a committee layer *= layerCapacityFactorCommittee (M6, §9.9)",
+      "plainLanguage": "A committee seat processes about 40% fewer decisions per day than a baseline PM seat."
+    },
+    {
+      "id": "layerDistortionFactorCommittee",
+      "value": 0.5,
+      "range": [
+        0.2,
+        0.8
+      ],
+      "distribution": "point",
+      "unit": "multiplier",
+      "anchor": "Editorial: multiple reviewers catch and correct relayed context, halving distortion versus a single human hand-up",
+      "tier": "editorial-heuristic",
+      "limitation": "Groupthink can defeat the many-eyes benefit; editorial default.",
+      "formula": "layerDistortionFactor(committee) in layerDistortionMean → override distortion (M8, §9.9)",
+      "plainLanguage": "A committee seat's many eyes cut relayed-context loss roughly in half - fewer overrides than a lone human seat."
     }
   ]
 }

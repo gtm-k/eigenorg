@@ -212,14 +212,14 @@
       "tolerance": 0,
       "step": 35,
       "instrument": "monteCarlo",
-      "rationale": "Pre-mortem A3: the launch-centerpiece chart must be visually unambiguous, golden-asserted rather than hoped for."
+      "rationale": "The launch-centerpiece chart must be visually unambiguous - the two bands must be golden-asserted to stay separated rather than merely hoped to."
     },
     {
       "id": "fdSeductiveThroughput",
       "scenario": "fasterDysfunction",
       "metric": "throughput@sh3",
       "comparator": "twoWindowRatioAbove",
-      "predicate": "Right after injection (steps 16-22) SH=3 throughput runs at least 3% above its pre-injection level (steps 8-14): the dysfunction is FASTER - that is the seduction.",
+      "predicate": "Right after injection (steps 16-22) SH=3 throughput runs at least 5% above its pre-injection level (steps 8-14), within a 3% tolerance: the dysfunction is FASTER - that is the seduction.",
       "bound": {
         "windowA": [
           16,
@@ -340,12 +340,15 @@
       "scenario": "hollowMiddle",
       "metric": "cumThroughput@hollow / cumThroughput@humanPm",
       "comparator": "ratioAbove",
-      "predicate": "By step 10 the hollow team has shipped at least 15% more items - work accelerates initially.",
-      "bound": 1.15,
+      "predicate": "Across the early window (steps 8-14) the hollow team's cumulative throughput averages at least 8% above the human-PM team's - work accelerates initially.",
+      "bound": 1.08,
       "tolerance": 0.05,
-      "step": 10,
+      "step": [
+        8,
+        14
+      ],
       "instrument": "meanPath",
-      "rationale": "The seductive first fortnight, before the edge cases arrive."
+      "rationale": "The seductive first fortnight, before the edge cases arrive. Re-anchored (round-1 H3) from the single step t=10 - where the ratio of small-integer cumulative medians jumps discretely (1.000 -> 1.14 with nothing between) - to the mean of the pointwise ratio over [8,14], a continuous carrier that no longer straddles a knife-edge under the Monte-Carlo p50 semantics."
     },
     {
       "id": "hmBrittlenessSpike",
@@ -357,12 +360,12 @@
       "tolerance": 0.1,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (red-team stress test 2)."
+      "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (red-team stress test 2). Zero-denominator convention (§11.1): the human-PM team's novel failures (humanNovelFailureBase) are sparse enough that its cumulative total can be 0, giving ratio = +infinity, which satisfies ratioAbove; the paired hmBrittlenessFloorMc pins the hollow numerator to >= 1.5 so the ratio is never the indeterminate 0/0."
     },
     {
       "id": "hmStakeholderGap",
       "scenario": "hollowMiddle",
-      "metric": "coverage.stakeholderCommunication.score@hollow",
+      "metric": "functionCoverage.stakeholderCommunication.score@hollow",
       "comparator": "scalarBelow",
       "predicate": "Stakeholder Communication coverage is at most 0.5 (red) in the hollow team - the function the AI cannot actually do.",
       "bound": 0.5,
@@ -374,7 +377,7 @@
     {
       "id": "hmExecutionCovered",
       "scenario": "hollowMiddle",
-      "metric": "coverage.execution.score@hollow",
+      "metric": "functionCoverage.execution.score@hollow",
       "comparator": "scalarAbove",
       "predicate": "Execution coverage stays at least 0.8 (green) - the hollow team's problem is not capacity.",
       "bound": 0.8,
@@ -418,6 +421,57 @@
       "step": null,
       "instrument": "monteCarlo",
       "rationale": "Median-run realism for the brittleness narrative."
+    },
+    {
+      "id": "lcRoutineLatencyDrops",
+      "scenario": "layerConfigurator",
+      "metric": "decisionLatency@aiMiddle / decisionLatency@allHuman",
+      "comparator": "ratioBelow",
+      "predicate": "With an AI agent in the middle approval seat, settled first-pass decision latency runs at most 0.9x the all-human stack's - the routing acceleration is real.",
+      "bound": 0.9,
+      "tolerance": 0.05,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "P6 configurator acceptance, half 1: an aiAgent layer's low layerLatencyFactor and higher layerCapacityFactor (§9.9) speed the routine majority through the stack."
+    },
+    {
+      "id": "lcNovelBrittleRises",
+      "scenario": "layerConfigurator",
+      "metric": "cumulativeBrittleness@aiMiddle",
+      "comparator": "above",
+      "predicate": "The AI-middle stack accumulates at least 2 novel-task brittleness events over the run - the acceleration comes bundled with novel exposure.",
+      "bound": 2,
+      "tolerance": 0.2,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "P6 configurator acceptance, half 2: an aiAgent seat's layerNovelExposure (§9.9) routes novel work into the M9 brittleness path even with no org-wide injection."
+    },
+    {
+      "id": "lcAllHumanNoBrittle",
+      "scenario": "layerConfigurator",
+      "metric": "cumulativeBrittleness@allHuman",
+      "comparator": "below",
+      "predicate": "The all-human stack produces zero brittleness events - the novel exposure is entirely attributable to the AI seat, not the scenario.",
+      "bound": 0.001,
+      "tolerance": 0,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "The clean counterfactual that makes lcNovelBrittleRises meaningful: swap only the middle seat's type and the brittleness appears."
+    },
+    {
+      "id": "lcBrittleFloorMc",
+      "scenario": "layerConfigurator",
+      "metric": "cumulativeBrittleness.p50@aiMiddle",
+      "comparator": "above",
+      "predicate": "The median Monte Carlo run of the AI-middle stack sees at least 1 brittleness event - the novel exposure is not a mean-path artifact.",
+      "bound": 1,
+      "tolerance": 0,
+      "step": null,
+      "instrument": "monteCarlo",
+      "rationale": "Band-level realism: the per-layer novel exposure survives Monte Carlo, not just the deterministic accumulator."
     }
   ]
 }

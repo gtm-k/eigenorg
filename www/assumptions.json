@@ -179,9 +179,9 @@
       "id": "meetingHeavyMultiplier",
       "plainLanguage": "Meeting-heavy cultures pay about one and a half times the coordination tax of async-first cultures.",
       "formula": "mu_modality = meetingHeavyMultiplier when modality == meetingHeavy (M4)",
-      "tier": "industry-report",
-      "limitation": "The 1.4-1.6x range is an inference from meeting-waste research, not a direct measurement of the multiplier.",
-      "anchor": "SI Labs (2026) meeting research: ~60% of meeting time produces no concrete output; design red-team range 1.4-1.6x",
+      "tier": "editorial-heuristic",
+      "limitation": "The 1.4-1.6x range is an inference from meeting-waste research, not a direct measurement of the multiplier, so it is an editorial default.",
+      "anchor": "Direction from SI Labs (2026) meeting research (~60% of meeting time produces no concrete output); the 1.4-1.6x multiplier is an editorial default",
       "value": 1.5,
       "range": [
         1.4,
@@ -729,15 +729,15 @@
     {
       "type": "parameter",
       "id": "aiCoordinationRelief",
-      "plainLanguage": "In a healthy org, AI trims up to a quarter of the coordination tax. In an unhealthy one: nothing.",
+      "plainLanguage": "In a healthy org, AI trims up to about a third of the coordination tax. In an unhealthy one: nothing.",
       "formula": "relief_ai = aiCoordinationRelief * clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) (M9)",
       "tier": "editorial-heuristic",
-      "limitation": "Relief assumes agents are wired into clear ownership - which is exactly what low-SH orgs lack.",
+      "limitation": "Relief assumes agents are wired into clear ownership - which is exactly what low-SH orgs lack. Range extends above the default so calibration has upward headroom.",
       "anchor": "Editorial: AI routing/summarizing relieves coordination in structurally healthy orgs",
       "value": 0.35,
       "range": [
         0.05,
-        0.35
+        0.45
       ],
       "unit": "fraction of tax",
       "distribution": "point"
@@ -1061,11 +1061,11 @@
     {
       "type": "parameter",
       "id": "cohesionAiPenalty",
-      "plainLanguage": "The more teammates are agents, the weaker the human bonds get - about 20 points if the whole team were AI.",
+      "plainLanguage": "The more teammates are agents, the weaker the human bonds get - about 15 points if the whole team were AI.",
       "formula": "target -= cohesionAiPenalty * effectiveAiShare (M12)",
-      "tier": "industry-report",
-      "limitation": "Survey-based perception data; magnitude scaled editorially to the 0-100 index.",
-      "anchor": "WEF (2026) and AMCIS 2025: AI-heavy teams report weaker co-worker connections",
+      "tier": "editorial-heuristic",
+      "limitation": "The direction is survey-supported but the magnitude is scaled editorially to the 0-100 index, so this is an editorial default, not a reported figure.",
+      "anchor": "Direction from WEF (2026) and AMCIS 2025 (AI-heavy teams report weaker co-worker connections); magnitude is an editorial default",
       "value": 15,
       "range": [
         10,
@@ -1555,6 +1555,150 @@
       "distribution": "point"
     },
     {
+      "type": "parameter",
+      "id": "layerLatencyFactorDirector",
+      "plainLanguage": "A director seat sits on each decision about 20% longer than a baseline PM seat.",
+      "formula": "service draw at a humanDirector layer *= layerLatencyFactorDirector (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Seat behavior varies; a decisive director can be faster than a committee-run PM function.",
+      "anchor": "Editorial: a senior/exec approval seat deliberates longer per item than a first-line PM",
+      "value": 1.2,
+      "range": [
+        1,
+        1.5
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerCapacityFactorDirector",
+      "plainLanguage": "A director seat processes about a quarter fewer decisions per day than a baseline PM seat.",
+      "formula": "cap_l at a humanDirector layer *= layerCapacityFactorDirector (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Some directors batch-approve; the reduction is an editorial default.",
+      "anchor": "Editorial: senior seats review fewer items per day (span-of-attention), amplifying the top-of-stack queue",
+      "value": 0.75,
+      "range": [
+        0.5,
+        1
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerLatencyFactorAiAgent",
+      "plainLanguage": "An AI agent seat clears approvals at roughly 40% of a human seat's time.",
+      "formula": "service draw at an aiAgent layer *= layerLatencyFactorAiAgent (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the routing genuinely is mechanical; the agent is no faster on genuinely ambiguous calls.",
+      "anchor": "Editorial: an AI prioritization agent clears a routing decision in a fraction of a human seat's time (consistent with aiRoutineLatencyFactor)",
+      "value": 0.4,
+      "range": [
+        0.2,
+        0.7
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerCapacityFactorAiAgent",
+      "plainLanguage": "An AI agent seat processes about 40% more decisions per day than a baseline PM seat.",
+      "formula": "cap_l at an aiAgent layer *= layerCapacityFactorAiAgent (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Bandwidth is a modeling proxy; a badly-integrated agent can add rework instead.",
+      "anchor": "Editorial: an agent adds mechanical approval bandwidth at any Structural Health (M11(c) rationale, applied per-seat)",
+      "value": 1.4,
+      "range": [
+        1.1,
+        1.8
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerDistortionFactorAiAgent",
+      "plainLanguage": "An AI agent seat loses only about a third of the context a human relay would - so it triggers fewer overrides.",
+      "formula": "layerDistortionFactor(aiAgent) in layerDistortionMean → override distortion (M8, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the agent preserves nuance; over-summarizing agents can distort in their own way.",
+      "anchor": "Editorial: an agent relays context verbatim, so its layer garbles far less than a human hand-up",
+      "value": 0.3,
+      "range": [
+        0,
+        0.6
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerNovelExposureAiAgent",
+      "plainLanguage": "Put an AI agent in an approval seat and about 70% of the AI novel-failure exposure of a full org-wide injection shows up - the routine speed-up comes bundled with novel brittleness.",
+      "formula": "novelExposure = max(injectionActive?1:0, max_l layerNovelExposure(type_l)); P(brittle) = aiNovelFailureBase * shBrittleFactor(SH) * novelExposure (M11/M9, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "The single load-bearing coefficient that makes an AI middle layer riskier on novel work; deliberately adjustable.",
+      "anchor": "Editorial: an AI-owned prioritization seat routes novel work into the brittleness path much like an org-wide injection, scaled below 1 because a single seat is narrower than full injection",
+      "value": 0.7,
+      "range": [
+        0.3,
+        1
+      ],
+      "unit": "exposure fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerLatencyFactorCommittee",
+      "plainLanguage": "A committee seat sits on each decision about 50% longer than a baseline PM seat.",
+      "formula": "service draw at a committee layer *= layerLatencyFactorCommittee (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "A well-run committee with a decider can beat this; the default models the common slow case.",
+      "anchor": "Editorial: committee decision-making is slow (scheduling, consensus)",
+      "value": 1.5,
+      "range": [
+        1.1,
+        2
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerCapacityFactorCommittee",
+      "plainLanguage": "A committee seat processes about 40% fewer decisions per day than a baseline PM seat.",
+      "formula": "cap_l at a committee layer *= layerCapacityFactorCommittee (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Standing committees with delegated sub-decisions can process more.",
+      "anchor": "Editorial: a committee meets periodically, so its per-day approval bandwidth is low",
+      "value": 0.6,
+      "range": [
+        0.4,
+        0.9
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerDistortionFactorCommittee",
+      "plainLanguage": "A committee seat's many eyes cut relayed-context loss roughly in half - fewer overrides than a lone human seat.",
+      "formula": "layerDistortionFactor(committee) in layerDistortionMean → override distortion (M8, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Groupthink can defeat the many-eyes benefit; editorial default.",
+      "anchor": "Editorial: multiple reviewers catch and correct relayed context, halving distortion versus a single human hand-up",
+      "value": 0.5,
+      "range": [
+        0.2,
+        0.8
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
       "type": "mechanic",
       "id": "brooksIntraTeamChannels",
       "plainLanguage": "Within each team, everyone can end up talking to everyone: the number of possible communication channels grows with the square of team size. A team of 12 has 66 channels; a team of 25 has 300. The model applies this inside each team only - not across the whole org as one giant graph - because real organizations route most cross-team communication through structure.",
@@ -1628,8 +1772,8 @@
     {
       "type": "mechanic",
       "id": "decisionPipeline",
-      "plainLanguage": "Every approval layer adds waiting: around 2-3 working days each just for its own look, plus queueing when the layer is busy. Higher layers have less bandwidth (a VP reviews fewer things per day than a team lead), so queues form at the top. Decisions that cut across teams with unclear ownership get escalated and wait extra days. Three layers turn a same-week decision into a two-week one.",
-      "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10). Layer l advances at most cap_l tasks/step: cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) (x the M11 AI approval-bandwidth multiplier when AI is active). Capacity is use-it-or-lose-it: the fractional accumulator carries at most the sub-1 remainder between steps (acc = min(acc + cap_l - moved, 1)) - idle days never bank whole approvals. On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L.",
+      "plainLanguage": "Every approval layer adds waiting: around 2-3 working days each just for its own look, plus queueing when the layer is busy. Higher layers have less bandwidth (a VP reviews fewer things per day than a team lead), so queues form at the top. What sits in each seat changes the wait: an AI prioritization agent clears routine items fast and adds bandwidth; a committee is slower with less. Decisions that cut across teams with unclear ownership get escalated and wait extra days. Three layers turn a same-week decision into a two-week one.",
+      "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10) * layerLatencyFactor(type_l) (§9.9; 1.0 for the default humanPm type, so absent layerTypes reproduces the base model). Layer l advances at most cap_l tasks/step: cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) * layerCapacityFactor(type_l) (§9.9) (x the M11 AI approval-bandwidth multiplier when org-level AI injection is active). Capacity is use-it-or-lose-it: the fractional accumulator carries at most one whole approval between steps (acc_l = min(acc_l + cap_l - moved_l, 1)); idle days bank at most a single approval, never more. On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L, recorded only for first-pass approvals (overrideCount == 0; §11.1).",
       "citations": [
         "SI Labs (2026). Why Hierarchies Slow Down Companies - five approval layers, ~3 days per layer, 15 working days to a decision. https://www.si-labs.com/en/articles/slow-decisions/",
         "Baker, N. R. et al. (1975). Diffuse decision-making in hierarchical organizations. Management Science 21(6) - empirical multi-layer decision delay."
@@ -1654,8 +1798,8 @@
     {
       "type": "mechanic",
       "id": "overrideWipReset",
-      "plainLanguage": "With more layers above the work, higher layers more often reverse lower-layer decisions - especially when ownership is unclear and information has been distorted on its way up the hierarchy. An overridden task is not lost: it re-enters the pipeline keeping about half its progress. That partial rework, plus a fresh trip through every approval layer, is the true cost of an override.",
-      "formula": "Per step, each inProgress task is overridden with probability o(t) = overrideBaseRate * (L - 1) * (1 + overrideMisalignmentGain * m(t)) * (1 + distortionOverrideCoupling * distortion); distortion = distortionPerHumanLayer * (D - 1). On override: task returns to layer 1, progress *= wipResetFraction.",
+      "plainLanguage": "With more layers above the work, higher layers more often reverse lower-layer decisions - especially when ownership is unclear and information has been distorted on its way up the hierarchy. Cleaner relays reduce this: an AI agent or a committee seat garbles less context than a chain of human hand-ups, so it triggers fewer overrides. An overridden task is not lost: it re-enters the pipeline keeping about half its progress. That partial rework, plus a fresh trip through every approval layer, is the true cost of an override.",
+      "formula": "Per step, each inProgress task is overridden with probability o(t) = min(1, overrideBaseRate * (L - 1) * (1 + overrideMisalignmentGain * m(t)) * (1 + distortionOverrideCoupling * distortion)); the min(1, .) clamp keeps o(t) a probability at every in-range corner (§6 L1). distortion = distortionPerHumanLayer * (D - 1) * layerDistortionMean, where layerDistortionMean = mean over l in 2..=L of layerDistortionFactor(type_l) (§9.9), or 1.0 when L == 1 (default humanPm layers give 1.0, reproducing the base model). On override: task returns to layer 1, progress *= wipResetFraction, overrideCount += 1. Each override event is attributed to an overriding layer drawn uniformly over {2..L} for the perLayer.overrideShare output (§7.1); layer 1 originates and is never the overrider.",
       "citations": [
         "SI Labs (2026). Why Hierarchies Slow Down Companies. https://www.si-labs.com/en/articles/slow-decisions/",
         "eigenorg design red-team (2026): overridden WIP re-enters at partial completion rather than disappearing from throughput."
@@ -1684,7 +1828,7 @@
       "type": "mechanic",
       "id": "brittlenessRecovery",
       "plainLanguage": "When an AI agent hits a case beyond its ceiling, the failure does not just cost that one task. If a named human owns recovery, the mess is contained: a day or two, small slowdown. If nobody owns recovery, everything nearby slows down 1.5-2.5x for the next 3-5 days while people figure out whose problem it is.",
-      "formula": "A brittleness event draws ONE duration d ~ Triangular(recoveryDurationUnownedSteps | recoveryDurationOwnedSteps), rounded to whole steps (min 1), shared by the task block and the recovery window; the window is active for steps [t_event, t_event + d). While any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned). Owned: multiplier = recoveryLatencyMultiplierOwned (point value, no draw).",
+      "formula": "A brittleness event draws ONE duration d ~ Triangular(recoveryDurationUnownedSteps | recoveryDurationOwnedSteps), rounded to whole steps (min 1), shared by the task block and the recovery window; the window is active for steps [t_event, t_event + d). While any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Because M_recovery(t) is computed at step start (§5 step 2) BEFORE that step's own arrivals and unblocks, a window opened during t_event's arrivals (§5 step 3) first multiplies service draws at t_event+1; the event's own blocked task used the pre-event M_recovery. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned). Owned: multiplier = recoveryLatencyMultiplierOwned (point value, no draw).",
       "citations": [
         "eigenorg design red-team (2026): Failure Recovery Owner assignment; unowned high-AI-coverage functions apply a 1.5-2.5x latency multiplier for 3-5 steps after a brittleness event.",
         "HatchWorks (2025). AI agent design best practices - agent failure modes on novel inputs."
@@ -1698,7 +1842,7 @@
       "type": "mechanic",
       "id": "aiTaskTypeCapability",
       "plainLanguage": "AI agents are genuinely faster on routine work - routing, triage, standard execution. On novel, ambiguous, high-stakes work their capability collapses: they misroute, stall, or fail, unless a human co-owns the judgment. Research on hybrid teams finds human+AI outperforming fully autonomous agent teams by roughly 69% on complex tasks - so the model rewards keeping humans on judgment functions and penalizes hollowing them out.",
-      "formula": "Team sim: if any AI covers prioritization, routine service time *= aiRoutineLatencyFactor; if nobody covers prioritization, service *= uncoveredPrioritizationFactor. Execution: routine progress *= (1 + aiExecShare * (aiRoutineAdvantage - 1)); novel progress *= (humanExecShare + aiExecShare * aiNovelEffectiveness). Novel arrivals take the AI failure probability (M9) when AI is assigned to prioritization and no human is assigned to prioritization; when a human covers prioritization the probability is humanNovelFailureBase. Quality: for complex/novel tasks with zero human judgment coverage, the judgment contribution is divided by hybridVsAutonomousAdvantage (M16). Org sim: AI injection (a) multiplies routine execution allocations by aiThroughputBoostOrg on the aiRoutineShareOrg share of routine work, (b) multiplies routine-task service draws by (1 - (1 - aiRoutineLatencyFactor) * reliefRamp(SH)), reliefRamp = clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) - AI routing accelerates routine decisions only in structurally healthy orgs - and (c) multiplies every decision layer's capacity by (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) at ANY Structural Health: AI agents add mechanical routing/approval bandwidth regardless of structure; what depends on SH is the QUALITY of that routing (brittleness, M9) and the coordination relief - work reaches broken structure faster, which is the 'faster' in Faster Dysfunction.",
+      "formula": "Team sim: if any AI covers prioritization, routine service time *= aiRoutineLatencyFactor; if nobody covers prioritization, service *= uncoveredPrioritizationFactor. Execution: routine progress *= (1 + aiExecShare * (aiRoutineAdvantage - 1)); novel progress *= (humanExecShare + aiExecShare * aiNovelEffectiveness). Novel arrivals take the AI failure probability (M9) when AI is assigned to prioritization and no human is assigned to prioritization; when a human covers prioritization the probability is humanNovelFailureBase. Quality: for complex/novel tasks with zero human judgment coverage, the judgment contribution is divided by hybridVsAutonomousAdvantage (M16). Org sim: AI injection (a) multiplies EVERY routine execution allocation by the uniform expected-value factor (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) - the closed-form mean of boosting the aiRoutineShareOrg share of routine work by aiThroughputBoostOrg, applied deterministically to all routine allocations with NO per-task share draw - (b) multiplies routine-task service draws by (1 - (1 - aiRoutineLatencyFactor) * reliefRamp(SH)), reliefRamp = clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) - AI routing accelerates routine decisions only in structurally healthy orgs - and (c) multiplies every decision layer's capacity by the same (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) at ANY Structural Health: AI agents add mechanical routing/approval bandwidth regardless of structure; what depends on SH is the QUALITY of that routing (brittleness, M9) and the coordination relief - work reaches broken structure faster, which is the 'faster' in Faster Dysfunction. Per-layer AI (org sim, §9.9 aiAgent layer type): a novel arrival faces the M9 brittleness draw with exposure novelExposure = max(orgInjectionActive ? 1 : 0, max over layers l of layerNovelExposure(type_l)) - i.e. an aiAgent-typed ownership layer exposes novel work to brittleness from t=0 even with no org-level injection - and the probability is aiNovelFailureBase * shBrittleFactor(SH) * novelExposure. That layer's routing speed and added bandwidth come from its layerLatencyFactor / layerCapacityFactor in M6; per-layer AI does NOT trigger the org-level execution boost or coordination relief (those are injection effects).",
       "citations": [
         "e-discoveryteam.com (2025). Stanford/Carnegie study: hybrid human-AI teams beat fully autonomous agents by 68.7% on complex tasks. https://e-discoveryteam.com/2025/12/01/",
         "TechXplore (2024). Researchers test human vs AI-human hybrid teams in dynamic tasks.",
@@ -1713,7 +1857,7 @@
       "type": "mechanic",
       "id": "cohesionDynamics",
       "plainLanguage": "Cohesion is the human glue: trust, shared context, willingness to flag problems early. It erodes when teams outgrow the size where everyone knows everyone, when a larger share of teammates are AI agents (people report weaker co-worker bonds), and when the human relationship layer (a PM who talks to people) is removed. It slowly recovers toward its structural ceiling - but a high-entropy environment keeps grinding it down.",
-      "formula": "Per team: target(t) = cohesionBase - cohesionSizePenalty * sigma((s - cognitiveBandClose)/(bandWidthFactor * cognitiveBandClose)) - cohesionAiPenalty * effectiveAiShare - (hollow ? cohesionHollownessPenalty : 0). c(t+1) = clamp(c(t) + cohesionRecoveryRate * (target - c(t)) - cohesionEntropyCoupling * max(0, E(t) - entropyStressThreshold) / 10, 0, 100). c(0) = cohesionBase. Team sim: effectiveAiShare = (# AI entities)/(# entities); hollow = for any of {prioritization, coordination, stakeholderCommunication}, at least one AI entity is assigned AND no human entity is assigned. Org sim: effectiveAiShare = aiActive ? aiRoutineShareOrg * taskMixRoutineOrg : 0; hollow = false.",
+      "formula": "Per team: target(t) = cohesionBase - cohesionSizePenalty * sigma((s - cognitiveBandClose)/(bandWidthFactor * cognitiveBandClose)) - cohesionAiPenalty * effectiveAiShare - (hollow ? cohesionHollownessPenalty : 0). c(t+1) = clamp(c(t) + cohesionRecoveryRate * (target(t) - c(t)) - cohesionEntropyCoupling * max(0, E(t-1) - entropyStressThreshold) / 10, 0, 100), where E(t-1) is the PRIOR step's entropy composite with the convention E(-1) = 0 (the t=0 update sees no prior entropy). c(0) = cohesionBase; the cohesion series reports the PRE-update value c(t) (§5 step 8), so the update takes effect from t+1. Team sim: effectiveAiShare = (# AI entities)/(# entities); hollow = for any of {prioritization, coordination, stakeholderCommunication}, at least one AI entity is assigned AND no human entity is assigned. Org sim: effectiveAiShare = aiActive ? aiRoutineShareOrg * taskMixRoutineOrg : 0; hollow = false.",
       "citations": [
         "World Economic Forum (2026). AI is becoming your new work colleague - early adopters report weaker co-worker connections.",
         "AMCIS 2025: AI team members and team dynamics.",
