@@ -1,0 +1,1950 @@
+{
+  "modelVersion": "1.0.0",
+  "generatedBy": "scripts/extract_params.mjs from MODEL.md - do not edit by hand",
+  "items": [
+    {
+      "type": "parameter",
+      "id": "orgExecPointsPerPersonPerStep",
+      "plainLanguage": "How much focused work one average person can finish in a day, before coordination overhead.",
+      "formula": "P_eff = n * orgExecPointsPerPersonPerStep * (1 - tau) (Sec 5.1 step 7)",
+      "tier": "editorial-heuristic",
+      "limitation": "Averages over role mix; the org sim does not model individual performers.",
+      "anchor": "Definitional: 1 point = one focused person-day of an average performer",
+      "value": 1,
+      "range": [
+        0.5,
+        1.5
+      ],
+      "unit": "points/person/step",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "execPointsPerThroughputPoint",
+      "plainLanguage": "Converts an entity's 1-10 throughput rating into work points per day.",
+      "formula": "rate_e = throughput_e * execPointsPerThroughputPoint * ramp_e * availability_e (M15)",
+      "tier": "editorial-heuristic",
+      "limitation": "Linear scaling of the 1-10 throughput scale is a simplification.",
+      "anchor": "Definitional: throughput-5 entity = 1.0 point/step, consistent with orgExecPointsPerPersonPerStep",
+      "value": 0.2,
+      "range": [
+        0.1,
+        0.3
+      ],
+      "unit": "points/step per throughput point",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "taskArrivalPerPersonPerStep",
+      "plainLanguage": "How much new work shows up per person per day.",
+      "formula": "arrivals(t) = taskArrivalPerPersonPerStep * n(t) (M18)",
+      "tier": "editorial-heuristic",
+      "limitation": "Real demand is bursty and seasonal; arrivals here are steady.",
+      "anchor": "Editorial: sized so a healthy 20-person org runs near (not over) capacity",
+      "value": 0.135,
+      "range": [
+        0.06,
+        0.3
+      ],
+      "unit": "tasks/person/step",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "taskEffortRoutine",
+      "plainLanguage": "Size of a routine work item: a couple of days.",
+      "formula": "effort ~ Triangular(taskEffortRoutine) for routine tasks (M18)",
+      "tier": "editorial-heuristic",
+      "limitation": "Org-specific; adjustable via config.",
+      "anchor": "Editorial elicitation: routine items take 1.5-4 focused person-days",
+      "value": [
+        1.5,
+        2.5,
+        4
+      ],
+      "range": [
+        1.5,
+        3.5
+      ],
+      "unit": "points",
+      "distribution": "triangular"
+    },
+    {
+      "type": "parameter",
+      "id": "taskEffortComplex",
+      "plainLanguage": "Size of a complex work item: about a week.",
+      "formula": "effort ~ Triangular(taskEffortComplex) for complex tasks (M18)",
+      "tier": "editorial-heuristic",
+      "limitation": "Org-specific; adjustable via config.",
+      "anchor": "Editorial elicitation",
+      "value": [
+        3,
+        5,
+        8
+      ],
+      "range": [
+        4,
+        7
+      ],
+      "unit": "points",
+      "distribution": "triangular"
+    },
+    {
+      "type": "parameter",
+      "id": "taskEffortNovel",
+      "plainLanguage": "Size of a novel work item: one to three weeks, uncertain.",
+      "formula": "effort ~ Triangular(taskEffortNovel) for novel tasks (M18)",
+      "tier": "editorial-heuristic",
+      "limitation": "Novel work has the fattest real-world tails; the triangular max understates true worst cases.",
+      "anchor": "Editorial elicitation",
+      "value": [
+        5,
+        8,
+        14
+      ],
+      "range": [
+        6,
+        12
+      ],
+      "unit": "points",
+      "distribution": "triangular"
+    },
+    {
+      "type": "parameter",
+      "id": "taskMixRoutineOrg",
+      "plainLanguage": "Share of org work that is routine.",
+      "formula": "class ~ {routine: taskMixRoutineOrg, complex: taskMixComplexOrg, novel: remainder} (M18)",
+      "tier": "editorial-heuristic",
+      "limitation": "Mix varies enormously by industry and team charter.",
+      "anchor": "Editorial: most org work is routine",
+      "value": 0.6,
+      "range": [
+        0.4,
+        0.8
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "taskMixComplexOrg",
+      "plainLanguage": "Share of org work that is complex but not novel.",
+      "formula": "class mix (M18)",
+      "tier": "editorial-heuristic",
+      "limitation": "Mix varies by org; novel share is the remainder (default 0.15).",
+      "anchor": "Editorial",
+      "value": 0.25,
+      "range": [
+        0.1,
+        0.4
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "maxPointsPerTaskPerStep",
+      "plainLanguage": "How much progress a single task can absorb in one day, no matter how many people are free.",
+      "formula": "per-task allocation cap in the execution loop (Sec 5.1 step 7)",
+      "tier": "editorial-heuristic",
+      "limitation": "Some work parallelizes better than this cap allows.",
+      "anchor": "Editorial: at most ~2 people can effectively swarm one task per day",
+      "value": 2,
+      "range": [
+        1,
+        4
+      ],
+      "unit": "points/task/step",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "channelCostFraction",
+      "plainLanguage": "How much of a person's day each open communication channel consumes.",
+      "formula": "tau = min(maxCoordinationTax, mu * channelCostFraction * (C/n) * B(n) * (1 - relief)) (M4)",
+      "tier": "editorial-heuristic",
+      "limitation": "Not a measured constant; the single most influential editorial coefficient in the org sim.",
+      "anchor": "Calibrated so a 12-person meeting-heavy flat team pays ~30% coordination tax, directionally consistent with Asana (2024) meeting-load data",
+      "value": 0.036,
+      "range": [
+        0.01,
+        0.06
+      ],
+      "unit": "capacity fraction per (channel/person)",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "meetingHeavyMultiplier",
+      "plainLanguage": "Meeting-heavy cultures pay about one and a half times the coordination tax of async-first cultures.",
+      "formula": "mu_modality = meetingHeavyMultiplier when modality == meetingHeavy (M4)",
+      "tier": "editorial-heuristic",
+      "limitation": "The 1.4-1.6x range is an inference from meeting-waste research, not a direct measurement of the multiplier, so it is an editorial default.",
+      "anchor": "Direction from SI Labs (2026) meeting research (~60% of meeting time produces no concrete output); the 1.4-1.6x multiplier is an editorial default",
+      "value": 1.5,
+      "range": [
+        1.4,
+        1.6
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "maxCoordinationTax",
+      "plainLanguage": "An org never spends literally 100% of its time coordinating; this is the ceiling.",
+      "formula": "tau = min(maxCoordinationTax, ...) (M4); also normalizes xCoord (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "A cap, not an observation.",
+      "anchor": "Boundedness requirement (Sec 6)",
+      "value": 0.85,
+      "range": [
+        0.7,
+        0.95
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "meetingShareMeetingHeavy",
+      "plainLanguage": "In meeting-heavy orgs, ~70% of coordination cost shows up as actual meetings.",
+      "formula": "meetingOverheadPct = tau * meetingShareMeetingHeavy (meetingHeavy) (M4b)",
+      "tier": "editorial-heuristic",
+      "limitation": "Coordination cost manifests differently across orgs.",
+      "anchor": "Editorial split informed by Asana/Atlassian meeting-load reports",
+      "value": 0.7,
+      "range": [
+        0.5,
+        0.85
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "meetingShareAsync",
+      "plainLanguage": "Async-first orgs take less of their coordination cost as meetings.",
+      "formula": "meetingOverheadPct = tau * meetingShareAsync (asyncFirst) (M4b)",
+      "tier": "editorial-heuristic",
+      "limitation": "As above.",
+      "anchor": "Editorial",
+      "value": 0.4,
+      "range": [
+        0.2,
+        0.6
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "interTeamChannelCoefficient",
+      "plainLanguage": "How many working channels a typical pair of teams keeps open.",
+      "formula": "C_inter = interTeamChannelCoefficient * kappa_topology * T(T-1)/2 * (1 + conwayMisalignmentPenalty * m) (M2)",
+      "tier": "editorial-heuristic",
+      "limitation": "Real inter-team coupling depends on the dependency graph, not just pair counts.",
+      "anchor": "Editorial: each pair of coupled teams maintains a few active coordination channels",
+      "value": 3,
+      "range": [
+        1,
+        6
+      ],
+      "unit": "channels per team pair",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "topologyCouplingPods",
+      "plainLanguage": "Pod structures keep the standard level of team-pair coupling.",
+      "formula": "kappa_topology for pods (M2)",
+      "tier": "editorial-heuristic",
+      "limitation": "Topology labels compress many real designs.",
+      "anchor": "Editorial reference level",
+      "value": 1,
+      "range": [
+        0.6,
+        1.4
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "topologyCouplingHierarchical",
+      "plainLanguage": "Hierarchies route some coordination up-and-down instead of peer-to-peer, cutting direct channels but adding latency.",
+      "formula": "kappa_topology for hierarchical (M2)",
+      "tier": "editorial-heuristic",
+      "limitation": "Ignores that vertical routing adds latency (captured separately in M6).",
+      "anchor": "Editorial: vertical routing substitutes for some peer-to-peer channels",
+      "value": 0.7,
+      "range": [
+        0.4,
+        1
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "topologyCouplingFederated",
+      "plainLanguage": "Federated structures deliberately decouple units, halving pair coupling.",
+      "formula": "kappa_topology for federated (M2)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the federation charter is actually respected.",
+      "anchor": "Editorial: federated designs minimize cross-unit coupling by charter",
+      "value": 0.5,
+      "range": [
+        0.3,
+        0.8
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "conwayMisalignmentPenalty",
+      "plainLanguage": "When ownership and structure are fully misaligned, cross-team coordination needs nearly double the channels.",
+      "formula": "C_inter *= (1 + conwayMisalignmentPenalty * m) (M2)",
+      "tier": "editorial-heuristic",
+      "limitation": "The mirroring effect is peer-reviewed; this specific gain is not.",
+      "anchor": "Direction: MacCormack, Rusnak & Baldwin (2012); Nagappan et al. (2008). Magnitude: editorial",
+      "value": 0.8,
+      "range": [
+        0.3,
+        1.5
+      ],
+      "unit": "multiplier gain",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "misalignmentPerExtraTeam",
+      "plainLanguage": "Every team added without restructuring makes who-owns-what a bit murkier.",
+      "formula": "m(t) = clamp(m0 + misalignmentPerExtraTeam * (T - T_atStart), 0, 1) (M2/M5)",
+      "tier": "editorial-heuristic",
+      "limitation": "Deliberate restructuring (not modeled in v1) resets this in reality.",
+      "anchor": "Editorial: ownership ambiguity accretes as teams are added without restructuring",
+      "value": 0.1,
+      "range": [
+        0,
+        0.25
+      ],
+      "unit": "misalignment/team",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "federatedAutonomyFactor",
+      "plainLanguage": "Federated charters soak up some of the ownership ambiguity that growth creates.",
+      "formula": "m(t) *= federatedAutonomyFactor when topology == federated (M5)",
+      "tier": "editorial-heuristic",
+      "limitation": "Federation quality varies.",
+      "anchor": "Editorial: delegated ownership absorbs some ambiguity",
+      "value": 0.7,
+      "range": [
+        0.5,
+        0.9
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "crossCutShare",
+      "plainLanguage": "Roughly a third of decisions touch more than one team - those are the ones that escalate when ownership is unclear.",
+      "formula": "escalationShare = m(t) * crossCutShare (M6)",
+      "tier": "editorial-heuristic",
+      "limitation": "Depends on architecture modularity (Conway again).",
+      "anchor": "Editorial: share of decisions that span team boundaries",
+      "value": 0.3,
+      "range": [
+        0.1,
+        0.5
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "escalationExtraDays",
+      "plainLanguage": "A decision nobody clearly owns waits about a week extra while it gets escalated.",
+      "formula": "service += Triangular(escalationExtraDays) on escalated entry to layer L (M6)",
+      "tier": "editorial-heuristic",
+      "limitation": "Escalation cost varies with executive attention, not modeled.",
+      "anchor": "Editorial, consistent with SI Labs multi-layer delay observations",
+      "value": [
+        3,
+        5,
+        8
+      ],
+      "range": [
+        3,
+        7
+      ],
+      "unit": "working days",
+      "distribution": "triangular"
+    },
+    {
+      "type": "parameter",
+      "id": "cognitiveBandInner",
+      "plainLanguage": "Around five people, everyone shares full context effortlessly.",
+      "formula": "band center in B(n) (M3)",
+      "tier": "industry-report",
+      "limitation": "Contested: Lind et al. (2021) find the underlying method imprecise; treated as an adjustable band, not a law.",
+      "anchor": "Dunbar (1992) support-clique tier; used as a planning heuristic per Atlassian/CTO-practice frameworks",
+      "value": 5,
+      "range": [
+        3,
+        8
+      ],
+      "unit": "people",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cognitiveBandClose",
+      "plainLanguage": "Past ~15 people, a team stops being one trusted unit.",
+      "formula": "band center in B(n) (M3); also the cohesion size penalty midpoint (M12)",
+      "tier": "industry-report",
+      "limitation": "As cognitiveBandInner.",
+      "anchor": "Dunbar sympathy-group tier; industry planning heuristic",
+      "value": 15,
+      "range": [
+        10,
+        20
+      ],
+      "unit": "people",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cognitiveBandWorking",
+      "plainLanguage": "Past ~50, working relationships need explicit structure.",
+      "formula": "band center in B(n) (M3)",
+      "tier": "industry-report",
+      "limitation": "As cognitiveBandInner.",
+      "anchor": "Dunbar band tier; industry planning heuristic",
+      "value": 50,
+      "range": [
+        35,
+        70
+      ],
+      "unit": "people",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cognitiveBandStable",
+      "plainLanguage": "Somewhere between 100 and 300 people, nobody knows everyone anymore.",
+      "formula": "band center in B(n) (M3)",
+      "tier": "industry-report",
+      "limitation": "The most contested number in the model; the range deliberately spans the critique.",
+      "anchor": "Dunbar's 150; range extends to ~290 per the alternative US estimate (McCarty et al.)",
+      "value": 150,
+      "range": [
+        100,
+        290
+      ],
+      "unit": "people",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "bandPenaltyInner",
+      "plainLanguage": "Crossing the ~5-person band adds a small coordination surcharge.",
+      "formula": "B(n) term (M3)",
+      "tier": "editorial-heuristic",
+      "limitation": "Penalty magnitudes are tuned, not measured.",
+      "anchor": "Editorial",
+      "value": 0.05,
+      "range": [
+        0,
+        0.15
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "bandPenaltyClose",
+      "plainLanguage": "Crossing ~15 adds a moderate surcharge.",
+      "formula": "B(n) term (M3)",
+      "tier": "editorial-heuristic",
+      "limitation": "As bandPenaltyInner.",
+      "anchor": "Editorial",
+      "value": 0.1,
+      "range": [
+        0,
+        0.2
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "bandPenaltyWorking",
+      "plainLanguage": "Crossing ~50 adds a bigger surcharge.",
+      "formula": "B(n) term (M3)",
+      "tier": "editorial-heuristic",
+      "limitation": "As bandPenaltyInner.",
+      "anchor": "Editorial",
+      "value": 0.12,
+      "range": [
+        0,
+        0.25
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "bandPenaltyStable",
+      "plainLanguage": "Crossing ~150 adds the largest surcharge.",
+      "formula": "B(n) term (M3)",
+      "tier": "editorial-heuristic",
+      "limitation": "As bandPenaltyInner.",
+      "anchor": "Editorial",
+      "value": 0.15,
+      "range": [
+        0,
+        0.3
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "bandWidthFactor",
+      "plainLanguage": "How gradual each band crossing feels - the model never has a cliff at exactly 150.",
+      "formula": "sigma((n - center)/(bandWidthFactor * center)) (M3)",
+      "tier": "editorial-heuristic",
+      "limitation": "Width is a smoothing choice, not an observation.",
+      "anchor": "Editorial: makes band crossings gradual, per the design red-team requirement (no cliffs)",
+      "value": 0.15,
+      "range": [
+        0.05,
+        0.3
+      ],
+      "unit": "fraction of band center",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerFrictionFactor",
+      "plainLanguage": "How much each extra ownership layer drags on the decision-velocity score.",
+      "formula": "V = 100 / ((1 + (L-1) * layerFrictionFactor) * congestion) (M7)",
+      "tier": "editorial-heuristic",
+      "limitation": "Context-dependent; user-adjustable by design.",
+      "anchor": "eigenorg editorial default derived from the SI Labs hierarchy-latency pattern",
+      "value": 0.35,
+      "range": [
+        0.2,
+        0.6
+      ],
+      "unit": "dimensionless",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "decisionLatencyPerLayerDays",
+      "plainLanguage": "Each approval layer sits on a decision for two to three working days.",
+      "formula": "service ~ Triangular(decisionLatencyPerLayerDays) per layer (M6)",
+      "tier": "industry-report",
+      "limitation": "Documented mainly in large hierarchical orgs; flat orgs and startups differ (Flat Paradox).",
+      "anchor": "SI Labs (2026): ~3 days average processing per approval layer; design default 2-3 days",
+      "value": [
+        2,
+        2.5,
+        3
+      ],
+      "range": [
+        2,
+        3
+      ],
+      "unit": "working days/layer",
+      "distribution": "triangular"
+    },
+    {
+      "type": "parameter",
+      "id": "layerCapacityPerStep",
+      "plainLanguage": "How many decisions the first layer can actually process per day.",
+      "formula": "cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) (M6)",
+      "tier": "editorial-heuristic",
+      "limitation": "Real capacity depends on decision size and delegation.",
+      "anchor": "Editorial: a first-line decision layer processes ~6 items/day",
+      "value": 6,
+      "range": [
+        3,
+        15
+      ],
+      "unit": "decisions/step",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerCapacityDecay",
+      "plainLanguage": "Every layer up the stack has ~30% less decision bandwidth - which is why queues form at the top.",
+      "formula": "cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) (M6)",
+      "tier": "editorial-heuristic",
+      "limitation": "Some execs batch-approve; decay is not universal.",
+      "anchor": "Editorial: senior layers review fewer items per day",
+      "value": 0.7,
+      "range": [
+        0.5,
+        0.9
+      ],
+      "unit": "multiplier/layer",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "overrideBaseRate",
+      "plainLanguage": "The per-day chance that a higher layer reverses an in-flight piece of work, per extra layer above it.",
+      "formula": "o = overrideBaseRate * (L-1) * (1 + overrideMisalignmentGain*m) * (1 + distortionOverrideCoupling*distortion) (M8)",
+      "tier": "editorial-heuristic",
+      "limitation": "Override frequency data is scarce; tuned so ~10-15% of tasks in a 3-layer stack get overridden.",
+      "anchor": "Editorial",
+      "value": 0.02,
+      "range": [
+        0.005,
+        0.05
+      ],
+      "unit": "probability/step/task per extra layer",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "overrideMisalignmentGain",
+      "plainLanguage": "Unclear ownership makes overrides much more likely - people relitigate decisions nobody clearly owned.",
+      "formula": "override probability term (M8)",
+      "tier": "editorial-heuristic",
+      "limitation": "Tuned, not measured.",
+      "anchor": "Editorial",
+      "value": 2,
+      "range": [
+        0,
+        4
+      ],
+      "unit": "gain",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "wipResetFraction",
+      "plainLanguage": "An overridden task keeps about half its progress - rework, not restart.",
+      "formula": "progress *= wipResetFraction on override (M8)",
+      "tier": "editorial-heuristic",
+      "limitation": "Real rework cost depends on how contested the direction was.",
+      "anchor": "design red-team fix: overridden tasks re-enter at 50% completion (partial rework), not 0%",
+      "value": 0.5,
+      "range": [
+        0.25,
+        0.75
+      ],
+      "unit": "fraction of progress kept",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "distortionPerHumanLayer",
+      "plainLanguage": "Every human-to-human relay of context loses about 8% of the signal.",
+      "formula": "distortion = distortionPerHumanLayer * (D - 1); feeds override probability (M8) and perLayer stats",
+      "tier": "editorial-heuristic",
+      "limitation": "Distortion research (serial reproduction) is qualitative; the number is editorial.",
+      "anchor": "Editorial: information degrades at each human relay",
+      "value": 0.08,
+      "range": [
+        0.03,
+        0.15
+      ],
+      "unit": "fraction/layer",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "distortionOverrideCoupling",
+      "plainLanguage": "The more the story got garbled on its way up, the more likely the top layer overrides the call.",
+      "formula": "override probability *= (1 + distortionOverrideCoupling * distortion) (M8)",
+      "tier": "editorial-heuristic",
+      "limitation": "Tuned, not measured; couples two editorial quantities.",
+      "anchor": "Editorial",
+      "value": 0.5,
+      "range": [
+        0,
+        1
+      ],
+      "unit": "gain",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "metricSmoothingAlpha",
+      "plainLanguage": "How quickly the displayed latency and entropy react to what just happened versus the recent past.",
+      "formula": "x_ema(t) = alpha*x(t) + (1-alpha)*x_ema(t-1) (M13; decisionLatency series)",
+      "tier": "editorial-heuristic",
+      "limitation": "Affects chart smoothness and entropy responsiveness, not steady-state values.",
+      "anchor": "Standard exponential smoothing; editorial constant",
+      "value": 0.3,
+      "range": [
+        0.1,
+        0.5
+      ],
+      "unit": "EMA weight",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiRoutineShareOrg",
+      "plainLanguage": "When an org 'adds AI', about 60% of routine work actually flows through the agents.",
+      "formula": "routine allocations boosted on this share (M11); effectiveAiShare for cohesion (M12)",
+      "tier": "editorial-heuristic",
+      "limitation": "Adoption is uneven in reality.",
+      "anchor": "Editorial: share of routine work AI agents actually touch after an org-level injection",
+      "value": 0.6,
+      "range": [
+        0.3,
+        0.8
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiThroughputBoostOrg",
+      "plainLanguage": "AI makes the routine work it touches about 25% faster at org level.",
+      "formula": "routine execution allocation *= (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) when AI active - uniform expected-value factor, no per-task share draw (M11(a))",
+      "tier": "editorial-heuristic",
+      "limitation": "Deliberately conservative; vendor-reported gains are usually task-level, not org-level.",
+      "anchor": "Editorial, conservative relative to vendor claims",
+      "value": 1.25,
+      "range": [
+        1.1,
+        1.5
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiCoordinationRelief",
+      "plainLanguage": "In a healthy org, AI trims up to about a third of the coordination tax. In an unhealthy one: nothing.",
+      "formula": "relief_ai = aiCoordinationRelief * clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) (M9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Relief assumes agents are wired into clear ownership - which is exactly what low-SH orgs lack. Range extends above the default so calibration has upward headroom.",
+      "anchor": "Editorial: AI routing/summarizing relieves coordination in structurally healthy orgs",
+      "value": 0.35,
+      "range": [
+        0.05,
+        0.45
+      ],
+      "unit": "fraction of tax",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiNovelFailureBase",
+      "plainLanguage": "Roughly one in five novel tasks routed through an AI agent without human judgment hits a failure it cannot handle.",
+      "formula": "P(brittleness) = aiNovelFailureBase * shBrittleFactor(SH) [* highStakesBrittlenessFactor] (M9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Agent failure rates vary by domain and tooling generation; adjustable by design.",
+      "anchor": "HatchWorks (2025) AI-agent failure-mode analysis; editorial calibration",
+      "value": 0.22,
+      "range": [
+        0.1,
+        0.4
+      ],
+      "unit": "probability per novel task",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "humanNovelFailureBase",
+      "plainLanguage": "Humans stumble on a few percent of novel tasks.",
+      "formula": "brittleness probability when a human covers the judgment path (M11)",
+      "tier": "editorial-heuristic",
+      "limitation": "Humans fail on novel work too - just far less often and more recoverably.",
+      "anchor": "Editorial baseline",
+      "value": 0.03,
+      "range": [
+        0.01,
+        0.08
+      ],
+      "unit": "probability per novel task",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiAmplificationLowSH",
+      "plainLanguage": "In a structurally unhealthy org, AI injection multiplies novel-task failures by about 1.5x - faster dysfunction.",
+      "formula": "shBrittleFactor(SH <= shRiskThreshold) = aiAmplificationLowSH (M9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Practitioner-report-based, not a controlled study; the model's most load-bearing editorial coefficient.",
+      "anchor": "design red-team range 1.3-1.8x, synthesized from AI-transformation failure reports (rework.com 2025, aimagicx 2026)",
+      "value": 1.55,
+      "range": [
+        1.3,
+        1.8
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiGuardrailedHighSH",
+      "plainLanguage": "In a healthy org, most AI stumbles get caught before they become failures.",
+      "formula": "shBrittleFactor(SH >= shSafeThreshold) = aiGuardrailedHighSH (M9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes guardrails actually exist at high SH.",
+      "anchor": "Editorial: healthy orgs keep humans in the loop, catching most agent failures",
+      "value": 0.2,
+      "range": [
+        0.2,
+        0.5
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "shRiskThreshold",
+      "plainLanguage": "At Structural Health 4 or below, AI amplifies dysfunction at full strength.",
+      "formula": "amplification is full at SH <= shRiskThreshold (M9)",
+      "tier": "editorial-heuristic",
+      "limitation": "The 1-10 SH scale is itself a diagnostic heuristic (Sec 3.4).",
+      "anchor": "design red-team: 'when Structural Health is low (<= 4)'",
+      "value": 4,
+      "range": [
+        3,
+        5
+      ],
+      "unit": "SH score",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "shSafeThreshold",
+      "plainLanguage": "At Structural Health 7 or above, AI injection actually helps.",
+      "formula": "guardrailed regime at SH >= shSafeThreshold; linear in between (M9)",
+      "tier": "editorial-heuristic",
+      "limitation": "As shRiskThreshold.",
+      "anchor": "Editorial",
+      "value": 7,
+      "range": [
+        6,
+        8
+      ],
+      "unit": "SH score",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "recoveryOwnershipThreshold",
+      "plainLanguage": "Below Structural Health 5, nobody clearly owns failure recovery.",
+      "formula": "org sim: recovery is owned iff SH >= recoveryOwnershipThreshold (M10)",
+      "tier": "editorial-heuristic",
+      "limitation": "Org sim derives ownership from SH; team sim uses the explicit recoveryOwner config.",
+      "anchor": "Editorial: SH question 5 (recovery path) dominates this",
+      "value": 5,
+      "range": [
+        4,
+        6
+      ],
+      "unit": "SH score",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "recoveryLatencyMultiplierUnowned",
+      "plainLanguage": "An unowned failure roughly doubles decision times while people figure out whose problem it is.",
+      "formula": "M_recovery window multiplier, unowned (M10)",
+      "tier": "editorial-heuristic",
+      "limitation": "Range is an editorial synthesis.",
+      "anchor": "design red-team fix: 1.5-2.5x latency for 3-5 steps when no recovery owner",
+      "value": [
+        1.5,
+        2,
+        2.5
+      ],
+      "range": [
+        1.5,
+        2.5
+      ],
+      "unit": "multiplier",
+      "distribution": "triangular"
+    },
+    {
+      "type": "parameter",
+      "id": "recoveryDurationUnownedSteps",
+      "plainLanguage": "The unowned-failure slowdown lasts most of a week.",
+      "formula": "recovery window duration, unowned (M10)",
+      "tier": "editorial-heuristic",
+      "limitation": "As recoveryLatencyMultiplierUnowned.",
+      "anchor": "design red-team fix: next 3-5 time steps",
+      "value": [
+        3,
+        4,
+        5
+      ],
+      "range": [
+        3,
+        5
+      ],
+      "unit": "steps",
+      "distribution": "triangular"
+    },
+    {
+      "type": "parameter",
+      "id": "recoveryLatencyMultiplierOwned",
+      "plainLanguage": "With a named recovery owner, a failure barely dents decision speed.",
+      "formula": "M_recovery window multiplier, owned (M10)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the named owner is competent and available.",
+      "anchor": "Editorial",
+      "value": 1.15,
+      "range": [
+        1,
+        1.3
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "recoveryDurationOwnedSteps",
+      "plainLanguage": "Owned recoveries wrap up in a day or two.",
+      "formula": "recovery window duration, owned (M10)",
+      "tier": "editorial-heuristic",
+      "limitation": "As recoveryLatencyMultiplierOwned.",
+      "anchor": "Editorial",
+      "value": [
+        1,
+        1.5,
+        2
+      ],
+      "range": [
+        1,
+        2
+      ],
+      "unit": "steps",
+      "distribution": "triangular"
+    },
+    {
+      "type": "parameter",
+      "id": "hybridVsAutonomousAdvantage",
+      "plainLanguage": "On complex work, teams that keep humans in the judgment loop outperform all-AI pipelines by a large margin - about 69% in the one study we anchor to, which is why we let you adjust it.",
+      "formula": "judgment contribution /= hybridVsAutonomousAdvantage for complex/novel tasks with zero human judgment coverage (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "Lab-based, domain-specific (law, drone design, creative tasks), secondhand-reported; treated as an adjustable editorial default and deliberately NOT presented as a universal constant. For routine tasks the advantage may reverse.",
+      "anchor": "Stanford/Carnegie study as reported by e-discoveryteam.com (2025): hybrid teams beat fully autonomous agent teams by 68.7% on complex tasks",
+      "value": 1.687,
+      "range": [
+        1.2,
+        2
+      ],
+      "unit": "ratio",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiRoutineAdvantage",
+      "plainLanguage": "AI executes routine work about 50% faster than humans.",
+      "formula": "routine execution progress *= (1 + aiExecShare * (aiRoutineAdvantage - 1)) (M11)",
+      "tier": "editorial-heuristic",
+      "limitation": "Task-type dependent.",
+      "anchor": "Editorial, consistent with the hybrid-team literature's routine-task findings",
+      "value": 1.5,
+      "range": [
+        1.2,
+        2
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiRoutineLatencyFactor",
+      "plainLanguage": "An AI prioritization agent turns a 2.5-day routine triage into a same-day one.",
+      "formula": "routine prioritization service *= aiRoutineLatencyFactor when AI covers prioritization (M11)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the routing genuinely is routine.",
+      "anchor": "Editorial: agents triage in minutes-to-hours, humans in days",
+      "value": 0.25,
+      "range": [
+        0.1,
+        0.5
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "aiNovelEffectiveness",
+      "plainLanguage": "On novel work an AI executor delivers less than a third of its routine effectiveness.",
+      "formula": "novel progress *= (humanExecShare + aiExecShare * aiNovelEffectiveness) (M11)",
+      "tier": "editorial-heuristic",
+      "limitation": "Improving frontier; adjustable.",
+      "anchor": "Editorial: capability collapse on novel work",
+      "value": 0.3,
+      "range": [
+        0.1,
+        0.5
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "uncoveredPrioritizationFactor",
+      "plainLanguage": "If nobody owns prioritization, everything waits 50% longer to get picked up.",
+      "formula": "prioritization service *= uncoveredPrioritizationFactor when nobody covers prioritization (M11)",
+      "tier": "editorial-heuristic",
+      "limitation": "Small teams sometimes self-prioritize well.",
+      "anchor": "Editorial: unowned queues self-organize slowly",
+      "value": 1.5,
+      "range": [
+        1.2,
+        2
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "highStakesBrittlenessFactor",
+      "plainLanguage": "High-stakes novel work is where AI failures concentrate.",
+      "formula": "brittleness probability *= highStakesBrittlenessFactor for high-stakes novel tasks (M9, team sim)",
+      "tier": "editorial-heuristic",
+      "limitation": "Stakes and novelty correlate in reality; modeled independently here.",
+      "anchor": "Editorial",
+      "value": 1.5,
+      "range": [
+        1,
+        2
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cohesionBase",
+      "plainLanguage": "A normal healthy team sits around 75/100 on cohesion.",
+      "formula": "cohesion target ceiling and initial value (M12)",
+      "tier": "editorial-heuristic",
+      "limitation": "Starting cohesion varies; the dynamics matter more than the level.",
+      "anchor": "Editorial baseline for a functioning team",
+      "value": 75,
+      "range": [
+        60,
+        85
+      ],
+      "unit": "index 0-100",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cohesionSizePenalty",
+      "plainLanguage": "Teams that outgrow ~15 people lose about a dozen points of glue.",
+      "formula": "target -= cohesionSizePenalty * sigma((s - cognitiveBandClose)/(bandWidthFactor * cognitiveBandClose)) (M12)",
+      "tier": "editorial-heuristic",
+      "limitation": "Band location is contested (Sec 9.3).",
+      "anchor": "Editorial, keyed to the ~15-person band",
+      "value": 12,
+      "range": [
+        5,
+        20
+      ],
+      "unit": "index points",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cohesionAiPenalty",
+      "plainLanguage": "The more teammates are agents, the weaker the human bonds get - about 15 points if the whole team were AI.",
+      "formula": "target -= cohesionAiPenalty * effectiveAiShare (M12)",
+      "tier": "editorial-heuristic",
+      "limitation": "The direction is survey-supported but the magnitude is scaled editorially to the 0-100 index, so this is an editorial default, not a reported figure.",
+      "anchor": "Direction from WEF (2026) and AMCIS 2025 (AI-heavy teams report weaker co-worker connections); magnitude is an editorial default",
+      "value": 15,
+      "range": [
+        10,
+        30
+      ],
+      "unit": "index points at 100% AI",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cohesionHollownessPenalty",
+      "plainLanguage": "Replacing the human relationship layer (like the PM people actually talked to) costs the team extra glue.",
+      "formula": "target -= cohesionHollownessPenalty when prioritization, coordination, or stakeholderCommunication has zero human coverage (M12)",
+      "tier": "editorial-heuristic",
+      "limitation": "Binary trigger; real hollowing is gradual.",
+      "anchor": "Editorial, modeling the Hollow Middle red-team finding (front-line teams lose the human relationship layer)",
+      "value": 8,
+      "range": [
+        3,
+        15
+      ],
+      "unit": "index points",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cohesionRecoveryRate",
+      "plainLanguage": "Cohesion drifts about 5% of the way toward its ceiling (or floor) each day.",
+      "formula": "c += cohesionRecoveryRate * (target - c) (M12)",
+      "tier": "editorial-heuristic",
+      "limitation": "Recovery speed varies by team history.",
+      "anchor": "Editorial",
+      "value": 0.05,
+      "range": [
+        0.01,
+        0.15
+      ],
+      "unit": "fraction/step",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "cohesionEntropyCoupling",
+      "plainLanguage": "Sustained thrash grinds team spirit down a little every day.",
+      "formula": "c -= cohesionEntropyCoupling * max(0, E - entropyStressThreshold)/10 (M12)",
+      "tier": "editorial-heuristic",
+      "limitation": "Bounded by clamps; see Sec 6 L3 for the stability argument.",
+      "anchor": "Editorial (the L3 reinforcing loop, Sec 6)",
+      "value": 0.15,
+      "range": [
+        0,
+        0.4
+      ],
+      "unit": "points/step per 10 entropy above threshold",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "entropyStressThreshold",
+      "plainLanguage": "Below ~60 entropy, people cope; above it, the thrash starts eating the team.",
+      "formula": "cohesion coupling activates above this entropy (M12)",
+      "tier": "editorial-heuristic",
+      "limitation": "Threshold form is a simplification of a continuous effect.",
+      "anchor": "Editorial",
+      "value": 60,
+      "range": [
+        40,
+        80
+      ],
+      "unit": "entropy index",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "entropyWeightCoordination",
+      "plainLanguage": "Coordination overhead is the biggest single ingredient of entropy.",
+      "formula": "E term weight (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "Weighting is an editorial judgment about salience, not a fit.",
+      "anchor": "Editorial; weights sum to 1 (extractor-checked)",
+      "value": 0.3,
+      "range": [
+        0,
+        0.5
+      ],
+      "unit": "weight",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "entropyWeightLatency",
+      "plainLanguage": "Slow decisions are the second-biggest ingredient.",
+      "formula": "E term weight (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "As entropyWeightCoordination.",
+      "anchor": "Editorial",
+      "value": 0.25,
+      "range": [
+        0,
+        0.5
+      ],
+      "unit": "weight",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "entropyWeightCohesion",
+      "plainLanguage": "Frayed human fabric contributes a fifth.",
+      "formula": "E term weight (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "As entropyWeightCoordination.",
+      "anchor": "Editorial",
+      "value": 0.2,
+      "range": [
+        0,
+        0.5
+      ],
+      "unit": "weight",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "entropyWeightBrittleness",
+      "plainLanguage": "Failures on novel work contribute when AI is in play.",
+      "formula": "E term weight (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "As entropyWeightCoordination.",
+      "anchor": "Editorial",
+      "value": 0.15,
+      "range": [
+        0,
+        0.5
+      ],
+      "unit": "weight",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "entropyWeightWip",
+      "plainLanguage": "Piled-up work-in-progress rounds out the index.",
+      "formula": "E term weight (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "As entropyWeightCoordination.",
+      "anchor": "Editorial",
+      "value": 0.1,
+      "range": [
+        0,
+        0.5
+      ],
+      "unit": "weight",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "latencyNormDays",
+      "plainLanguage": "Decisions taking 12+ days count as maximally slow.",
+      "formula": "xLat = min(1, latencySmoothed / latencyNormDays) (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "Normalization constant, affects entropy scale only.",
+      "anchor": "Editorial: ~2.5 working weeks of decision latency saturates the entropy term",
+      "value": 12,
+      "range": [
+        8,
+        25
+      ],
+      "unit": "working days",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "brittlenessNormPerStep",
+      "plainLanguage": "A failure every other day counts as maximal brittleness.",
+      "formula": "xBrit = min(1, brittleEMA / brittlenessNormPerStep) (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "Normalization constant.",
+      "anchor": "Editorial",
+      "value": 0.5,
+      "range": [
+        0.2,
+        1
+      ],
+      "unit": "events/step",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "wipNormPerPerson",
+      "plainLanguage": "More than ~2.5 items in flight per person counts as maximal WIP overload.",
+      "formula": "xWip = min(1, WIP / (wipNormPerPerson * n)) (M13)",
+      "tier": "editorial-heuristic",
+      "limitation": "Normalization constant.",
+      "anchor": "Editorial, informed by common WIP-limit practice (1-3 items/person)",
+      "value": 2.5,
+      "range": [
+        1,
+        4
+      ],
+      "unit": "items/person",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "handoffTaxCoefficient",
+      "plainLanguage": "A team of average-friction entities loses ~3% of capacity to handoffs.",
+      "formula": "handoffTax = handoffTaxCoefficient * mean(handoffFriction)/5 (M14)",
+      "tier": "editorial-heuristic",
+      "limitation": "Pairwise friction is averaged (M14).",
+      "anchor": "Editorial",
+      "value": 0.03,
+      "range": [
+        0.01,
+        0.06
+      ],
+      "unit": "fraction at friction 5",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "humanAttentionSpan",
+      "plainLanguage": "A person juggling more than three functions covers each one thinner; software does not have this problem.",
+      "formula": "attention_e = min(1, humanAttentionSpan / count(functions_e)) for humans (M17)",
+      "tier": "editorial-heuristic",
+      "limitation": "Individual variance is large.",
+      "anchor": "Editorial: humans cover ~3 functions before attention dilutes",
+      "value": 3,
+      "range": [
+        1,
+        4
+      ],
+      "unit": "functions",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "functionDemandExecution",
+      "plainLanguage": "Execution is the hungriest function - it needs multiple people's full attention.",
+      "formula": "demand(execution) = functionDemandExecution * (n_e/8) (M17)",
+      "tier": "editorial-heuristic",
+      "limitation": "Linear team-size scaling is a simplification.",
+      "anchor": "Editorial: execution needs several dedicated people",
+      "value": 2,
+      "range": [
+        1,
+        3
+      ],
+      "unit": "demand units at 8 entities",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "functionDemandDefault",
+      "plainLanguage": "Each judgment/communication function needs about half a dedicated person on an 8-person team.",
+      "formula": "demand(non-execution f) = functionDemandDefault * (n_e/8) (M17)",
+      "tier": "editorial-heuristic",
+      "limitation": "As functionDemandExecution.",
+      "anchor": "Editorial",
+      "value": 0.5,
+      "range": [
+        0.3,
+        1
+      ],
+      "unit": "demand units at 8 entities",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "coverageGreenThreshold",
+      "plainLanguage": "80%+ covered shows green.",
+      "formula": "rating green iff coverage >= coverageGreenThreshold (M17)",
+      "tier": "editorial-heuristic",
+      "limitation": "Display semantics only; no dynamics hang off this value.",
+      "anchor": "Editorial display threshold",
+      "value": 0.8,
+      "range": [
+        0.7,
+        0.9
+      ],
+      "unit": "coverage score",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "coverageAmberThreshold",
+      "plainLanguage": "Below 50% covered shows red - effectively unowned.",
+      "formula": "rating amber iff coverage >= coverageAmberThreshold (else red) (M17)",
+      "tier": "editorial-heuristic",
+      "limitation": "As coverageGreenThreshold.",
+      "anchor": "Editorial display threshold",
+      "value": 0.5,
+      "range": [
+        0.4,
+        0.6
+      ],
+      "unit": "coverage score",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "qualityBase",
+      "plainLanguage": "Work with zero applied judgment starts from a mediocre baseline.",
+      "formula": "mu_q = qualityBase + judgment and reliability terms (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "Quality index is internally comparable only (M16).",
+      "anchor": "Editorial",
+      "value": 45,
+      "range": [
+        30,
+        60
+      ],
+      "unit": "quality index",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "qualityJudgmentWeight",
+      "plainLanguage": "Strong judgment coverage lifts quality from mediocre to excellent.",
+      "formula": "mu_q += qualityJudgmentWeight * judgmentEff * hybridFactor (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "As qualityBase.",
+      "anchor": "Editorial",
+      "value": 5.5,
+      "range": [
+        3,
+        8
+      ],
+      "unit": "quality points per judgment point",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "qualityReliabilityWeight",
+      "plainLanguage": "Unreliable builders drag quality down a bit even with good review.",
+      "formula": "mu_q += qualityReliabilityWeight * (meanReliability(exec pool) - 7) (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "As qualityBase.",
+      "anchor": "Editorial",
+      "value": 1,
+      "range": [
+        0,
+        3
+      ],
+      "unit": "quality points per reliability point",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "noveltyQualityPenalty",
+      "plainLanguage": "Novel work shipped without any human judgment takes a big quality hit.",
+      "formula": "mu_q -= noveltyQualityPenalty for novel tasks with zero human judgment coverage (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "As qualityBase.",
+      "anchor": "Editorial, consistent with the hybrid-team literature's novel-task findings",
+      "value": 15,
+      "range": [
+        5,
+        25
+      ],
+      "unit": "quality points",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "reviewUncoveredQualityPenalty",
+      "plainLanguage": "Skipping review costs several points of quality on everything.",
+      "formula": "mu_q -= reviewUncoveredQualityPenalty when review is uncovered (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "As qualityBase.",
+      "anchor": "Editorial",
+      "value": 8,
+      "range": [
+        3,
+        15
+      ],
+      "unit": "quality points",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "qualitySpreadDown",
+      "plainLanguage": "Bad days are worse than good days are good - the downside spread is wider.",
+      "formula": "quality ~ Triangular(mu_q - qualitySpreadDown, mu_q, mu_q + qualitySpreadUp) (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "Symmetric-ish triangular spread is a simplification.",
+      "anchor": "Editorial",
+      "value": 15,
+      "range": [
+        5,
+        25
+      ],
+      "unit": "quality points",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "qualitySpreadUp",
+      "plainLanguage": "Upside surprise on quality is modest.",
+      "formula": "quality upper spread (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "As qualitySpreadDown.",
+      "anchor": "Editorial",
+      "value": 10,
+      "range": [
+        3,
+        20
+      ],
+      "unit": "quality points",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "reviewDwellDays",
+      "plainLanguage": "Review adds about a day before work counts as shipped.",
+      "formula": "completed tasks wait reviewDwellDays before done when review is covered (Sec 5.2 step 6)",
+      "tier": "editorial-heuristic",
+      "limitation": "Fixed dwell; review queues are not modeled in v1.",
+      "anchor": "Editorial",
+      "value": 1,
+      "range": [
+        0.5,
+        2
+      ],
+      "unit": "working days",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "rampStartFactor",
+      "plainLanguage": "A new hire starts at about 30% effectiveness.",
+      "formula": "ramp_e(0) = rampStartFactor for ramping humans (M15)",
+      "tier": "editorial-heuristic",
+      "limitation": "Linear ramp (M15).",
+      "anchor": "Brooks (1975) onboarding cost, magnitude editorial",
+      "value": 0.3,
+      "range": [
+        0.1,
+        0.5
+      ],
+      "unit": "fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "judgmentFloor",
+      "plainLanguage": "Even with nobody on judgment functions, some residual judgment happens in the doing.",
+      "formula": "judgmentEff = judgmentFloor when nobody covers review/synthesis/ambiguity (M16)",
+      "tier": "editorial-heuristic",
+      "limitation": "As qualityBase.",
+      "anchor": "Editorial",
+      "value": 2,
+      "range": [
+        1,
+        4
+      ],
+      "unit": "judgment points",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "teamPodTargetSize",
+      "plainLanguage": "Pods are sized around 8 people.",
+      "formula": "T = ceil(n / teamPodTargetSize) for pods/federated (Sec 3.3)",
+      "tier": "industry-report",
+      "limitation": "Partition arithmetic, not a behavioral coefficient.",
+      "anchor": "Industry pod-design practice (6-8 person pods)",
+      "value": 8,
+      "range": [
+        5,
+        10
+      ],
+      "unit": "people",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "hierarchicalTeamSize",
+      "plainLanguage": "Hierarchies fan out at about seven people per manager.",
+      "formula": "T = ceil(n / hierarchicalTeamSize) for hierarchical (Sec 3.3)",
+      "tier": "industry-report",
+      "limitation": "As teamPodTargetSize.",
+      "anchor": "Common span-of-control practice (~7 direct reports)",
+      "value": 7,
+      "range": [
+        5,
+        10
+      ],
+      "unit": "people",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerLatencyFactorDirector",
+      "plainLanguage": "A director seat sits on each decision about 20% longer than a baseline PM seat.",
+      "formula": "service draw at a humanDirector layer *= layerLatencyFactorDirector (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Seat behavior varies; a decisive director can be faster than a committee-run PM function.",
+      "anchor": "Editorial: a senior/exec approval seat deliberates longer per item than a first-line PM",
+      "value": 1.2,
+      "range": [
+        1,
+        1.5
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerCapacityFactorDirector",
+      "plainLanguage": "A director seat processes about a quarter fewer decisions per day than a baseline PM seat.",
+      "formula": "cap_l at a humanDirector layer *= layerCapacityFactorDirector (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Some directors batch-approve; the reduction is an editorial default.",
+      "anchor": "Editorial: senior seats review fewer items per day (span-of-attention), amplifying the top-of-stack queue",
+      "value": 0.75,
+      "range": [
+        0.5,
+        1
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerLatencyFactorAiAgent",
+      "plainLanguage": "An AI agent seat clears approvals at roughly 40% of a human seat's time.",
+      "formula": "service draw at an aiAgent layer *= layerLatencyFactorAiAgent (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the routing genuinely is mechanical; the agent is no faster on genuinely ambiguous calls.",
+      "anchor": "Editorial: an AI prioritization agent clears a routing decision in a fraction of a human seat's time (consistent with aiRoutineLatencyFactor)",
+      "value": 0.4,
+      "range": [
+        0.2,
+        0.7
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerCapacityFactorAiAgent",
+      "plainLanguage": "An AI agent seat processes about 40% more decisions per day than a baseline PM seat.",
+      "formula": "cap_l at an aiAgent layer *= layerCapacityFactorAiAgent (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Bandwidth is a modeling proxy; a badly-integrated agent can add rework instead.",
+      "anchor": "Editorial: an agent adds mechanical approval bandwidth at any Structural Health (M11(c) rationale, applied per-seat)",
+      "value": 1.4,
+      "range": [
+        1.1,
+        1.8
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerDistortionFactorAiAgent",
+      "plainLanguage": "An AI agent seat loses only about a third of the context a human relay would - so it triggers fewer overrides.",
+      "formula": "layerDistortionFactor(aiAgent) in layerDistortionMean → override distortion (M8, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Assumes the agent preserves nuance; over-summarizing agents can distort in their own way.",
+      "anchor": "Editorial: an agent relays context verbatim, so its layer garbles far less than a human hand-up",
+      "value": 0.3,
+      "range": [
+        0,
+        0.6
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerNovelExposureAiAgent",
+      "plainLanguage": "Put an AI agent in an approval seat and about 70% of the AI novel-failure exposure of a full org-wide injection shows up - the routine speed-up comes bundled with novel brittleness.",
+      "formula": "novelExposure = max(injectionActive?1:0, max_l layerNovelExposure(type_l)); P(brittle) = aiNovelFailureBase * shBrittleFactor(SH) * novelExposure (M11/M9, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "The single load-bearing coefficient that makes an AI middle layer riskier on novel work; deliberately adjustable.",
+      "anchor": "Editorial: an AI-owned prioritization seat routes novel work into the brittleness path much like an org-wide injection, scaled below 1 because a single seat is narrower than full injection",
+      "value": 0.7,
+      "range": [
+        0.3,
+        1
+      ],
+      "unit": "exposure fraction",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerLatencyFactorCommittee",
+      "plainLanguage": "A committee seat sits on each decision about 50% longer than a baseline PM seat.",
+      "formula": "service draw at a committee layer *= layerLatencyFactorCommittee (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "A well-run committee with a decider can beat this; the default models the common slow case.",
+      "anchor": "Editorial: committee decision-making is slow (scheduling, consensus)",
+      "value": 1.5,
+      "range": [
+        1.1,
+        2
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerCapacityFactorCommittee",
+      "plainLanguage": "A committee seat processes about 40% fewer decisions per day than a baseline PM seat.",
+      "formula": "cap_l at a committee layer *= layerCapacityFactorCommittee (M6, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Standing committees with delegated sub-decisions can process more.",
+      "anchor": "Editorial: a committee meets periodically, so its per-day approval bandwidth is low",
+      "value": 0.6,
+      "range": [
+        0.4,
+        0.9
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "parameter",
+      "id": "layerDistortionFactorCommittee",
+      "plainLanguage": "A committee seat's many eyes cut relayed-context loss roughly in half - fewer overrides than a lone human seat.",
+      "formula": "layerDistortionFactor(committee) in layerDistortionMean → override distortion (M8, §9.9)",
+      "tier": "editorial-heuristic",
+      "limitation": "Groupthink can defeat the many-eyes benefit; editorial default.",
+      "anchor": "Editorial: multiple reviewers catch and correct relayed context, halving distortion versus a single human hand-up",
+      "value": 0.5,
+      "range": [
+        0.2,
+        0.8
+      ],
+      "unit": "multiplier",
+      "distribution": "point"
+    },
+    {
+      "type": "mechanic",
+      "id": "brooksIntraTeamChannels",
+      "plainLanguage": "Within each team, everyone can end up talking to everyone: the number of possible communication channels grows with the square of team size. A team of 12 has 66 channels; a team of 25 has 300. The model applies this inside each team only - not across the whole org as one giant graph - because real organizations route most cross-team communication through structure.",
+      "formula": "C_intra(t) = sum over teams i of n_i(t) * (n_i(t) - 1) / 2",
+      "citations": [
+        "Brooks, F. P. (1975). The Mythical Man-Month. Addison-Wesley. (n(n-1)/2 communication channels)",
+        "Raymond, E. S. (1999). The Cathedral and the Bazaar, ch. 'How Many Eyeballs Tame Complexity' - only the core group pays full Brooksian overhead. http://www.catb.org/~esr/writings/cathedral-bazaar/"
+      ],
+      "limitations": [
+        "The complete-graph assumption overstates real communication: not every pair actually talks. Applying it per-team (not org-wide) reduces but does not remove this bias.",
+        "Channel count is a proxy for coordination surface, not measured communication volume."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "interTeamChannelsConway",
+      "plainLanguage": "Teams also need channels between them, and every pair of teams that shares work adds a few. When the org chart and the actual ownership of functions do not line up (Conway misalignment), each of those pairs needs even more channels, because work keeps crossing boundaries nobody owns. Misalignment drifts upward as more teams are added without restructuring.",
+      "formula": "C_inter(t) = interTeamChannelCoefficient * kappa_topology * (T*(T-1)/2) * (1 + conwayMisalignmentPenalty * m(t)); kappa_topology in {pods: topologyCouplingPods, hierarchical: topologyCouplingHierarchical, federated: topologyCouplingFederated, flat: 0}; m(t) = clamp(m0 + misalignmentPerExtraTeam * max(0, T - T_atStart), 0, 1) * (topology == federated ? federatedAutonomyFactor : 1); m0 defaults to clamp((7 - SH) / 9, 0, 1) when not set in config",
+      "citations": [
+        "Conway, M. E. (1968). How do committees invent? Datamation 14(4).",
+        "MacCormack, A., Rusnak, J., & Baldwin, C. (2012). Exploring the duality between product and organizational architectures. Research Policy 41(8) - empirical support for the mirroring hypothesis.",
+        "Nagappan, N., Murphy, B., & Basili, V. (2008). The influence of organizational structure on software quality. ICSE '08."
+      ],
+      "limitations": [
+        "The direction (misalignment amplifies coordination cost) is peer-reviewed; the magnitude of conwayMisalignmentPenalty is an editorial default.",
+        "Misalignment is modeled as a single scalar; real ownership gaps are per-function and lumpy."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "cognitiveLoadBands",
+      "plainLanguage": "As headcount crosses familiar social thresholds (about 5, 15, 50, 150 people), keeping track of who knows what gets gradually harder, so every communication channel costs a bit more. The model uses smooth ramps, not cliffs: nothing special happens at exactly 150. The band centers are adjustable because the underlying numbers are contested.",
+      "formula": "B(n) = 1 + sum over bands b in {inner, close, working, stable} of bandPenalty_b * sigma((n - center_b) / (bandWidthFactor * center_b)); sigma(x) = 1/(1+exp(-x)); centers = {cognitiveBandInner, cognitiveBandClose, cognitiveBandWorking, cognitiveBandStable}",
+      "citations": [
+        "Dunbar, R. I. M. (1992). Neocortex size as a constraint on group size in primates. Journal of Human Evolution 22(6).",
+        "Lind, J., Lindenfors, P., et al. (2021). 'Dunbar's number' deconstructed. Biology Letters 17(5) - re-analysis finds the concept lacks empirical precision (confidence intervals from single digits to several hundred).",
+        "Atlassian (2020). Three research-backed principles for scaling engineering orgs - bands used as design heuristics."
+      ],
+      "limitations": [
+        "Dunbar-style thresholds are contested (Lind et al. 2021); the bands are planning heuristics, not empirical constants.",
+        "Band penalties are editorial defaults tuned so degradation is visible but gradual."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "coordinationTax",
+      "plainLanguage": "Every open communication channel eats a slice of everyone's day. The tax is the fraction of total capacity spent coordinating instead of producing. Meeting-heavy cultures pay roughly 1.4-1.6x what async-first cultures pay for the same structure. The tax is capped: an org never spends literally all its time coordinating.",
+      "formula": "tau(t) = min(maxCoordinationTax, mu_modality * channelCostFraction * ((C_intra + C_inter) / n) * B(n) * (1 - relief_ai(t))); mu_modality = meetingHeavyMultiplier when modality == meetingHeavy else 1.0; relief_ai per M9. Effective execution capacity = raw capacity * (1 - tau).",
+      "citations": [
+        "SI Labs (2026). The Meeting Trap - about 60% of meeting time produces no concrete output. https://www.si-labs.com/en/articles/meeting-trap/",
+        "Asana Anatomy of Work Index (2024). Unproductive meeting time for ICs rose 118% between 2019 and 2024 (1.7 to 3.7 h/week)."
+      ],
+      "limitations": [
+        "channelCostFraction is an editorial default calibrated so a 12-person meeting-heavy flat team pays roughly 30% coordination tax; it is not a measured constant.",
+        "The multiplicative form (modality x channels x bands) is a modeling choice; interactions could be non-multiplicative in reality."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "meetingOverhead",
+      "plainLanguage": "Of the total coordination tax, this is the slice that shows up as actual meetings on calendars (the rest is chat, docs, handoffs, and waiting). Meeting-heavy orgs both pay a higher tax and take more of it as meetings.",
+      "formula": "meetingOverheadPct(t) = tau(t) * (modality == meetingHeavy ? meetingShareMeetingHeavy : meetingShareAsync)",
+      "citations": [
+        "SI Labs (2026). The Meeting Trap. https://www.si-labs.com/en/articles/meeting-trap/",
+        "Atlassian (2019). Workplace Woes: Meetings."
+      ],
+      "limitations": [
+        "The meeting share split is an editorial default; real orgs vary widely in how coordination cost manifests."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "decisionPipeline",
+      "plainLanguage": "Every approval layer adds waiting: around 2-3 working days each just for its own look, plus queueing when the layer is busy. Higher layers have less bandwidth (a VP reviews fewer things per day than a team lead), so queues form at the top. What sits in each seat changes the wait: an AI prioritization agent clears routine items fast and adds bandwidth; a committee is slower with less. Decisions that cut across teams with unclear ownership get escalated and wait extra days. Three layers turn a same-week decision into a two-week one.",
+      "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10) * layerLatencyFactor(type_l) (§9.9; 1.0 for the default humanPm type, so absent layerTypes reproduces the base model). Layer l advances at most cap_l tasks/step: cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) * layerCapacityFactor(type_l) (§9.9) (x the M11 AI approval-bandwidth multiplier when org-level AI injection is active). Capacity is use-it-or-lose-it: the fractional accumulator carries at most one whole approval between steps (acc_l = min(acc_l + cap_l - moved_l, 1)); idle days bank at most a single approval, never more. On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L, recorded only for first-pass approvals (overrideCount == 0; §11.1).",
+      "citations": [
+        "SI Labs (2026). Why Hierarchies Slow Down Companies - five approval layers, ~3 days per layer, 15 working days to a decision. https://www.si-labs.com/en/articles/slow-decisions/",
+        "Baker, N. R. et al. (1975). Diffuse decision-making in hierarchical organizations. Management Science 21(6) - empirical multi-layer decision delay."
+      ],
+      "limitations": [
+        "2-3 days/layer is documented mainly in large hierarchical organizations; startups and flat orgs have different latency profiles (the Flat Paradox: flat is faster on novel decisions, slower on execution scaling).",
+        "Layer capacity and its decay up the stack are editorial defaults."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "decisionVelocityScore",
+      "plainLanguage": "A 0-100 speedometer for decisions. 100 means single-layer, no queues. Each extra ownership layer applies friction f (default 0.35), and real-time congestion (queues, escalations, recovery slowdowns) drags it below even that.",
+      "formula": "V(t) = 100 / ((1 + (L - 1) * layerFrictionFactor) * max(1, latencySmoothed(t) / (L * mean(decisionLatencyPerLayerDays)))). The static term is the classic V = V_base / (1 + (L-1)*f); the dynamic term degrades it further when actual (queued, escalated, recovery-multiplied) latency exceeds the structural minimum.",
+      "citations": [
+        "SI Labs (2026). Why Hierarchies Slow Down Companies. https://www.si-labs.com/en/articles/slow-decisions/"
+      ],
+      "limitations": [
+        "The friction factor f = 0.35 is an adjustable editorial default (range 0.2-0.6); the score is a display index, not a measured quantity."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "overrideWipReset",
+      "plainLanguage": "With more layers above the work, higher layers more often reverse lower-layer decisions - especially when ownership is unclear and information has been distorted on its way up the hierarchy. Cleaner relays reduce this: an AI agent or a committee seat garbles less context than a chain of human hand-ups, so it triggers fewer overrides. An overridden task is not lost: it re-enters the pipeline keeping about half its progress. That partial rework, plus a fresh trip through every approval layer, is the true cost of an override.",
+      "formula": "Per step, each inProgress task is overridden with probability o(t) = min(1, overrideBaseRate * (L - 1) * (1 + overrideMisalignmentGain * m(t)) * (1 + distortionOverrideCoupling * distortion)); the min(1, .) clamp keeps o(t) a probability at every in-range corner (§6 L1). distortion = distortionPerHumanLayer * (D - 1) * layerDistortionMean, where layerDistortionMean = mean over l in 2..=L of layerDistortionFactor(type_l) (§9.9), or 1.0 when L == 1 (default humanPm layers give 1.0, reproducing the base model). On override: task returns to layer 1, progress *= wipResetFraction, overrideCount += 1. Each override event is attributed to an overriding layer drawn uniformly over {2..L} for the perLayer.overrideShare output (§7.1); layer 1 originates and is never the overrider.",
+      "citations": [
+        "SI Labs (2026). Why Hierarchies Slow Down Companies. https://www.si-labs.com/en/articles/slow-decisions/",
+        "eigenorg design red-team (2026): overridden WIP re-enters at partial completion rather than disappearing from throughput."
+      ],
+      "limitations": [
+        "Override probability and the 50% reset fraction are editorial defaults; real override cost varies with how far the work had progressed.",
+        "Single-layer stacks (L=1) never override in this model; in reality self-reversal exists but is rare enough to ignore."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "structuralHealthAmplification",
+      "plainLanguage": "AI agents amplify whatever structure they land in. In a structurally healthy org (clear ownership, WIP discipline, async norms - SH 7+), AI routing genuinely relieves coordination load and failures are caught by humans in the loop. In a structurally unhealthy org (SH 4 or below), AI agents push work through the same broken ownership structure faster, so novel cases fail 1.3-1.8x more often and there is no relief. That is 'faster dysfunction': throughput up, entropy up.",
+      "formula": "shBrittleFactor(SH) = aiAmplificationLowSH if SH <= shRiskThreshold; aiGuardrailedHighSH if SH >= shSafeThreshold; linear interpolation between. Brittleness event probability per novel task under AI handling = aiNovelFailureBase * shBrittleFactor(SH) (* highStakesBrittlenessFactor if high stakes, team sim). relief_ai(t) = aiCoordinationRelief * clamp((SH - shRiskThreshold) / (shSafeThreshold - shRiskThreshold), 0, 1) when AI is active, else 0.",
+      "citations": [
+        "rework.com (2025). Why Most AI Transformations Fail. https://resources.rework.com/libraries/ai-transformation-strategy/why-most-ai-transformations-fail",
+        "aimagicx.com (2026). Why 80% of AI Transformation Projects Fail.",
+        "eigenorg design red-team (2026): Structural Health precondition gates whether AI injection reduces or amplifies entropy."
+      ],
+      "limitations": [
+        "The 1.3-1.8x amplification range comes from practitioner reports and editorial synthesis, not controlled studies - it is the model's most load-bearing editorial coefficient and is deliberately adjustable.",
+        "SH compresses five distinct structural properties into one scalar; two orgs with the same SH can fail differently."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "brittlenessRecovery",
+      "plainLanguage": "When an AI agent hits a case beyond its ceiling, the failure does not just cost that one task. If a named human owns recovery, the mess is contained: a day or two, small slowdown. If nobody owns recovery, everything nearby slows down 1.5-2.5x for the next 3-5 days while people figure out whose problem it is.",
+      "formula": "A brittleness event draws ONE duration d ~ Triangular(recoveryDurationUnownedSteps | recoveryDurationOwnedSteps), rounded to whole steps (min 1), shared by the task block and the recovery window; the window is active for steps [t_event, t_event + d). While any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Because M_recovery(t) is computed at step start (§5 step 2) BEFORE that step's own arrivals and unblocks, a window opened during t_event's arrivals (§5 step 3) first multiplies service draws at t_event+1; the event's own blocked task used the pre-event M_recovery. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned). Owned: multiplier = recoveryLatencyMultiplierOwned (point value, no draw).",
+      "citations": [
+        "eigenorg design red-team (2026): Failure Recovery Owner assignment; unowned high-AI-coverage functions apply a 1.5-2.5x latency multiplier for 3-5 steps after a brittleness event.",
+        "HatchWorks (2025). AI agent design best practices - agent failure modes on novel inputs."
+      ],
+      "limitations": [
+        "Multiplier and duration ranges are editorial defaults from the eigenorg design red-team, not field measurements.",
+        "Concurrent events take the max multiplier, not a compounding product - a deliberate boundedness choice."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "aiTaskTypeCapability",
+      "plainLanguage": "AI agents are genuinely faster on routine work - routing, triage, standard execution. On novel, ambiguous, high-stakes work their capability collapses: they misroute, stall, or fail, unless a human co-owns the judgment. Research on hybrid teams finds human+AI outperforming fully autonomous agent teams by roughly 69% on complex tasks - so the model rewards keeping humans on judgment functions and penalizes hollowing them out.",
+      "formula": "Team sim: if any AI covers prioritization, routine service time *= aiRoutineLatencyFactor; if nobody covers prioritization, service *= uncoveredPrioritizationFactor. Execution: routine progress *= (1 + aiExecShare * (aiRoutineAdvantage - 1)); novel progress *= (humanExecShare + aiExecShare * aiNovelEffectiveness). Novel arrivals take the AI failure probability (M9) when AI is assigned to prioritization and no human is assigned to prioritization; when a human covers prioritization the probability is humanNovelFailureBase. Quality: for complex/novel tasks with zero human judgment coverage, the judgment contribution is divided by hybridVsAutonomousAdvantage (M16). Org sim: AI injection (a) multiplies EVERY routine execution allocation by the uniform expected-value factor (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) - the closed-form mean of boosting the aiRoutineShareOrg share of routine work by aiThroughputBoostOrg, applied deterministically to all routine allocations with NO per-task share draw - (b) multiplies routine-task service draws by (1 - (1 - aiRoutineLatencyFactor) * reliefRamp(SH)), reliefRamp = clamp((SH - shRiskThreshold)/(shSafeThreshold - shRiskThreshold), 0, 1) - AI routing accelerates routine decisions only in structurally healthy orgs - and (c) multiplies every decision layer's capacity by the same (1 + aiRoutineShareOrg * (aiThroughputBoostOrg - 1)) at ANY Structural Health: AI agents add mechanical routing/approval bandwidth regardless of structure; what depends on SH is the QUALITY of that routing (brittleness, M9) and the coordination relief - work reaches broken structure faster, which is the 'faster' in Faster Dysfunction. Per-layer AI (org sim, §9.9 aiAgent layer type): a novel arrival faces the M9 brittleness draw with exposure novelExposure = max(orgInjectionActive ? 1 : 0, max over layers l of layerNovelExposure(type_l)) - i.e. an aiAgent-typed ownership layer exposes novel work to brittleness from t=0 even with no org-level injection - and the probability is aiNovelFailureBase * shBrittleFactor(SH) * novelExposure. That layer's routing speed and added bandwidth come from its layerLatencyFactor / layerCapacityFactor in M6; per-layer AI does NOT trigger the org-level execution boost or coordination relief (those are injection effects).",
+      "citations": [
+        "e-discoveryteam.com (2025). Stanford/Carnegie study: hybrid human-AI teams beat fully autonomous agents by 68.7% on complex tasks. https://e-discoveryteam.com/2025/12/01/",
+        "TechXplore (2024). Researchers test human vs AI-human hybrid teams in dynamic tasks.",
+        "AMCIS 2025 proceedings: Human-AI collaboration in hybrid teams."
+      ],
+      "limitations": [
+        "The 68.7% figure is lab-based and domain-specific (law, drone design, creative tasks); it is treated as an adjustable editorial default, not a universal constant.",
+        "The routine/novel dichotomy is a simplification; real tasks sit on a spectrum."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "cohesionDynamics",
+      "plainLanguage": "Cohesion is the human glue: trust, shared context, willingness to flag problems early. It erodes when teams outgrow the size where everyone knows everyone, when a larger share of teammates are AI agents (people report weaker co-worker bonds), and when the human relationship layer (a PM who talks to people) is removed. It slowly recovers toward its structural ceiling - but a high-entropy environment keeps grinding it down.",
+      "formula": "Per team: target(t) = cohesionBase - cohesionSizePenalty * sigma((s - cognitiveBandClose)/(bandWidthFactor * cognitiveBandClose)) - cohesionAiPenalty * effectiveAiShare - (hollow ? cohesionHollownessPenalty : 0). c(t+1) = clamp(c(t) + cohesionRecoveryRate * (target(t) - c(t)) - cohesionEntropyCoupling * max(0, E(t-1) - entropyStressThreshold) / 10, 0, 100), where E(t-1) is the PRIOR step's entropy composite with the convention E(-1) = 0 (the t=0 update sees no prior entropy). c(0) = cohesionBase; the cohesion series reports the PRE-update value c(t) (§5 step 8), so the update takes effect from t+1. Team sim: effectiveAiShare = (# AI entities)/(# entities); hollow = for any of {prioritization, coordination, stakeholderCommunication}, at least one AI entity is assigned AND no human entity is assigned. Org sim: effectiveAiShare = aiActive ? aiRoutineShareOrg * taskMixRoutineOrg : 0; hollow = false.",
+      "citations": [
+        "World Economic Forum (2026). AI is becoming your new work colleague - early adopters report weaker co-worker connections.",
+        "AMCIS 2025: AI team members and team dynamics.",
+        "TechXplore (2024): human-AI hybrid team members report weaker cohesion independent of output quality."
+      ],
+      "limitations": [
+        "Cohesion is self-report-shaped: the studies measure perceived connection, not output. Magnitudes are editorial.",
+        "Recovery rate is an editorial default; real teams recover at wildly different speeds."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "entropyComposite",
+      "plainLanguage": "Entropy is a 0-100 composite of five things leaders can feel: how much capacity goes to coordination, how long decisions take, how frayed the human fabric is, how often things break on novel cases, and how much work is stuck in progress. 0 is a crisp org; 100 is thrash. It is deliberately a secondary metric - the headline numbers stay in real units (days, %, items/step).",
+      "formula": "E(t) = 100 * (wC*xCoord + wL*xLat + wH*xCoh + wB*xBrit + wW*xWip), weights = {entropyWeightCoordination, entropyWeightLatency, entropyWeightCohesion, entropyWeightBrittleness, entropyWeightWip}, sum = 1. xCoord = tau/maxCoordinationTax; xLat = min(1, latencySmoothed/latencyNormDays); xCoh = 1 - cohesion/100; xBrit = min(1, brittleEMA/brittlenessNormPerStep); xWip = min(1, WIP/(wipNormPerPerson*n)). EMA smoothing: x_ema(t) = alpha*x(t) + (1-alpha)*x_ema(t-1), alpha = metricSmoothingAlpha. orgHealth(t) = 100 - E(t). Team sim proxy: E_team uses the {coordination, latency, brittleness} terms only, weights renormalized to sum 1, with xLat computed on routine decision latency.",
+      "citations": [
+        "eigenorg model definition (2026) - composite index, weights editorial."
+      ],
+      "limitations": [
+        "The weights and normalization constants are editorial choices; entropy values are comparable across runs of this model version but are not an external benchmark.",
+        "Calling it 'entropy' is a metaphor, not thermodynamics."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "teamHandoffFriction",
+      "plainLanguage": "Inside one team the same channel math applies, plus a friction term: every handoff between people (or between a person and an agent) loses a little context. Smooth operators (and well-integrated agents) have low friction; entities that need everything re-explained have high friction.",
+      "formula": "Team coordination tax: tau_team(t) = min(maxCoordinationTax, mu_modality * channelCostFraction * (C/n_e) * B(n_e) + handoffTaxCoefficient * mean(handoffFriction_e)/5), where C = n_e*(n_e-1)/2 over entities.",
+      "citations": [
+        "Brooks, F. P. (1975). The Mythical Man-Month.",
+        "eigenorg model definition (2026) - handoff friction term."
+      ],
+      "limitations": [
+        "Friction is a per-entity scalar; real handoff cost depends on the pair and the artifact."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "rampTime",
+      "plainLanguage": "New humans start at a fraction of their full speed and ramp up over weeks - and while ramping they consume teammates' time (captured by the coordination tax they add as headcount). This is the mechanism behind 'adding manpower to a late project makes it later'.",
+      "formula": "ramp_e(t) = 1 for AI entities and humans with rampTimeWeeks == 0; else min(1, rampStartFactor + (1 - rampStartFactor) * t / (rampTimeWeeks * 5)). Execution rate_e = throughput_e * execPointsPerThroughputPoint * ramp_e(t) * availability_e.",
+      "citations": [
+        "Brooks, F. P. (1975). The Mythical Man-Month - onboarding cost.",
+        "effectiviology.com - Brooks' Law analysis."
+      ],
+      "limitations": [
+        "Linear ramp is a simplification; v1 starts all entities at t=0 (a mid-simulation hire event is a v2 concern)."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "qualityModel",
+      "plainLanguage": "Output quality tracks the judgment actually applied to the work: who reviewed it, who resolved its ambiguities, how reliable the builders are. Fully autonomous AI pipelines on complex work lose most of the judgment bonus - matching research where hybrid teams clearly beat autonomous ones on complex tasks.",
+      "formula": "On task completion: judgmentEff = weighted mean of judgmentQuality over entities covering {review, synthesis, ambiguityResolution} (weights = attention * availability), or judgmentFloor if none. hybridFactor = 1/hybridVsAutonomousAdvantage if task class in {complex, novel} and zero human judgment coverage, else 1. mu_q = qualityBase + qualityJudgmentWeight * judgmentEff * hybridFactor + qualityReliabilityWeight * (meanReliability(execution pool) - 7) - (novel task with zero human judgment coverage ? noveltyQualityPenalty : 0) - (review uncovered ? reviewUncoveredQualityPenalty : 0). quality ~ clamp(Triangular(mu_q - qualitySpreadDown, mu_q, mu_q + qualitySpreadUp), 0, 100).",
+      "citations": [
+        "e-discoveryteam.com (2025). Stanford/Carnegie hybrid team study.",
+        "Emerald ITP (2024). Member performance in human-AI hybrid teams."
+      ],
+      "limitations": [
+        "Quality is a unitless 0-100 score; it is comparable within the model only.",
+        "The additive form is editorial; interaction effects between review and reliability are not modeled."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "functionCoverage",
+      "plainLanguage": "For each of the seven functions, how much qualified attention is actually pointed at it, relative to how much the team needs? A brilliant director who is 25% available and juggling three functions covers less than it looks. Red means the function is effectively unowned - and the simulation makes you feel it.",
+      "formula": "coverage(f) = min(1, sum over entities e assigned to f of (capabilities_e(f)/10) * attention_e * availability_e / demand(f)); demand(execution) = functionDemandExecution * (n_e/8); demand(other f) = functionDemandDefault * (n_e/8). attention_e = 1 for AI; min(1, humanAttentionSpan/count(functions_e)) for humans. Rating: green if coverage >= coverageGreenThreshold, amber if >= coverageAmberThreshold, else red.",
+      "citations": [
+        "eigenorg design red-team (2026) - functions vs roles: work that must happen regardless of what title handles it."
+      ],
+      "limitations": [
+        "Demand scaling with team size is a linear editorial default.",
+        "Coverage is static per run (entities do not reassign mid-simulation in v1)."
+      ]
+    },
+    {
+      "type": "mechanic",
+      "id": "taskEffortAndMix",
+      "plainLanguage": "Work arrives continuously, sized in effort points where 1 point is roughly one focused person-day for an average performer. Routine items are small and predictable; novel items are big and uncertain - and they are the ones AI handles worst.",
+      "formula": "Org sim arrivals per step = taskArrivalPerPersonPerStep * n(t) (fractional accumulator; Bernoulli remainder in MC); at t = 0 the arrival count is additionally increased by org.initialBacklog (default 0) - a standing backlog the org starts with; backlog tasks draw class/effort/service exactly like arrivals. Class ~ {routine: taskMixRoutineOrg, complex: taskMixComplexOrg, novel: 1 - routine - complex}. Team sim: arrivals and mix from workStream config. Effort ~ Triangular(taskEffortRoutine | taskEffortComplex | taskEffortNovel) by class. Team sim stakes: high with probability workStream.highStakesShare.",
+      "citations": [
+        "eigenorg model definition (2026)."
+      ],
+      "limitations": [
+        "Effort distributions are editorial; the routine/complex/novel taxonomy is a simplification of continuous task variety."
+      ]
+    }
+  ]
+}
