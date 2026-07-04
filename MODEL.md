@@ -2604,24 +2604,24 @@ override cost is asserted separately via `overrideRate` and `wip`.
 { "id": "adLatencyRatio", "scenario": "accountabilityDiffusion",
   "metric": "decisionLatency@coOwned / decisionLatency@singleOwner", "comparator": "ratioAbove",
   "predicate": "Three co-equal owners per seat make settled first-pass decisions at least 1.4x slower than a single owner in the same org - the consultation/relitigation surcharge is real.",
-  "bound": 1.4, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
-  "rationale": "M19 latency surcharge: each added co-equal owner adds consultation rounds before a decision clears (muLatencySurchargeRate; ~1.7x at mu=3). decisionLatency samples first-pass approvals (overrideCount == 0; §11.1), so the ratio isolates the per-seat surcharge; the diffusion-driven queue growth in coOwned only widens it. Direction is well supported (Darley & Latané 1968: interventions both fewer AND slower with more responsible parties). (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "bound": 1.5, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
+  "rationale": "M19 latency surcharge: each added co-equal owner adds consultation rounds before a decision clears (muLatencySurchargeRate; ~1.7x at mu=3). decisionLatency samples first-pass approvals (overrideCount == 0; §11.1), so the ratio isolates the per-seat surcharge; the diffusion-driven queue growth in coOwned only widens it. Direction is well supported (Darley & Latané 1968: interventions both fewer AND slower with more responsible parties). (Retuned against the engine golden harness, seed 42, 500 iters, 2026-07-04: measured 1.90; the 1.5 bound sits well below the measured surcharge so the assertion tracks the phenomenon, not seed-42 noise.)" }
 ```
 
 ```json eigenorg:golden
 { "id": "adOverrideRatio", "scenario": "accountabilityDiffusion",
   "metric": "cumulativeOverrides@coOwned / cumulativeOverrides@singleOwner", "comparator": "ratioAbove",
   "predicate": "The three-co-owner stack accumulates at least 1.4x the overrides of the single-owner stack by the end - accountability multiplicity multiplies relitigation.",
-  "bound": 1.4, "tolerance": 0.1, "step": null, "instrument": "meanPath",
-  "rationale": "M19 feeds the M8 override probability as an additional multiplicative diffusionMean = 1 + overrideDiffusionGain·(mu−1) ≈ 1.8 at mu=3 (Latané 1981 Social Impact Theory, felt responsibility ∝ N^−0.5). Both runs are 3-layer so both override; the ratio isolates the diffusion multiplier. singleOwner is the base-model override rate (identical to prioritizationTax@threeLayer). Zero-denominator convention (§11.1) keeps the ratio valid if the single-owner cumulative is small. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "bound": 1.3, "tolerance": 0.1, "step": null, "instrument": "meanPath",
+  "rationale": "M19 feeds the M8 override probability as an additional multiplicative diffusionMean = 1 + overrideDiffusionGain·(mu−1) ≈ 1.8 at mu=3 (Latané 1981 Social Impact Theory, felt responsibility ∝ N^−0.5). Both runs are 3-layer so both override; the ratio isolates the diffusion multiplier. singleOwner is the base-model override rate (identical to prioritizationTax@threeLayer). Zero-denominator convention (§11.1) keeps the ratio valid if the single-owner cumulative is small. (Retuned against the engine golden harness, seed 42, 500 iters, 2026-07-04: measured 1.48 (31/21 cumulative overrides); the bound is lowered to 1.3 to keep a robust margin over a lumpy small-integer count ratio that a ±1-event seed shift can move ~5%.)" }
 ```
 
 ```json eigenorg:golden
 { "id": "adWipRatio", "scenario": "accountabilityDiffusion",
   "metric": "wip@coOwned / wip@singleOwner", "comparator": "ratioAbove",
   "predicate": "The three-co-owner org carries at least 1.2x the work-in-progress of the single-owner org - diffused ownership piles up relitigated, half-reset work.",
-  "bound": 1.2, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
-  "rationale": "Combined visible symptom: more overrides re-inject WIP at wipResetFraction (M8) and the latency surcharge holds tasks in-pipeline longer, so queued+inProgress+blocked rises. Mirrors ptWipRatio; the bound is lower than prioritizationTax's 1.5 because both runs share the same 3-layer stack and only the multiplicity differs. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "bound": 1.4, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
+  "rationale": "Combined visible symptom: more overrides re-inject WIP at wipResetFraction (M8) and the latency surcharge holds tasks in-pipeline longer, so queued+inProgress+blocked rises. Mirrors ptWipRatio; the bound stays below prioritizationTax's 1.5 because both runs share the same 3-layer stack and only the multiplicity differs. (Retuned against the engine golden harness, seed 42, 500 iters, 2026-07-04: measured 1.82; raised to 1.4 — still under prioritizationTax's 1.5 — so it asserts the pile-up with a robust margin below the measured value.)" }
 ```
 
 ```json eigenorg:golden
@@ -2629,7 +2629,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cumulativeOverrides.p50@coOwned / cumulativeOverrides.p50@singleOwner", "comparator": "ratioAbove",
   "predicate": "Even at the Monte Carlo median, the three-co-owner stack runs at least 1.3x the overrides of the single-owner stack - the diffusion effect is structural, not a mean-path artifact.",
   "bound": 1.3, "tolerance": 0.1, "step": null, "instrument": "monteCarlo",
-  "rationale": "Band-level realism for the relitigation narrative (mirrors hmBrittlenessFloorMc / lcBrittleFloorMc). Using the p50 ratio makes the claim magnitude-independent and robust to the sparse-integer override counts; the zero-denominator convention (§11.1) satisfies ratioAbove if the single-owner median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "rationale": "Band-level realism for the relitigation narrative (mirrors hmBrittlenessFloorMc / lcBrittleFloorMc). Using the p50 ratio makes the claim magnitude-independent and robust to the sparse-integer override counts; the zero-denominator convention (§11.1) satisfies ratioAbove if the single-owner median is 0. (Retuned against the engine golden harness MC p50, seed 42, 500 iters, 2026-07-04: measured 1.48; the 1.3 bound is held with margin for the lumpy count ratio.)" }
 ```
 
 ### 11.9 Assertions — committeeInversion (3)
@@ -2638,16 +2638,16 @@ override cost is asserted separately via `overrideRate` and `wip`.
 { "id": "adCommitteeDiffusionCost", "scenario": "committeeInversion",
   "metric": "cumulativeOverrides@committeeDiffuse / cumulativeOverrides@committeeSingle", "comparator": "ratioAbove",
   "predicate": "A diffuse committee (three co-equal owners) accumulates at least 1.15x the overrides of the SAME committee at a single accountable owner - the accountability-diffusion cost now appears on the committee seat, driven entirely by layerOwnerCount.",
-  "bound": 1.15, "tolerance": 0.1, "step": null, "instrument": "meanPath",
-  "rationale": "M19 additive diffusion: committeeDiffuse's layerOwnerCount 3 on the middle seat raises diffusionMean = mean over l in 2..=L of (1 + overrideDiffusionGain*(mu_l-1)) to ~1.4 (one of two averaged seats at mu=3), scaling the M8 override probability; committeeSingle (layerOwnerCount 1) is the v1 committee with diffusionMean = 1. Both runs share the identical committee §9.9 relay factors, so the ratio isolates the diffusion cost. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "bound": 1.1, "tolerance": 0.1, "step": null, "instrument": "meanPath",
+  "rationale": "M19 additive diffusion: committeeDiffuse's layerOwnerCount 3 on the middle seat raises diffusionMean = mean over l in 2..=L of (1 + overrideDiffusionGain*(mu_l-1)) to ~1.4 (one of two averaged seats at mu=3), scaling the M8 override probability; committeeSingle (layerOwnerCount 1) is the v1 committee with diffusionMean = 1. Both runs share the identical committee §9.9 relay factors, so the ratio isolates the diffusion cost. (Retuned against the engine golden harness, seed 42, 500 iters, 2026-07-04: measured 1.25 (25/20 cumulative overrides); lowered to 1.1 to keep a robust margin over a small-count (~20) ratio that a ±1-event seed shift moves ~5%.)" }
 ```
 
 ```json eigenorg:golden
 { "id": "adCommitteeRelayBenefit", "scenario": "committeeInversion",
   "metric": "cumulativeOverrides@committeeSingle / cumulativeOverrides@allHuman", "comparator": "ratioBelow",
   "predicate": "A single-owner committee still accumulates FEWER overrides than the all-human stack (ratio at most ~0.95) - the many-eyes relay benefit persists, so the committee is not inverted into a penalty (anti-inversion evidence).",
-  "bound": 0.95, "tolerance": 0.05, "step": null, "instrument": "meanPath",
-  "rationale": "At mu = 1 on both runs the M8 override PROBABILITY o(t) differs only through the distortion term: the committee middle seat's layerDistortionFactorCommittee (0.5) vs humanPm (1.0) lowers layerDistortionMean, so the distortion-driven override component is strictly lower for the committee - the v1 many-eyes relay discount, untouched by the amendment. (The committee seat's slower layerLatencyFactorCommittee / layerCapacityFactorCommittee act on queueing, M6, a second-order influence on the override COUNT - which is precisely why this bound is provisional and the load-bearing claim is the direction, ratio < 1.) (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "bound": 0.9, "tolerance": 0.05, "step": null, "instrument": "meanPath",
+  "rationale": "At mu = 1 on both runs the M8 override PROBABILITY o(t) differs only through the distortion term: the committee middle seat's layerDistortionFactorCommittee (0.5) vs humanPm (1.0) lowers layerDistortionMean, so the distortion-driven override component is strictly lower for the committee - the v1 many-eyes relay discount, untouched by the amendment. (The committee seat's slower layerLatencyFactorCommittee / layerCapacityFactorCommittee act on queueing, M6, a second-order influence on the override COUNT - which is why the load-bearing claim is the direction, ratio < 1.) (Retuned against the engine golden harness, seed 42, 500 iters, 2026-07-04: measured 0.83 (20/24 cumulative overrides); tightened to 0.9 so the relay discount is asserted clearly below 1 while leaving margin above the measured value for the lumpy count ratio.)" }
 ```
 
 ```json eigenorg:golden
@@ -2655,7 +2655,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cumulativeOverrides.p50@committeeDiffuse / cumulativeOverrides.p50@committeeSingle", "comparator": "ratioAbove",
   "predicate": "Even at the Monte Carlo median, the diffuse committee runs at least 1.1x the overrides of the single-owner committee - the diffusion cost is structural, not a mean-path artifact.",
   "bound": 1.1, "tolerance": 0.1, "step": null, "instrument": "monteCarlo",
-  "rationale": "Band-level realism for the diffusion-cost claim (mirrors adOverrideRatioMc). The p50 ratio is magnitude-independent and robust to sparse-integer override counts; the §11.1 zero-denominator convention satisfies ratioAbove if the single-owner median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "rationale": "Band-level realism for the diffusion-cost claim (mirrors adOverrideRatioMc). The p50 ratio is magnitude-independent and robust to sparse-integer override counts; the §11.1 zero-denominator convention satisfies ratioAbove if the single-owner median is 0. (Retuned against the engine golden harness MC p50, seed 42, 500 iters, 2026-07-04: measured 1.25; the 1.1 bound is held with margin for the small-count ratio.)" }
 ```
 
 ### 11.10 Assertions — matrix (5)
@@ -2664,8 +2664,8 @@ override cost is asserted separately via `overrideRate` and `wip`.
 { "id": "mxLatencyRatio", "scenario": "matrix",
   "metric": "decisionLatency@dualBossNoTiebreak / decisionLatency@singleBoss", "comparator": "ratioAbove",
   "predicate": "Two bosses with no tiebreaker make settled decisions at least 1.2x slower than a single boss - dual authority strangles the decision.",
-  "bound": 1.2, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
-  "rationale": "M19 at mu=2, tiebreaker=0 applies the shared muLatencySurchargeRate to the terminal matrix seat (diffusionLatencyFactor_L ≈ 1.35; there is NO separate dual-authority coefficient - the matrix folds entirely into M19). Davis & Lawrence 1977 'decision strangulation'; McKinsey 2016/2019: distributed accountability decides materially slower. The bound is conservative because only the terminal of two seats carries the surcharge, so the aggregate ratio sits between 1 and ~1.35. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "bound": 1.15, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
+  "rationale": "M19 at mu=2, tiebreaker=0 applies the shared muLatencySurchargeRate to the terminal matrix seat (diffusionLatencyFactor_L ≈ 1.35; there is NO separate dual-authority coefficient - the matrix folds entirely into M19). Davis & Lawrence 1977 'decision strangulation'; McKinsey 2016/2019: distributed accountability decides materially slower. The bound is conservative because only the terminal of two seats carries the surcharge, so the aggregate ratio sits between 1 and ~1.35. (Retuned against the engine golden harness, seed 42, 500 iters, 2026-07-04: measured 1.24; lowered from the knife-edge 1.2 to 1.15 for a robust margin below the measured modest surcharge.)" }
 ```
 
 ```json eigenorg:golden
@@ -2673,7 +2673,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cumulativeOverrides@dualBossNoTiebreak / cumulativeOverrides@singleBoss", "comparator": "ratioAbove",
   "predicate": "The no-tiebreaker matrix relitigates at least 1.3x as many decisions as the single-boss org - either boss can reopen what the other cleared.",
   "bound": 1.3, "tolerance": 0.1, "step": null, "instrument": "meanPath",
-  "rationale": "M19 multiplies M8 override probability by diffusionMean ≈ 1.4 at mu=2 for the L=2 stack (Davis & Lawrence 'power struggles'; McKinsey 2022: multiple veto-holders create loops/reversals a single decider removes). singleBoss's 2-layer stack provides the base override channel the diffusion factor scales; §11.1 zero-denominator convention keeps the ratio valid. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "rationale": "M19 multiplies M8 override probability by diffusionMean ≈ 1.4 at mu=2 for the L=2 stack (Davis & Lawrence 'power struggles'; McKinsey 2022: multiple veto-holders create loops/reversals a single decider removes). singleBoss's 2-layer stack provides the base override channel the diffusion factor scales; §11.1 zero-denominator convention keeps the ratio valid. (Retuned against the engine golden harness, seed 42, 500 iters, 2026-07-04: measured 1.50 (15/10 cumulative overrides); the 1.3 bound is held with a robust margin for the lumpy small-count ratio.)" }
 ```
 
 ```json eigenorg:golden
@@ -2689,7 +2689,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "decisionLatency@dualBossClearDecider / decisionLatency@dualBossNoTiebreak", "comparator": "ratioBelow",
   "predicate": "The two-bosses-with-a-decider matrix is at least ~15% faster than the deadlocked two-boss matrix - the tiebreaker is the documented fix, not the dual reporting itself.",
   "bound": 0.85, "tolerance": 0.05, "step": [50, 59], "instrument": "meanPath",
-  "rationale": "The load-bearing tiebreaker contrast, robust to the exact surcharge coefficient: dualBossClearDecider recovers to single-boss latency while dualBossNoTiebreak carries the full mu=2 terminal-seat surcharge, so the ratio ≈ 1/1.35 ≈ 0.74. Isolates the [0,1] tiebreaker as the leverage point (McKinsey 2022 single point of accountability). (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "rationale": "The load-bearing tiebreaker contrast, robust to the exact surcharge coefficient: dualBossClearDecider recovers to single-boss latency while dualBossNoTiebreak carries the full mu=2 terminal-seat surcharge, so the ratio ≈ 1/1.35 ≈ 0.74. Isolates the [0,1] tiebreaker as the leverage point (McKinsey 2022 single point of accountability). (Retuned against the engine golden harness, seed 42, 500 iters, 2026-07-04: measured 0.81; the 0.85 bound is held — it asserts the documented ≥15% speed-up with margin above the measured value.)" }
 ```
 
 ```json eigenorg:golden
@@ -2697,7 +2697,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cumulativeOverrides.p50@dualBossNoTiebreak / cumulativeOverrides.p50@singleBoss", "comparator": "ratioAbove",
   "predicate": "Even at the Monte Carlo median, the no-tiebreaker matrix relitigates at least 1.2x the single-boss org - the dual-authority reversal loop survives noise.",
   "bound": 1.2, "tolerance": 0.1, "step": null, "instrument": "monteCarlo",
-  "rationale": "Band-level realism for the relitigation claim; p50 ratio is magnitude-independent and the §11.1 zero-denominator convention satisfies ratioAbove if the single-boss median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+  "rationale": "Band-level realism for the relitigation claim; p50 ratio is magnitude-independent and the §11.1 zero-denominator convention satisfies ratioAbove if the single-boss median is 0. (Retuned against the engine golden harness MC p50, seed 42, 500 iters, 2026-07-04: measured 1.50; the 1.2 bound is held with a robust margin.)" }
 ```
 
 ### 11.11 Assertions — reviewBottleneck (5)
@@ -3112,7 +3112,7 @@ Tier counts: the four new §9.10 coefficients are all **editorial-heuristic**; t
 | modelVersion | date | params.json sha256 | goldens.json sha256 | assumptions.json sha256 | changes |
 |---|---|---|---|---|---|
 | 1.0.0 | 2026-07-04 | `9b2ce2421c1a13c06dacae001914f5ea4bb6427e44e47c9afcb0fa5d77a080fb` | `3581b470fe333b7a56ad3c8bbb64d9b6d0616e9228355c3460f727dd84aa0173` | `147ec8b99e5e3d2c2593bd7ac763483b0f66418492370d0b824e3a701f6140d6` | Initial model: unified org/team spec with per-layer ownership typing (§9.9), 6 calibrated scenarios, 34 golden assertions, extraction pipeline. |
-| 2.0.0 | 2026-07-04 | `60e0ebd0c51b54562b585cf2adf7bc4c602113e23535be201265c5b541440b82` | `6e8b29fe89d8444295618a7c3499e1016bc621a77b63b117369bc9739aca7d03` | `ca4a16cf385a704c4d24ac1f005567da3df9d1bf4af91d4fe1d497d580839496` | Accountability multiplicity μ (§4 M19 `accountabilityDiffusion`) + review-capacity queue (§4 M20 `reviewCapacityQueue`). M8 gains a diffusion term (μ>1 co-equal owners raise relitigation) and an opt-in authority-gradient override attribution (default `0.0` = v1 uniform draw); four new params in **§9.10** (all editorial-heuristic; document order fixes params.json order/SHA). New additive-optional config fields `org.layerOwnerCount` (int 1–8), `org.matrix{enabled,tiebreaker}` (terminal-layer μ=2), `team.reviewCapacityPerStep` (config field, not a params.json coefficient); new team output series `reviewQueueDepth`, `reviewWaitDays` (additive; consumers ignore unknown output fields). Four new scenarios (§10.7–§10.10) and 18 new goldens ⇒ **ten scenarios, 52 golden assertions** (34 v1 unchanged + 18 new). **Neutral identity (fully additive):** μ=1 / matrix off / unbounded review / gradient 0 reproduces v1.0.0 series byte-for-byte AND all 34 v1 golden verdicts for **every** pre-existing config, **including any using a `committee` seat** (a committee's §9.9 factors are unchanged and its default μ is 1; its accountability diffusion is now the opt-in, additive `org.layerOwnerCount` cost, so no existing `layerTypes` value changes meaning). `schemaVersion` stays `"1"`. |
+| 2.0.0 | 2026-07-04 | `60e0ebd0c51b54562b585cf2adf7bc4c602113e23535be201265c5b541440b82` | `bf4249cfbca2a3bf128029d1decb4472874a4ee2fbea8b426d0848b531777c01` | `ca4a16cf385a704c4d24ac1f005567da3df9d1bf4af91d4fe1d497d580839496` | Accountability multiplicity μ (§4 M19 `accountabilityDiffusion`) + review-capacity queue (§4 M20 `reviewCapacityQueue`). M8 gains a diffusion term (μ>1 co-equal owners raise relitigation) and an opt-in authority-gradient override attribution (default `0.0` = v1 uniform draw); four new params in **§9.10** (all editorial-heuristic; document order fixes params.json order/SHA). New additive-optional config fields `org.layerOwnerCount` (int 1–8), `org.matrix{enabled,tiebreaker}` (terminal-layer μ=2), `team.reviewCapacityPerStep` (config field, not a params.json coefficient); new team output series `reviewQueueDepth`, `reviewWaitDays` (additive; consumers ignore unknown output fields). Four new scenarios (§10.7–§10.10) and 18 new goldens ⇒ **ten scenarios, 52 golden assertions** (34 v1 unchanged + 18 new). **Neutral identity (fully additive):** μ=1 / matrix off / unbounded review / gradient 0 reproduces v1.0.0 series byte-for-byte AND all 34 v1 golden verdicts for **every** pre-existing config, **including any using a `committee` seat** (a committee's §9.9 factors are unchanged and its default μ is 1; its accountability diffusion is now the opt-in, additive `org.layerOwnerCount` cost, so no existing `layerTypes` value changes meaning). `schemaVersion` stays `"1"`. **Calibration (2026-07-04):** the org-side v2 golden bounds (§11.8 accountabilityDiffusion, §11.9 committeeInversion, §11.10 matrix) were retuned against the engine golden harness at seed 42 / 500 iterations and are asserted green; the `matrix` `mxTiebreakerRecovers` exact identity and the §11.6 `hmReviewWaitNeutral` identity both verify. The team-side §11.11 `reviewBottleneck` bounds remain provisional (the team engine arm is NotImplemented until P7a and its scoped calibrator surfaced a scenario/mechanics mismatch — see the P3c calibration report); their retune and the v2.0.0 lock await that resolution. |
 
 ---
 
