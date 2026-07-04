@@ -13,7 +13,7 @@ fences are illustrative only.
 
 ```json eigenorg:meta
 {
-  "modelVersion": "1.0.0",
+  "modelVersion": "2.0.0",
   "schemaVersion": "1"
 }
 ```
@@ -83,7 +83,7 @@ The atomic unit of work is a **task**. A task has: `class` (routine | complex | 
 | T5 | `inProgress` | `inProgress` | Execution allocates points; `progress += allocation` (§5 step 7). |
 | T6 | `inProgress` | `done` | `progress ≥ effort` AND (org sim, OR team sim with the review function uncovered). Counted in `throughput` this step; team sim draws quality (§4 M16). |
 | T6r | `inProgress` | `review` | Team sim with the review function covered: `progress ≥ effort`. Enters a review dwell of `reviewDwellDays` (not counted in `throughput` yet, not counted as WIP). |
-| T6d | `review` | `done` | Team sim: the review dwell has elapsed. **Counted in `throughput` at this dwell-exit step** and draws quality (§4 M16) — team throughput is measured at review-dwell exit, not at execution completion. |
+| T6d | `review` | `done` | Team sim: the review dwell has elapsed **AND review capacity is available this step** (M20 — `team.reviewCapacityPerStep`, unbounded by default so this reproduces v1). Dwell-elapsed tasks clear in FIFO order (completion step, then task id) up to the capacity; the rest stay in `review`. **Counted in `throughput` at this dwell-exit step** and draws quality (§4 M16) — team throughput is measured at review-dwell exit, not at execution completion. |
 | T7 | `inProgress` | `queued(1)` | **Override event** (§4 M8): task re-enters layer 1, `progress ×= wipResetFraction`, `overrideCount += 1`. |
 | T8 | `blocked` | `queued(1)` | Recovery window for that event elapses (§4 M10). |
 | T9 | any | — | There are no other transitions. `done` is terminal. Tasks are never dropped. |
@@ -148,12 +148,22 @@ configs may override any value):
 | aiCoordination | ai | 8 | 3 | 1 | 8 | 0 | 6 | 2 | 8 | 2 | 2 | 3 | 2 |
 | aiPrioritization | ai | 9 | 3 | 2 | 8 | 0 | 9 | 2 | 8 | 2 | 2 | 3 | 2 |
 
+**Review throughput gate (team sim).** The team config additionally accepts an optional
+`reviewCapacityPerStep` (number > 0, **may be fractional**, default `null` = unbounded) — the
+maximum completed items the review stage clears to `done` per step, ahead of the quality draw
+(§4 M20, §5.2 step 7). A finite value clears via a use-it-or-lose-it fractional accumulator
+mirroring M6 layer capacity (§4 M20), so e.g. `0.5` clears one review every two steps. Absent or `null`, review parallelism is unbounded and the fixed-dwell behavior of
+§5.2 step 7 is reproduced exactly. It is a per-run structural input (the sibling of
+`team.recoveryOwner`), not a params.json coefficient.
+
 ### 3.3 Org structure inputs
 
 `{ headcountStart (4–500), headcountGrowthPerStep (0–2 people/step),
 topology: "flat"|"hierarchical"|"pods"|"federated", hierarchyDepth D (1–6),
 ownershipLayers L (1–5), layerTypes (optional, length L, each
 "humanPm"|"humanDirector"|"aiAgent"|"committee" — default all "humanPm", §9.9),
+layerOwnerCount (optional, length L, each int 1–8 — default all 1, §4 M19),
+matrix: { enabled (default false), tiebreaker (0–1, default 0) } (optional — default off, §4 M19),
 modality: "asyncFirst"|"meetingHeavy", structuralHealth SH (1–10),
 misalignment m₀ (0–1, optional — default derived from SH, §4 M5),
 initialBacklog (int 0–500, optional, default 0 — standing backlog present at t=0, §4 M18),
@@ -163,6 +173,18 @@ Headcount at step t: `n(t) = round(headcountStart + headcountGrowthPerStep × t)
 Team partition by topology: flat → 1 team; pods/federated → `T = ceil(n / teamPodTargetSize)`;
 hierarchical → `T = ceil(n / hierarchicalTeamSize)`. Team sizes as equal as possible;
 the mean size `s = n/T` is used wherever a per-team size is needed.
+
+`layerOwnerCount` is the per-layer **accountability multiplicity** μ — how many co-equal
+owners hold one ownership seat (§4 M19). `matrix` turns on a **lateral dual-authority**
+seat (μ = 2 with no sequential-layer semantics), applied to the **terminal ownership layer L**,
+with a decision-rights `tiebreaker` in `[0, 1]` (0 = deadlock, 1 = a clear single decider).
+Both are additive-optional and, when absent — μ all 1, matrix off — reproduce the base model
+exactly, on the same footing as `layerTypes` (§4 M19, §12.5). The matrix seat's μ = 2 is
+**intrinsic** to the seat (§4 M19), not taken from `layerOwnerCount`; `validate()` rejects an
+explicit `layerOwnerCount ≠ 1` on the matrix target layer L (§12.1). A `committee` layer has
+**no** intrinsic multiplicity — it takes its μ from `layerOwnerCount` like any other non-matrix
+seat, so a committee **may** carry `layerOwnerCount > 1` (composing its §9.9 relay benefit with
+the diffusion cost).
 
 ### 3.4 Structural Health — the five diagnostic questions ARE the referents
 
@@ -299,7 +321,7 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
 ```json eigenorg:mechanic
 {
   "id": "decisionPipeline",
-  "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10) * layerLatencyFactor(type_l) (§9.9; 1.0 for the default humanPm type, so absent layerTypes reproduces the base model). Layer l advances at most cap_l tasks/step: cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) * layerCapacityFactor(type_l) (§9.9) (x the M11 AI approval-bandwidth multiplier when org-level AI injection is active). Capacity is use-it-or-lose-it: the fractional accumulator carries at most one whole approval between steps (acc_l = min(acc_l + cap_l - moved_l, 1)); idle days bank at most a single approval, never more. On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L, recorded only for first-pass approvals (overrideCount == 0; §11.1).",
+  "formula": "Each task clears layers 1..L. Service time per layer ~ Triangular(decisionLatencyPerLayerDays) * M_recovery(t) (M10) * layerLatencyFactor(type_l) (§9.9; 1.0 for the default humanPm type, so absent layerTypes reproduces the base model) * diffusionLatencyFactor_l (M19; = 1 at mu_l == 1, so single-owner seats add nothing; applies at every seat l in 1..L, including a matrix terminal seat at L == 1). Layer l advances at most cap_l tasks/step: cap_l = layerCapacityPerStep * layerCapacityDecay^(l-1) * layerCapacityFactor(type_l) (§9.9) (x the M11 AI approval-bandwidth multiplier when org-level AI injection is active). Capacity is use-it-or-lose-it: the fractional accumulator carries at most one whole approval between steps (acc_l = min(acc_l + cap_l - moved_l, 1)); idle days bank at most a single approval, never more. On entering layer L: with probability escalationShare(t) = m(t) * crossCutShare, service += Triangular(escalationExtraDays). decisionLatency sample = task age when it leaves layer L, recorded only for first-pass approvals (overrideCount == 0; §11.1).",
   "plainLanguage": "Every approval layer adds waiting: around 2-3 working days each just for its own look, plus queueing when the layer is busy. Higher layers have less bandwidth (a VP reviews fewer things per day than a team lead), so queues form at the top. What sits in each seat changes the wait: an AI prioritization agent clears routine items fast and adds bandwidth; a committee is slower with less. Decisions that cut across teams with unclear ownership get escalated and wait extra days. Three layers turn a same-week decision into a two-week one.",
   "citations": [
     "SI Labs (2026). Why Hierarchies Slow Down Companies - five approval layers, ~3 days per layer, 15 working days to a decision. https://www.si-labs.com/en/articles/slow-decisions/",
@@ -333,15 +355,17 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
 ```json eigenorg:mechanic
 {
   "id": "overrideWipReset",
-  "formula": "Per step, each inProgress task is overridden with probability o(t) = min(1, overrideBaseRate * (L - 1) * (1 + overrideMisalignmentGain * m(t)) * (1 + distortionOverrideCoupling * distortion)); the min(1, .) clamp keeps o(t) a probability at every in-range corner (§6 L1). distortion = distortionPerHumanLayer * (D - 1) * layerDistortionMean, where layerDistortionMean = mean over l in 2..=L of layerDistortionFactor(type_l) (§9.9), or 1.0 when L == 1 (default humanPm layers give 1.0, reproducing the base model). On override: task returns to layer 1, progress *= wipResetFraction, overrideCount += 1. Each override event is attributed to an overriding layer drawn uniformly over {2..L} for the perLayer.overrideShare output (§7.1); layer 1 originates and is never the overrider.",
-  "plainLanguage": "With more layers above the work, higher layers more often reverse lower-layer decisions - especially when ownership is unclear and information has been distorted on its way up the hierarchy. Cleaner relays reduce this: an AI agent or a committee seat garbles less context than a chain of human hand-ups, so it triggers fewer overrides. An overridden task is not lost: it re-enters the pipeline keeping about half its progress. That partial rework, plus a fresh trip through every approval layer, is the true cost of an override.",
+  "formula": "Per step, each inProgress task is overridden with probability o(t) = min(1, overrideBaseRate * (L - 1) * (1 + overrideMisalignmentGain * m(t)) * (1 + distortionOverrideCoupling * distortion) * diffusionMean); the min(1, .) clamp keeps o(t) a probability at every in-range corner (§6 L1). distortion = distortionPerHumanLayer * (D - 1) * layerDistortionMean, where layerDistortionMean = mean over l in 2..=L of layerDistortionFactor(type_l) (§9.9), or 1.0 when L == 1 (default humanPm layers give 1.0, reproducing the base model). diffusionMean = mean over l in 2..=L of the accountability-diffusion factor diffusionFactor_l (M19), or 1.0 when L == 1 (single-owner humanPm seats give diffusionFactor_l = 1, so the default org reproduces the base model). On override: task returns to layer 1, progress *= wipResetFraction * max(0, 1 - dropMean) (dropMean per M19; 0 at default, so the base model reproduces progress *= wipResetFraction), overrideCount += 1. Each override event is attributed to an overriding layer drawn over {2..L} with probability proportional to the authority-gradient weight w_l = 1 + overrideAuthorityGradient * (l - 1) (M19) for the perLayer.overrideShare output (§7.1) - the draw consumes EXACTLY ONE uniform per event, so the RNG draw order is unchanged and the default overrideAuthorityGradient == 0 recovers the v1 uniform attribution byte-for-byte; layer 1 originates and is never the overrider. RNG PARITY (normative): at overrideAuthorityGradient = 0 (default), the override-attribution step reproduces the v1.0.0 draw behavior byte-for-byte, INCLUDING the singleton case {2..L} = {2} at L = 2 (exactly one uniform consumed per event, the single candidate selected). This is a normative parity requirement; the pre-lock full-series diff of prioritizationTax (L=3), dunbarCliff (the L=2 singleton path), and layerConfigurator (typed seats) is a REQUIRED verification GATE that must pass before lock - not merely an assertion.",
+  "plainLanguage": "With more layers above the work, higher layers more often reverse lower-layer decisions - especially when ownership is unclear and information has been distorted on its way up the hierarchy. Cleaner relays reduce this: an AI agent or a committee seat garbles less context than a chain of human hand-ups, so it triggers fewer overrides. But co-equal owners cut the other way - a seat held by several co-equal owners (a dual-authority matrix box, or a layer with more than one named owner, including a committee you explicitly mark as diffuse via layerOwnerCount) diffuses accountability and gets relitigated MORE (M19), which is why a diffuse committee is an honest tradeoff and not a free lunch. An overridden task is not lost: it re-enters the pipeline keeping about half its progress (a touch less when many owners let work slip between them). That partial rework, plus a fresh trip through every approval layer, is the true cost of an override. An optional authority gradient (off by default) can make the higher-authority seats do more of the reversing.",
   "citations": [
     "SI Labs (2026). Why Hierarchies Slow Down Companies. https://www.si-labs.com/en/articles/slow-decisions/",
-    "eigenorg design red-team (2026): overridden WIP re-enters at partial completion rather than disappearing from throughput."
+    "eigenorg design red-team (2026): overridden WIP re-enters at partial completion rather than disappearing from throughput.",
+    "Latane, B. (1981). The psychology of social impact. American Psychologist, 36(4), 343-356 - source of the co-equal-owner relitigation multiplier folded into o(t) via M19 (accountabilityDiffusion)."
   ],
   "limitations": [
     "Override probability and the 50% reset fraction are editorial defaults; real override cost varies with how far the work had progressed.",
-    "Single-layer stacks (L=1) never override in this model; in reality self-reversal exists but is rare enough to ignore."
+    "Single-layer stacks (L=1) never override in this model; in reality self-reversal exists but is rare enough to ignore.",
+    "The accountability-diffusion multiplier (diffusionMean), the extra work-drop term (dropMean), and the authority-gradient attribution are defined and anchored in M19; at the default single-owner configuration diffusionMean = 1, dropMean = 0, and overrideAuthorityGradient = 0, so o(t), the reset fraction, the attribution distribution, and the RNG draw order are byte-identical to v1.0.0."
   ]
 }
 ```
@@ -523,6 +547,50 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
 }
 ```
 
+### M19 — Accountability diffusion (co-equal owners, relitigation, HiPPO)
+
+```json eigenorg:mechanic
+{
+  "id": "accountabilityDiffusion",
+  "formula": "Accountability multiplicity mu_l >= 1 is the count of co-equal owners holding one decision at ownership seat l, resolved by PRECEDENCE (no max(), no silent override): (i) the org.matrix seat - a lateral dual-authority applied to the TERMINAL ownership layer L when org.matrix.enabled (schema addition §12.2), REGARDLESS of that layer's §9.9 type - has mu_L = 2; (ii) every OTHER seat, INCLUDING a committee-typed seat (org.layerTypes[l-1] == 'committee', §9.9), has mu_l = org.layerOwnerCount[l-1] (schema addition §12.2; int in [1,8], default 1). The committee type carries NO intrinsic multiplicity: its §9.9 latency/capacity/distortion factors are unchanged from v1.0.0, and its accountability diffusion (if any) is expressed additively via org.layerOwnerCount on that layer - so a committee at layerOwnerCount 1 reproduces its v1 behavior byte-for-byte, and a diffuse committee is committee-type + layerOwnerCount > 1 (the §9.9 relay-fidelity distortion benefit and the accountability-diffusion cost COMPOSE - different mechanisms, no double count). validate() REJECTS an org.layerOwnerCount[l-1] != 1 ONLY on the matrix target layer L (the intrinsic mu = 2 wins there and a conflicting count is an authoring error); it ALLOWS org.layerOwnerCount != 1 on a committee seat. MATRIX ON A COMMITTEE SEAT: if the terminal layer L is a committee, org.matrix applies mu_L = 2 AND the committee still contributes its §9.9 relay-fidelity (distortion) factor - the distortion discount (M8) and the dual-authority multiplicity (M19) are different mechanisms that compose with no conflict. tiebreaker_l in [0,1] = org.matrix.tiebreaker at the matrix seat (l == L when org.matrix.enabled), else 0 - a single named owner, a committee, or a plain multi-owner seat carries no tiebreaker, i.e. full diffusion. Three channels, each LINEAR in (mu_l - 1) and attenuated by a clear decider (1 - tiebreaker_l), each an EXACT no-op at mu_l == 1: (a) OVERRIDE - diffusionFactor_l = 1 + overrideDiffusionGain * (mu_l - 1) * (1 - tiebreaker_l) (>= 1); the stack aggregate diffusionMean = mean over l in 2..=L of diffusionFactor_l (or 1.0 when L == 1) multiplies the M8 override probability o(t). (b) LATENCY - diffusionLatencyFactor_l = 1 + muLatencySurchargeRate * (mu_l - 1) * (1 - tiebreaker_l) multiplies the M6 per-layer service draw at EVERY seat l in 1..L. (c) MOTIVATION-LOSS - dropMean = mean over l in 2..=L of muWorkDropFraction * (mu_l - 1) * (1 - tiebreaker_l) (or 0 when L == 1); on override (T7) progress *= wipResetFraction * max(0, 1 - dropMean). MATRIX SEAT PLACEMENT: the latency factor applies per-seat at every l, but diffusionMean and dropMean average only over l in 2..=L, so a matrix (or any multi-owner terminal seat) adds its latency surcharge at any L including L == 1, yet contributes to the override and motivation-loss channels only when L >= 2 - at L == 1 there is no higher seat for the terminal owner to relitigate a decision through. AUTHORITY-GRADIENT attribution: each M8 override event is credited to an overriding seat drawn over {2..L} with probability proportional to w_l = 1 + overrideAuthorityGradient * (l - 1) (higher seats reverse more - HiPPO), consuming EXACTLY ONE uniform per event (draw-count/stream parity with v1); at the default overrideAuthorityGradient == 0 the weights are uniform, recovering the v1 uniform attribution and a byte-identical perLayer.overrideShare. NEUTRAL IDENTITY: org.layerOwnerCount all 1 (its default) + org.matrix off => every mu_l == 1 => diffusionFactor_l = 1, diffusionLatencyFactor_l = 1, dropMean = 0, diffusionMean = 1, so M6 and M8 reproduce the base model exactly and add no new RNG draw - for EVERY v1 config INCLUDING one that uses a committee seat (a committee's v1 §9.9 factors are untouched and its default mu is 1). The amendment is therefore FULLY ADDITIVE: no existing org.layerTypes value changes meaning, so all 34 v1 goldens and every pre-existing series are byte-identical at default (§12.4/§12.5). A committee that a user explicitly makes diffuse (layerOwnerCount > 1) is a NEW config the user authored with the correct explicit lever, not an existing one changing behavior.",
+  "plainLanguage": "More co-equal owners on a single decision diffuse felt responsibility - Latane's social-impact law says each owner feels roughly 1/sqrt(N) as accountable - so the decision gets relitigated and reversed more often, sits longer at its seat, and loses a little work between owners. The first added co-owner is by far the costliest, and a clear tiebreaker or a single named accountable owner collapses the whole effect. A committee seat keeps its v1 character exactly - its many eyes garble less context, so it still triggers FEWER distortion-driven overrides (§9.9) - and if you want to model a committee whose accountability is genuinely diffuse you say so explicitly by raising layerOwnerCount on that seat, at which point the relay benefit and the diffusion cost compose. That is the honest committee tradeoff, now driven by the correct explicit lever rather than baked into the seat type. When decisions are reversed, an optional authority gradient can make the higher-authority seats do more of the reversing (HiPPO); it is off by default, so by default every seat above the work is an equally likely overrider.",
+  "citations": [
+    "Darley, J. M., & Latane, B. (1968). Bystander intervention in emergencies: Diffusion of responsibility. Journal of Personality and Social Psychology, 8(4), 377-383. (decisive ownership 85%/62%/31% for 1/2/5 responsible parties). https://psycnet.apa.org/record/1968-08862-001",
+    "Latane, B. (1981). The psychology of social impact. American Psychologist, 36(4), 343-356. (individual felt-impact ~ N^-0.5).",
+    "Karau, S. J., & Williams, K. D. (1993). Social loafing: A meta-analytic review and theoretical integration. Journal of Personality and Social Psychology, 65(4), 681-706. (motivation-loss d ~= -0.44, the work-drop channel).",
+    "Brooks, F. P. (1975). The Mythical Man-Month. Addison-Wesley. (coordination cost ~ n(n-1)/2 pairwise channels - the convex-latency reference behind the surcharge's direction).",
+    "Rogers, P., & Blenko, M. (2006). Who Has the D? How Clear Decision Roles Enhance Organizational Performance. Harvard Business Review, Jan 2006. (a single named decider / RAPID 'D' is the tiebreaker that collapses the diffusion)."
+  ],
+  "limitations": [
+    "The felt-responsibility -> relitigation/latency/drop link is an author construct; the peer-reviewed anchors (Darley-Latane 1968, Latane 1981, Karau-Williams 1993) measure emergency helping and additive-task effort, not organizational decision overrides - so every M19 coefficient is editorial-heuristic despite the peer-reviewed direction.",
+    "All three channels are modeled LINEAR in (mu_l - 1). The override channel therefore overstates diffusion beyond ~4 co-equal owners (the data saturate ~N^0.5), and the latency channel understates it there (Brooks pairwise channels are convex, ~mu(mu-1)/2). A saturation cap on override and a convex Brooks form on latency for mu > 4 are deferred refinements (a candidate future MINOR); realistic mu (matrix 2, a diffuse committee ~3 via layerOwnerCount) sits in the linear regime, which is why v2.0.0 keeps the linear form.",
+    "Applies only to genuinely CO-EQUAL owners of one decision. A designated single accountable owner (org.layerOwnerCount == 1) or a clear tiebreaker (org.matrix.tiebreaker -> 1) collapses mu_l -> effective 1 and removes the term - matching the RACI/DACI 'exactly one Accountable' and RAPID single-'D' doctrines.",
+    "mu_l is resolved by PRECEDENCE (only the matrix-target seat takes an intrinsic multiplicity mu = 2; validate() rejects a conflicting org.layerOwnerCount only there), not a max() over sources, so each seat has exactly one multiplicity source and there is no double-count. The committee type carries no intrinsic multiplicity in v2.0.0 - its v1 §9.9 relay/latency/capacity factors are unchanged and its accountability diffusion is expressed additively via org.layerOwnerCount, so no v1 committee config changes at default. A committee (or any non-matrix seat) with a designated chair/decider that only PARTIALLY collapses the diffusion is not separately expressible - only the matrix seat carries a continuous [0,1] tiebreaker; a non-matrix seat is either fully single-owner (layerOwnerCount 1) or fully diffuse (layerOwnerCount > 1)."
+  ]
+}
+```
+
+### M20 — Review capacity queue (team sim)
+
+```json eigenorg:mechanic
+{
+  "id": "reviewCapacityQueue",
+  "formula": "Team sim only; a finite-throughput gate on the existing `review` state (T6r/T6d), inserted between execution-completion and `done` (§5.2 step 7). A completed task (progress >= effort) with the review function covered enters `review` (T6r) with a dwell of reviewDwellDays; with review uncovered it goes straight to `done` (T6) with a quality draw (M16) - unchanged. Each step, after execution, the tasks in `review` whose dwell has elapsed clear to `done` (T6d) in FIFO order (by completion step, then task id), up to a per-step budget from team.reviewCapacityPerStep, which MAY be fractional: clearance uses a use-it-or-lose-it fractional accumulator mirroring M6 layer capacity - reviewAcc starts at 0; each step budget = reviewAcc + reviewCapacityPerStep, cleared = min(dwell-elapsed count, floor(budget)) tasks clear FIFO, then reviewAcc = min(budget - cleared, 1) banks at most one whole clearance between steps; the remainder stay in `review`. (Example: reviewCapacityPerStep = 0.5 clears one review every two steps.) team.reviewCapacityPerStep = null (default) is unbounded, so every dwell-elapsed task clears the step its dwell ends - identical task set and identical clear-step as v1's ungated T6d, with an identical RNG-stream position (§8.1) for every asserted series; the within-step clearance order is the normative FIFO (completion step, then task id), and qualityHistogram byte-identity is the iff-order / reference-run case narrowed in §F.6. Each cleared task draws quality (M16) and is counted in `throughput` at the clear step (team throughput is measured at review-dwell exit, §2.2). Consequently, when reviewCapacityPerStep is below the completion-arrival rate, `throughput` plateaus at reviewCapacityPerStep (Theory-of-Constraints cap) while the surplus (completionRate - reviewCapacityPerStep) accumulates as review WIP. This gate does NOT touch M17 function coverage (the coverage MAP and its demand scaling are unchanged) - it is a separate throughput stage between execution-complete and done. Outputs (both computed deterministically from FSM state, adding NO draws): reviewQueueDepth(t) = count of tasks in `review` at end of step t; reviewWaitDays(t) = EMA (weight metricSmoothingAlpha) of the realized review sojourn (clear step - entry step, in working days) over tasks cleared at step t, holding the prior value on steps with no clearance, init reviewWaitDays(0) = reviewDwellDays. Neutral identity: unbounded capacity => every realized sojourn = reviewDwellDays => reviewWaitDays == reviewDwellDays and reviewQueueDepth is only the in-dwell population; no pre-existing series changes. REVIEW-CLEARANCE PARITY (normative): at unbounded capacity (reviewCapacityPerStep == null) the review-clearance SET and STEP match v1 exactly, so all asserted series and the 34 v1 verdicts are byte-identical; the clearance ORDER is normatively FIFO by (completion step, then task id). qualityHistogram byte-identity is not claimed unconditionally: M16 draws each cleared task's quality in clearance order and quality depends on task class/judgment path, so an order differing from v1's could reassign draws and shift histogram bucket counts; byte-identity holds iff v1 already clears in this normative order (confirmed by extending the pre-lock parity check to the non-series qualityHistogram block, since a series-only diff cannot). Either way no golden or asserted series reads qualityHistogram, so all 34 v1 verdicts and asserted series stay byte-identical regardless.",
+  "plainLanguage": "Review is a finite-capacity stage, not an infinitely parallel wait. Left at its default it is unbounded: completed work waits one review dwell and is done, exactly as before. Give reviewers a per-day clearance capacity and review becomes a throughput gate - once builders (especially AI-accelerated ones) finish faster than reviewers can clear, done-throughput stops rising, work banks up in review, and the wait grows. This is the bottleneck that AI-authored code pushes onto human reviewers.",
+  "citations": [
+    "Goldratt, E. M. & Cox, J. (1984). The Goal - Theory of Constraints: system throughput is set by the slowest stage; producing upstream of the constraint only inflates WIP.",
+    "Reinertsen, D. G. (2009). The Principles of Product Development Flow - queues grow superlinearly as utilization approaches 100%; provision review capacity ~1.25x demand (utilization <= 0.8).",
+    "Sadowski, C., Soderberg, E., Church, L., Sipko, M. & Bacchelli, A. (2018). Modern Code Review: A Case Study at Google (ICSE-SEIP) - review latency is dominated by reviewer availability and change size, not authoring speed."
+  ],
+  "limitations": [
+    "The gate is a deterministic per-step batch, so utilization rho = completionRate / reviewCapacityPerStep = 1 is the exact break-even, not a stochastic blow-up; no Kingman / M-M-1 variability term (c_a^2, c_s^2) is modeled.",
+    "Capacity is counted in items/step; a points/step (review-effort) formulation is not modeled.",
+    "reviewWaitDays inherits reviewDwellDays' treatment of fractional dwell and lags the instantaneous queue by the EMA smoothing.",
+    "Review-queue congestion is not fed back into the M13 entropy composite in v2.0.0 (§13 limitation 9); the queue is visible only through its own two series. Coupling it into entropy is a candidate future MINOR."
+  ]
+}
+```
+
 ---
 
 ## 5. Per-step algorithms (normative execution order)
@@ -576,16 +644,25 @@ reproducibility contract (§8).
 5. **Prioritization.** Single layer, capacity `layerCapacityPerStep` (fractional
    accumulator); ready tasks -> `inProgress` (T4; decision-latency sample; routine
    samples also feed `decisionLatencyRoutine`).
-6. **Execution.** Pool = sum of rates of entities covering `execution`, x (1 - tau_team).
-   FIFO allocation <= `maxPointsPerTaskPerStep`; routine x routine boost, novel x
-   `(humanExecShare + aiExecShare * aiNovelEffectiveness)` (M11). Completions enter
-   review dwell (`reviewDwellDays`, if review covered) then `done` with a quality draw
-   (M16).
-7. **Cohesion.** M12 (team variant, coupled to `E_team(t-1)`).
-8. **Metrics.** Series values for step t: throughput, cumThroughput,
+6. **Execution.** Pool = sum of rates of entities covering `execution`, × (1 − τ_team).
+   FIFO allocation ≤ `maxPointsPerTaskPerStep`; routine × routine boost, novel ×
+   `(humanExecShare + aiExecShare × aiNovelEffectiveness)` (M11). Completions
+   (`progress ≥ effort`): if the review function is covered, enter the `review` state
+   (T6r) with a dwell of `reviewDwellDays`; if review is uncovered, go straight to `done`
+   (T6) with a quality draw (M16).
+7. **Review clearance (M20).** Tasks in `review` whose dwell has elapsed clear to `done`
+   (T6d) in FIFO order (by completion step, then task id), up to
+   the M20 fractional-accumulator budget from `team.reviewCapacityPerStep` (which may be fractional) per step — **unbounded when `null`, so every dwell-elapsed
+   task clears the step its dwell ends, reproducing v1's ungated review exactly**. Each
+   cleared task draws quality (M16) and is counted in `throughput` at this step; the rest
+   remain in `review`. (The locked team scenarios cover review fully, so every quality
+   draw is a T6d draw and the RNG stream is byte-identical at the default `null` capacity.)
+8. **Cohesion.** M12 (team variant, coupled to `E_team(t-1)`).
+9. **Metrics.** Series values for step t: throughput, cumThroughput,
    decisionLatencyRoutine, coordinationTax, cohesion, brittlenessRate,
-   cumulativeBrittleness, entropyProxy, orgHealthProxy, healthGap; quality histogram
-   accumulation. Function coverage (M17) is computed once at t = 0 (static in v1).
+   cumulativeBrittleness, entropyProxy, orgHealthProxy, healthGap, `reviewQueueDepth`,
+   `reviewWaitDays` (M20); quality histogram accumulation. Function coverage (M17) is
+   computed once at t = 0 (static in v1).
 
 ---
 
@@ -603,9 +680,19 @@ to more override draws. **Boundedness:** the override probability per task-step 
 `o(t) = min(1, o_raw(t))` (M8), so `o(t) ∈ [0,1]` for **every** config within the declared
 ranges — the `min(1, ·)` clamp is load-bearing, because `o_raw` reaches
 `overrideBaseRate_max · (L−1)_max · (1 + overrideMisalignmentGain_max · 1) ·
-(1 + distortionOverrideCoupling_max · distortionPerHumanLayer_max · (D−1)_max) =
-0.05 · 4 · (1 + 4·1) · (1 + 1 · 0.15 · 5) = 0.05 · 4 · 5 · 1.75 = 1.75 > 1` at the in-range corner. Progress loss per
-override is bounded by `wipResetFraction`, and each layer's capacity caps pipeline flow —
+(1 + distortionOverrideCoupling_max · distortionPerHumanLayer_max · (D−1)_max) · diffusionMean_max =
+0.05 · 4 · (1 + 4·1) · (1 + 1 · 0.15 · 5) · diffusionMean_max = 1.75 · diffusionMean_max`
+at the in-range corner. The accountability-diffusion multiplier `diffusionMean` (M19) is finite and
+bounded: `diffusionFactor_l = 1 + overrideDiffusionGain·(μ_l−1)·(1−tiebreaker_l)` with `μ_l` pinned by
+`validate()` to the integer range `[1, 8]` (the `org.layerOwnerCount` ceiling; a matrix's
+`μ = 2` sits below it, and a committee now draws its `μ` from `layerOwnerCount`, so it is bounded
+by the same ceiling). The worst corner is
+therefore every seat at `μ_max = 8`, `overrideDiffusionGain_max = 0.8`, `tiebreaker = 0`, giving
+`diffusionFactor_l = 1 + 0.8·7 = 6.6`, hence `diffusionMean_max = 6.6` and
+`o_raw ≈ 1.75 · 6.6 = 11.55 > 1`. The same `min(1, ·)` clamp keeps `o(t) ∈ [0,1]` at every in-range
+corner, now including any multi-owner seat — the clamp remains load-bearing. Progress kept per
+override is `wipResetFraction · max(0, 1 − dropMean)` (M19) — bounded in `[0, wipResetFraction]`, the
+`max(0, ·)` clamp preventing negative progress at any multiplicity — and each layer's capacity caps pipeline flow —
 the loop amplifies latency but cannot diverge: latency is bounded by queue length, which
 is bounded by cumulative arrivals (at most linear growth in t in overloaded configs).
 
@@ -686,30 +773,36 @@ p10 = p50 = p90. Downstream phases must consume THIS list — no other output li
 
 **Org non-series blocks:** `perLayer` — for each layer l:
 `{layer, layerType, meanLatencyDays, meanQueue, utilization, overrideShare, distortion,
-bottleneck}`, with every field given a fully computable rule (no field is left to engine
+ownerMultiplicity, diffusionFactor, bottleneck}`, with every field given a fully computable rule (no field is left to engine
 discretion):
 
 - `layerType` — the layer's type from `org.layerTypes[l−1]` (`humanPm` when `layerTypes`
   is absent).
 - `meanLatencyDays` — mean, over tasks that **enter layer l during the final 20 steps**,
   of the service time drawn for that layer:
-  `Triangular(decisionLatencyPerLayerDays) × M_recovery × layerLatencyFactor(type_l)`
+  `Triangular(decisionLatencyPerLayerDays) × M_recovery × layerLatencyFactor(type_l) × diffusionLatencyFactor_l`
   (× the routine AI-routing factor when org injection is active, M11), **including — at
   layer L only — the escalation surcharge (M6) actually drawn for that task**, since the
   measured mean reports the whole drawn service time at the seat. If no task enters
   layer l in the window, it reports layer l's structural minimum
-  `mean(decisionLatencyPerLayerDays) × layerLatencyFactor(type_l)` (the escalation
+  `mean(decisionLatencyPerLayerDays) × layerLatencyFactor(type_l) × diffusionLatencyFactor_l` (the escalation
   surcharge, a stochastic add-on, is excluded from this floor).
 - `meanQueue` — mean over the final 20 steps of `count(tasks in queued(l))`.
 - `utilization` — mean over the final 20 steps of `moved_l / cap_l` (tasks advanced out
   of layer l that step divided by that step's capacity; capped at 1).
-- `overrideShare` — the per-layer share of total override events, where each override
-  event is attributed to an overriding layer drawn **uniformly over {2..L}** (M8); layer 1
-  originates work and never overrides, so its share is 0. Shares over l = 1..L sum to 1
-  (or 0 when no overrides occurred).
+- `overrideShare` — the per-layer share of total override events, where each override event
+  is attributed to an overriding layer drawn over {2..L} with probability proportional to
+  `w_l = 1 + overrideAuthorityGradient × (l−1)` (M8/M19); layer 1 originates work and never
+  overrides, so its share is 0. **At the default `overrideAuthorityGradient = 0` the weights
+  are uniform, so this is the v1 uniform draw and `overrideShare` is byte-identical.** Shares
+  over l = 1..L sum to 1 (or 0 when no overrides occurred). `overrideShare` is a
+  Monte-Carlo-only output (§8.4).
 - `distortion` — `distortionPerHumanLayer × (l−1) × layerDistortionFactor(type_l)`: the
   cumulative human-relay distortion up to layer l, scaled by how cleanly the seat relays
   (a committee or aiAgent seat lowers it, §9.9).
+- `ownerMultiplicity` — `μ_l` at seat l (M19; `1` for a single-owner humanPm seat).
+- `diffusionFactor` — `diffusionFactor_l = 1 + overrideDiffusionGain × (μ_l − 1) × (1 − tiebreaker_l)`
+  (M19; `1.0` at `μ_l = 1`), the per-seat relitigation multiplier this seat contributes to overrides.
 - `bottleneck` — `true` for the single layer with the maximum `utilization`.
 
 `bandMarkers` — echo of the four cognitive band centers (for chart annotations).
@@ -719,7 +812,7 @@ impact delta" chart are computed in the UI as the pointwise difference of two ru
 `entropy` (and `throughput`) series — same org, `aiInjection.enabled` false/true or
 SH varied. The engine does not emit a delta series; the UI must not invent one elsewhere.
 
-### 7.2 AI Agent Team Simulator series (10) and blocks
+### 7.2 AI Agent Team Simulator series (12) and blocks
 
 | id | unit | notes |
 |---|---|---|
@@ -733,6 +826,8 @@ SH varied. The engine does not emit a delta series; the UI must not invent one e
 | `entropyProxy` | index 0–100 | M13 team variant |
 | `orgHealthProxy` | index 0–100 | `100 − entropyProxy` |
 | `healthGap` | points | `cohesion − orgHealthProxy` (multi-level health) |
+| `reviewQueueDepth` | items | tasks in the `review` state at end of step (M20); only the in-dwell population until review capacity binds, then grows |
+| `reviewWaitDays` | working days | EMA realized review sojourn (M20); equals `reviewDwellDays` while review capacity is unbounded, rises when it binds |
 
 **Team non-series blocks:**
 - `qualityHistogram`: 10 bins `[{lo, hi, count}]` over completed-task quality (0–100,
@@ -805,6 +900,13 @@ simulation with every stochastic draw replaced as follows —
   `tolerance`.
 - `instrument: "monteCarlo"` predicates assert against the **band series**
   (p10/p50/p90 as named by the metric suffix `.p10|.p50|.p90`; default `.p50`).
+- **`perLayer.overrideShare` is a Monte-Carlo-only output.** The authority-gradient
+  attribution (M8/M19) draws one uniform per override event to credit an overriding seat;
+  that per-event draw exists only in the stochastic engine. Mean-path mode fires overrides
+  from a deterministic accumulator and performs no per-event seat draw, so
+  `perLayer.overrideShare` is defined and asserted only against the Monte-Carlo band series,
+  never the `meanPath` instrument. (No golden asserts `overrideShare`; this note fixes the
+  weighted-attribution mapping so it is unambiguous.)
 
 The harness's MC mode re-verifies ALL predicates (both instruments) under these engine
 semantics before lock, so the pre-lock proof uses the same statistics the engine's golden
@@ -1566,7 +1668,7 @@ require explicit maintainer review before they land.
 { "id": "reviewDwellDays", "value": 1, "range": [0.5, 2], "distribution": "point", "unit": "working days",
   "anchor": "Editorial", "tier": "editorial-heuristic",
   "limitation": "Fixed dwell; review queues are not modeled in v1.",
-  "formula": "completed tasks wait reviewDwellDays before done when review is covered (Sec 5.2 step 6)",
+  "formula": "completed tasks enter the review dwell at execution (§5.2 step 6, T6r) and wait reviewDwellDays before clearing to done at review clearance (§5.2 step 7, T6d/M20) when review is covered",
   "plainLanguage": "Review adds about a day before work counts as shipped." }
 ```
 
@@ -1697,15 +1799,64 @@ event; M11 takes the max of the two novel-exposure sources.)
   "plainLanguage": "A committee seat's many eyes cut relayed-context loss roughly in half - fewer overrides than a lone human seat." }
 ```
 
+### 9.10 Accountability diffusion (M19; co-equal-owner cost)
+
+The M19 accountability-diffusion mechanic (§4) reads a per-seat multiplicity `μ_l ≥ 1` — the number
+of co-equal owners holding one decision — from `org.layerOwnerCount` and `org.matrix` (§12.2) by
+the precedence rule in M19 (a `committee` seat takes its `μ` from `org.layerOwnerCount` like any
+other non-matrix seat; it has **no** intrinsic multiplicity), and raises relitigation, decision
+latency, and inter-owner work-drop as multiplicity rises, attenuated toward the single-owner case by
+a clear tiebreaker. **Every coefficient below is an exact no-op at `μ_l = 1`, so the default
+single-owner org reproduces the base model** (see the neutral-identity clause in M19). Directions rest
+on peer-reviewed diffusion-of-responsibility and social-loafing work; the magnitudes are editorial.
+The four blocks appear in this document order (which fixes their order in `model/params.json` and thus
+its SHA). `team.reviewCapacityPerStep` (M20) is a per-run **config field**, not a coefficient — it is
+defined in §12.2, not here.
+
+```json eigenorg:parameter
+{ "id": "overrideDiffusionGain", "value": 0.4, "range": [0.25, 0.8], "distribution": "point", "unit": "override-probability gain per added co-equal owner",
+  "anchor": "Darley & Latane (1968, JPSP 8:377-383): decisive helping fell 85%->62%->31% for 1/2/5 responsible parties - the first added co-equal owner cut decisive ownership to ~73% of solo; Latane (1981, American Psychologist 36:343-356) Social Impact Theory fits felt-responsibility ~ N^-0.5. Default 0.4 = a x1.4 override multiplier at the first added owner (mu=2), matching that first-owner drop.", "tier": "editorial-heuristic",
+  "limitation": "The felt-responsibility -> relitigation link is an author construct; no study measures decision-override rates directly, so despite the peer-reviewed diffusion anchor the coefficient is editorial. The linear (mu-1) form overstates diffusion beyond ~4 co-equal owners, where the data saturate (~N^0.5); a cap/power-law is a deferred refinement.",
+  "formula": "diffusionFactor_l = 1 + overrideDiffusionGain * (mu_l - 1) * (1 - tiebreaker_l); diffusionMean = mean over l in 2..=L of diffusionFactor_l feeds o(t) (M8/M19)",
+  "plainLanguage": "Each extra co-equal owner on one decision makes it about 40% more likely to be relitigated or overridden - and the first added owner is the costliest." }
+```
+
+```json eigenorg:parameter
+{ "id": "muLatencySurchargeRate", "value": 0.35, "range": [0.2, 0.6], "distribution": "point", "unit": "service-time gain per added co-equal owner",
+  "anchor": "Darley & Latane (1968) found intervention latency rose monotonically with bystander count (interventions were fewer AND slower); McKinsey ('Revisiting the matrix organization,' 2016; 'Decision making in the age of urgency,' 2019) reports distributed accountability decides materially slower than single-point accountability. Default +35% per added owner matches the 2-4 owner regime.", "tier": "editorial-heuristic",
+  "limitation": "Direction is well supported; the exact percentage is an anchored estimate, not a measured decision-cycle dataset. Modeled linear in (mu-1); the convex Brooks pairwise-channel form (n(n-1)/2) for >4 co-equal owners is a deferred refinement, kept distinct from the motivation-loss channel per Latane, Williams & Harkins (1979).",
+  "formula": "diffusionLatencyFactor_l = 1 + muLatencySurchargeRate * (mu_l - 1) * (1 - tiebreaker_l); multiplies the M6 per-layer service draw at every seat l in 1..L (M19)",
+  "plainLanguage": "Each extra co-equal owner adds about 35% to the time a decision sits at that seat - consultation and relitigation rounds pile up." }
+```
+
+```json eigenorg:parameter
+{ "id": "muWorkDropFraction", "value": 0.03, "range": [0, 0.1], "distribution": "point", "unit": "extra progress fraction dropped per added co-equal owner",
+  "anchor": "Karau & Williams (1993, JPSP 65:681-706) social-loafing meta-analysis (78 studies): motivation-loss d ~= -0.44, ~9-18% per-owner effort loss; Latane, Williams & Harkins (1979, JPSP 37:822-832) isolate motivation loss from coordination loss. Default 0.03 is a deliberately small extra loss, distinct from the latency (coordination) channel.", "tier": "editorial-heuristic",
+  "limitation": "Loafing is measured on additive output tasks, not decision ownership; kept small and applied only at the override event (T7) to avoid double-counting the coordination-latency channel. Set to 0 to disable the motivation-loss channel; identifiability (a named owner) also removes it (Williams, Harkins & Latane 1981).",
+  "formula": "on override (T7): progress *= wipResetFraction * max(0, 1 - dropMean), dropMean = mean over l in 2..=L of muWorkDropFraction * (mu_l - 1) * (1 - tiebreaker_l) (M19)",
+  "plainLanguage": "A little extra work falls between co-equal owners: when a diffuse decision is overridden it keeps slightly less of its progress than a single-owner one." }
+```
+
+```json eigenorg:parameter
+{ "id": "overrideAuthorityGradient", "value": 0.0, "range": [0, 2], "distribution": "point", "unit": "attribution weight per layer above layer 1",
+  "anchor": "Authority-gradient / HiPPO effect: steeper authority gradients concentrate reversal power at the top (crew-resource-management authority-gradient research, Fischer & Orasanu 2000; 'HiPPO' - highest-paid-person's-opinion overriding lower-level calls, popularized in evidence-based-management practice). Directional; magnitude editorial. Default 0 = uniform attribution, identical to the v1.0.0 draw - the gradient is exposed as an opt-in lever.", "tier": "editorial-heuristic",
+  "limitation": "Reweights only WHICH seat an override is credited to for the perLayer.overrideShare output; it does not change the override rate, the RNG draw count/order (still exactly one uniform per event), the WIP reset, or any series - so no golden is affected at any value. Default 0.0 keeps the uniform draw, so perLayer.overrideShare is byte-identical to v1 (calibration-safety). A maintainer may elect a default of 0.5 (the HiPPO tilt) only after confirming that no www/presets/*.json Rust plausibility test snapshots perLayer.overrideShare (none do in v1). The gradient's slope is an editorial default; real reversal authority is lumpy, not a smooth linear ramp.",
+  "formula": "override event attributed to seat l in {2..L} with probability proportional to w_l = 1 + overrideAuthorityGradient * (l - 1) (M8/M19); one uniform per event",
+  "plainLanguage": "Off by default: an override is credited to a uniformly-random higher seat, exactly as v1. Turn it up and the higher seats absorb more of the credit - the boss overturns more calls than the layer just above the work (HiPPO)." }
+```
+
 ---
 
 ## 10. Scenarios (normative configs)
 
-The six scenarios are defined here; `www/presets/*.json` (P4/P7a) materialize
+The ten scenarios are defined here; `www/presets/*.json` (P4/P7a) materialize
 these configs verbatim and carry Rust plausibility tests against the same files. Golden
 assertions (§11) reference `metric@runLabel`. **All golden evaluation uses seed 42 and
 500 iterations.** The sixth, `layerConfigurator`, is an org scenario that exercises the
 per-layer typing of §9.9 (the P6 configurator's model surface).
+Scenarios seven through ten — `accountabilityDiffusion`, `committeeInversion`, `matrix`,
+`reviewBottleneck` — are the v2.0.0 additions exercising accountability multiplicity (§4 M19)
+and the review-capacity queue (§4 M20).
 
 ### 10.1 `coordinationCollapse` — rapid scaling without structure (org)
 
@@ -1903,6 +2054,206 @@ org-wide AI injection: the effect is the seat, not an injection event.
         "layerTypes": ["humanPm", "humanPm", "humanPm"],
         "modality": "asyncFirst", "structuralHealth": 5,
         "aiInjection": { "enabled": false, "atStep": 0 } }
+    }
+  }
+}
+```
+
+### 10.7 `accountabilityDiffusion` — one owner vs three co-equal owners (org; §4 M19)
+
+The same 20-person hierarchical org with a 3-layer ownership stack, at SH 6, async-first, no
+AI, run twice: `singleOwner` gives every seat a single accountable owner
+(`layerOwnerCount [1,1,1]`); `coOwned` puts **three co-equal owners** in every seat
+(`layerOwnerCount [3,3,3]`). Only `org.layerOwnerCount` differs. This isolates the
+accountability-multiplicity mechanic (M19): more co-equal owners of one decision diffuse felt
+responsibility (Latané & Darley), so the decision is relitigated/overridden more and resolves
+slower — while nothing about the relay chain (distortion) changes. `singleOwner` (all-`1`) is
+the neutral identity: it reproduces the base 3-layer model, so its series is byte-identical
+(version-metadata excluded, §12.4) to `prioritizationTax@threeLayer`.
+
+```json
+{
+  "runs": {
+    "singleOwner": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+        "topology": "hierarchical", "hierarchyDepth": 3, "ownershipLayers": 3,
+        "layerOwnerCount": [1, 1, 1],
+        "modality": "asyncFirst", "structuralHealth": 6,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    },
+    "coOwned": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+        "topology": "hierarchical", "hierarchyDepth": 3, "ownershipLayers": 3,
+        "layerOwnerCount": [3, 3, 3],
+        "modality": "asyncFirst", "structuralHealth": 6,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    }
+  }
+}
+```
+
+### 10.8 `committeeInversion` — a committee's diffusion cost is now an explicit, additive lever (org; §4 M19/§9.9)
+
+The same 20-person hierarchical org with a 3-layer ownership stack at moderate Structural
+Health (SH 5), run three times. `committeeDiffuse` and `committeeSingle` both put a `committee`
+in the middle seat and differ **only** in `layerOwnerCount`: `committeeDiffuse` marks that
+committee as genuinely diffuse (`layerOwnerCount [1, 3, 1]` — three co-equal owners on the
+committee seat), while `committeeSingle` keeps a single accountable owner
+(`layerOwnerCount [1, 1, 1]`, which reproduces the v1 committee byte-for-byte). `allHuman`
+swaps the middle seat for a `humanPm` (single owner). This is the corrected committee
+behaviour: a committee's accountability diffusion is now expressed **additively** through
+`org.layerOwnerCount` rather than baked into the seat type, so (a) the diffuse committee
+relitigates **more** than the single-owner committee (the diffusion cost appears), while
+(b) the single-owner committee still relitigates **less** than the all-human stack, because
+its many-eyes relay (`layerDistortionFactorCommittee`, §9.9) keeps the 0.5 distortion discount
+(the relay benefit persists — the committee is not inverted into a penalty). A committee is
+therefore neither a free lunch (the diffuse case pays) nor forced to be costly (the
+single-owner case keeps the v1 benefit); the honest tradeoff is under explicit user control.
+(Run labels are scenario-scoped, so this scenario's `allHuman` is distinct from
+`layerConfigurator`'s `allHuman`; each golden resolves `@runLabel` within its own `scenario`.)
+
+```json
+{
+  "runs": {
+    "committeeDiffuse": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+        "topology": "hierarchical", "hierarchyDepth": 3, "ownershipLayers": 3,
+        "layerTypes": ["humanPm", "committee", "humanPm"],
+        "layerOwnerCount": [1, 3, 1],
+        "modality": "asyncFirst", "structuralHealth": 5,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    },
+    "committeeSingle": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+        "topology": "hierarchical", "hierarchyDepth": 3, "ownershipLayers": 3,
+        "layerTypes": ["humanPm", "committee", "humanPm"],
+        "layerOwnerCount": [1, 1, 1],
+        "modality": "asyncFirst", "structuralHealth": 5,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    },
+    "allHuman": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+        "topology": "hierarchical", "hierarchyDepth": 3, "ownershipLayers": 3,
+        "layerTypes": ["humanPm", "humanPm", "humanPm"],
+        "modality": "asyncFirst", "structuralHealth": 5,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    }
+  }
+}
+```
+
+### 10.9 `matrix` — one boss vs two bosses vs two-bosses-with-a-decider (org; §4 M19 lateral)
+
+The same 20-person hierarchical org with a 2-layer ownership stack, at SH 6, async-first, no
+AI, run three times. `singleBoss` is the ordinary single-authority stack (`matrix.enabled
+false`). `dualBossNoTiebreak` turns the terminal seat into lateral dual-authority (`matrix {
+enabled: true, tiebreaker: 0 }`, i.e. μ = 2 with **no** tiebreaker → full diffusion).
+`dualBossClearDecider` keeps the two bosses but names a clear decider (`tiebreaker: 1` →
+diffusion suppressed to the single-owner identity). Only `org.matrix` differs. This exercises
+the tiebreaker control: `tiebreaker = 1` makes the M19 diffusion factor `1 +
+overrideDiffusionGain·(μ−1)·(1 − tiebreaker) = 1` exactly (and the latency/drop channels 0), so
+`dualBossClearDecider` recovers single-boss behaviour byte-for-byte, while `dualBossNoTiebreak`
+pays the full "decision strangulation" + "power struggle" cost (Davis & Lawrence; Rogers &
+Blenko). The stack is 2 layers so L ≥ 2: the terminal matrix seat feeds both the M6 latency and
+the M8 override channels.
+
+```json
+{
+  "runs": {
+    "singleBoss": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+        "topology": "hierarchical", "hierarchyDepth": 2, "ownershipLayers": 2,
+        "matrix": { "enabled": false, "tiebreaker": 0 },
+        "modality": "asyncFirst", "structuralHealth": 6,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    },
+    "dualBossNoTiebreak": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+        "topology": "hierarchical", "hierarchyDepth": 2, "ownershipLayers": 2,
+        "matrix": { "enabled": true, "tiebreaker": 0 },
+        "modality": "asyncFirst", "structuralHealth": 6,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    },
+    "dualBossClearDecider": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+        "topology": "hierarchical", "hierarchyDepth": 2, "ownershipLayers": 2,
+        "matrix": { "enabled": true, "tiebreaker": 1 },
+        "modality": "asyncFirst", "structuralHealth": 6,
+        "aiInjection": { "enabled": false, "atStep": 0 } }
+    }
+  }
+}
+```
+
+### 10.10 `reviewBottleneck` — AI execution outruns a fixed reviewer (team; §4 M20)
+
+A 7-entity team with **five AI execution agents** driving a high completion stream into a
+single human review function, run twice. `bottleneck` caps review clearance at
+`reviewCapacityPerStep 2` (well below the AI-boosted completion rate); `unbounded` leaves
+`reviewCapacityPerStep null` (the default — unbounded parallelism, reproducing v1 review
+behaviour exactly). Only `team.reviewCapacityPerStep` differs. This exercises the review
+capacity gate (M20): once producers outrun a fixed reviewer, done-throughput plateaus at the
+reviewer's rate (Goldratt ToC) while the review queue grows and wait diverges (Little's Law),
+regardless of how fast the AI agents complete work upstream.
+
+```json
+{
+  "runs": {
+    "bottleneck": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "team", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "team": {
+        "entities": [
+          { "id": "aiEng1", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "aiEng2", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "aiEng3", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "aiEng4", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "aiEng5", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "rev", "kind": "human", "archetype": "reviewer", "throughput": 4, "judgmentQuality": 8, "handoffFriction": 4, "reliability": 9, "rampTimeWeeks": 0, "availability": 1, "functions": ["review"], "capabilities": { "review": 8 } },
+          { "id": "pm", "kind": "human", "archetype": "pm", "throughput": 5, "judgmentQuality": 7, "handoffFriction": 5, "reliability": 8, "rampTimeWeeks": 0, "availability": 1, "functions": ["prioritization", "coordination", "stakeholderCommunication"], "capabilities": { "prioritization": 7, "coordination": 6, "stakeholderCommunication": 8 } }
+        ],
+        "workStream": { "arrivalPerStep": 3.5, "mix": { "routine": 0.8, "complex": 0.15, "novel": 0.05 }, "highStakesShare": 0.1 },
+        "modality": "asyncFirst",
+        "structuralHealth": 6,
+        "recoveryOwner": "pm",
+        "reviewCapacityPerStep": 2
+      }
+    },
+    "unbounded": {
+      "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "team", "seed": 42,
+      "iterations": 500, "horizon": 60,
+      "team": {
+        "entities": [
+          { "id": "aiEng1", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "aiEng2", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "aiEng3", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "aiEng4", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "aiEng5", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+          { "id": "rev", "kind": "human", "archetype": "reviewer", "throughput": 4, "judgmentQuality": 8, "handoffFriction": 4, "reliability": 9, "rampTimeWeeks": 0, "availability": 1, "functions": ["review"], "capabilities": { "review": 8 } },
+          { "id": "pm", "kind": "human", "archetype": "pm", "throughput": 5, "judgmentQuality": 7, "handoffFriction": 5, "reliability": 8, "rampTimeWeeks": 0, "availability": 1, "functions": ["prioritization", "coordination", "stakeholderCommunication"], "capabilities": { "prioritization": 7, "coordination": 6, "stakeholderCommunication": 8 } }
+        ],
+        "workStream": { "arrivalPerStep": 3.5, "mix": { "routine": 0.8, "complex": 0.15, "novel": 0.05 }, "highStakesShare": 0.1 },
+        "modality": "asyncFirst",
+        "structuralHealth": 6,
+        "recoveryOwner": "pm",
+        "reviewCapacityPerStep": null
+      }
     }
   }
 }
@@ -2139,7 +2490,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "rationale": "The divergence must survive Monte Carlo noise to be chart-worthy." }
 ```
 
-### 11.6 Assertions — hollowMiddle (8)
+### 11.6 Assertions — hollowMiddle (9)
 
 ```json eigenorg:golden
 { "id": "hmRoutineLatencyDrops", "scenario": "hollowMiddle",
@@ -2205,6 +2556,14 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "rationale": "Median-run realism for the brittleness narrative." }
 ```
 
+```json eigenorg:golden
+{ "id": "hmReviewWaitNeutral", "scenario": "hollowMiddle",
+  "metric": "reviewWaitDays@hollow", "comparator": "within",
+  "predicate": "With review capacity unbounded (default null), review wait sits at the review dwell (1 working day) at every step - the M20 capacity gate is inert and reproduces v1 review byte-for-byte.",
+  "bound": [1, 1], "tolerance": 0, "step": null, "instrument": "meanPath",
+  "rationale": "Neutral-identity lock for M20: reviewCapacityPerStep = null must leave the realized review sojourn at reviewDwellDays, proving the queue changes nothing at default (the calibration-safety contract). reviewWaitDays is deterministic here (every sojourn = reviewDwellDays = 1), so within [1,1] at tol 0 holds under the p50 semantics. Exact identity, not a provisional bound." }
+```
+
 ### 11.7 Assertions — layerConfigurator (4)
 
 ```json eigenorg:golden
@@ -2239,6 +2598,198 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "rationale": "Band-level realism: the per-layer novel exposure survives Monte Carlo, not just the deterministic accumulator." }
 ```
 
+### 11.8 Assertions — accountabilityDiffusion (4)
+
+```json eigenorg:golden
+{ "id": "adLatencyRatio", "scenario": "accountabilityDiffusion",
+  "metric": "decisionLatency@coOwned / decisionLatency@singleOwner", "comparator": "ratioAbove",
+  "predicate": "Three co-equal owners per seat make settled first-pass decisions at least 1.4x slower than a single owner in the same org - the consultation/relitigation surcharge is real.",
+  "bound": 1.4, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
+  "rationale": "M19 latency surcharge: each added co-equal owner adds consultation rounds before a decision clears (muLatencySurchargeRate; ~1.7x at mu=3). decisionLatency samples first-pass approvals (overrideCount == 0; §11.1), so the ratio isolates the per-seat surcharge; the diffusion-driven queue growth in coOwned only widens it. Direction is well supported (Darley & Latané 1968: interventions both fewer AND slower with more responsible parties). (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "adOverrideRatio", "scenario": "accountabilityDiffusion",
+  "metric": "cumulativeOverrides@coOwned / cumulativeOverrides@singleOwner", "comparator": "ratioAbove",
+  "predicate": "The three-co-owner stack accumulates at least 1.4x the overrides of the single-owner stack by the end - accountability multiplicity multiplies relitigation.",
+  "bound": 1.4, "tolerance": 0.1, "step": null, "instrument": "meanPath",
+  "rationale": "M19 feeds the M8 override probability as an additional multiplicative diffusionMean = 1 + overrideDiffusionGain·(mu−1) ≈ 1.8 at mu=3 (Latané 1981 Social Impact Theory, felt responsibility ∝ N^−0.5). Both runs are 3-layer so both override; the ratio isolates the diffusion multiplier. singleOwner is the base-model override rate (identical to prioritizationTax@threeLayer). Zero-denominator convention (§11.1) keeps the ratio valid if the single-owner cumulative is small. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "adWipRatio", "scenario": "accountabilityDiffusion",
+  "metric": "wip@coOwned / wip@singleOwner", "comparator": "ratioAbove",
+  "predicate": "The three-co-owner org carries at least 1.2x the work-in-progress of the single-owner org - diffused ownership piles up relitigated, half-reset work.",
+  "bound": 1.2, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
+  "rationale": "Combined visible symptom: more overrides re-inject WIP at wipResetFraction (M8) and the latency surcharge holds tasks in-pipeline longer, so queued+inProgress+blocked rises. Mirrors ptWipRatio; the bound is lower than prioritizationTax's 1.5 because both runs share the same 3-layer stack and only the multiplicity differs. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "adOverrideRatioMc", "scenario": "accountabilityDiffusion",
+  "metric": "cumulativeOverrides.p50@coOwned / cumulativeOverrides.p50@singleOwner", "comparator": "ratioAbove",
+  "predicate": "Even at the Monte Carlo median, the three-co-owner stack runs at least 1.3x the overrides of the single-owner stack - the diffusion effect is structural, not a mean-path artifact.",
+  "bound": 1.3, "tolerance": 0.1, "step": null, "instrument": "monteCarlo",
+  "rationale": "Band-level realism for the relitigation narrative (mirrors hmBrittlenessFloorMc / lcBrittleFloorMc). Using the p50 ratio makes the claim magnitude-independent and robust to the sparse-integer override counts; the zero-denominator convention (§11.1) satisfies ratioAbove if the single-owner median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+### 11.9 Assertions — committeeInversion (3)
+
+```json eigenorg:golden
+{ "id": "adCommitteeDiffusionCost", "scenario": "committeeInversion",
+  "metric": "cumulativeOverrides@committeeDiffuse / cumulativeOverrides@committeeSingle", "comparator": "ratioAbove",
+  "predicate": "A diffuse committee (three co-equal owners) accumulates at least 1.15x the overrides of the SAME committee at a single accountable owner - the accountability-diffusion cost now appears on the committee seat, driven entirely by layerOwnerCount.",
+  "bound": 1.15, "tolerance": 0.1, "step": null, "instrument": "meanPath",
+  "rationale": "M19 additive diffusion: committeeDiffuse's layerOwnerCount 3 on the middle seat raises diffusionMean = mean over l in 2..=L of (1 + overrideDiffusionGain*(mu_l-1)) to ~1.4 (one of two averaged seats at mu=3), scaling the M8 override probability; committeeSingle (layerOwnerCount 1) is the v1 committee with diffusionMean = 1. Both runs share the identical committee §9.9 relay factors, so the ratio isolates the diffusion cost. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "adCommitteeRelayBenefit", "scenario": "committeeInversion",
+  "metric": "cumulativeOverrides@committeeSingle / cumulativeOverrides@allHuman", "comparator": "ratioBelow",
+  "predicate": "A single-owner committee still accumulates FEWER overrides than the all-human stack (ratio at most ~0.95) - the many-eyes relay benefit persists, so the committee is not inverted into a penalty (anti-inversion evidence).",
+  "bound": 0.95, "tolerance": 0.05, "step": null, "instrument": "meanPath",
+  "rationale": "At mu = 1 on both runs the M8 override PROBABILITY o(t) differs only through the distortion term: the committee middle seat's layerDistortionFactorCommittee (0.5) vs humanPm (1.0) lowers layerDistortionMean, so the distortion-driven override component is strictly lower for the committee - the v1 many-eyes relay discount, untouched by the amendment. (The committee seat's slower layerLatencyFactorCommittee / layerCapacityFactorCommittee act on queueing, M6, a second-order influence on the override COUNT - which is precisely why this bound is provisional and the load-bearing claim is the direction, ratio < 1.) (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "adCommitteeDiffusionCostMc", "scenario": "committeeInversion",
+  "metric": "cumulativeOverrides.p50@committeeDiffuse / cumulativeOverrides.p50@committeeSingle", "comparator": "ratioAbove",
+  "predicate": "Even at the Monte Carlo median, the diffuse committee runs at least 1.1x the overrides of the single-owner committee - the diffusion cost is structural, not a mean-path artifact.",
+  "bound": 1.1, "tolerance": 0.1, "step": null, "instrument": "monteCarlo",
+  "rationale": "Band-level realism for the diffusion-cost claim (mirrors adOverrideRatioMc). The p50 ratio is magnitude-independent and robust to sparse-integer override counts; the §11.1 zero-denominator convention satisfies ratioAbove if the single-owner median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+### 11.10 Assertions — matrix (5)
+
+```json eigenorg:golden
+{ "id": "mxLatencyRatio", "scenario": "matrix",
+  "metric": "decisionLatency@dualBossNoTiebreak / decisionLatency@singleBoss", "comparator": "ratioAbove",
+  "predicate": "Two bosses with no tiebreaker make settled decisions at least 1.2x slower than a single boss - dual authority strangles the decision.",
+  "bound": 1.2, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
+  "rationale": "M19 at mu=2, tiebreaker=0 applies the shared muLatencySurchargeRate to the terminal matrix seat (diffusionLatencyFactor_L ≈ 1.35; there is NO separate dual-authority coefficient - the matrix folds entirely into M19). Davis & Lawrence 1977 'decision strangulation'; McKinsey 2016/2019: distributed accountability decides materially slower. The bound is conservative because only the terminal of two seats carries the surcharge, so the aggregate ratio sits between 1 and ~1.35. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "mxRelitigationRatio", "scenario": "matrix",
+  "metric": "cumulativeOverrides@dualBossNoTiebreak / cumulativeOverrides@singleBoss", "comparator": "ratioAbove",
+  "predicate": "The no-tiebreaker matrix relitigates at least 1.3x as many decisions as the single-boss org - either boss can reopen what the other cleared.",
+  "bound": 1.3, "tolerance": 0.1, "step": null, "instrument": "meanPath",
+  "rationale": "M19 multiplies M8 override probability by diffusionMean ≈ 1.4 at mu=2 for the L=2 stack (Davis & Lawrence 'power struggles'; McKinsey 2022: multiple veto-holders create loops/reversals a single decider removes). singleBoss's 2-layer stack provides the base override channel the diffusion factor scales; §11.1 zero-denominator convention keeps the ratio valid. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "mxTiebreakerRecovers", "scenario": "matrix",
+  "metric": "decisionLatency@dualBossClearDecider / decisionLatency@singleBoss", "comparator": "ratioBelow",
+  "predicate": "Naming a clear decider recovers single-boss decision speed: the tiebreaker=1 matrix runs no slower than the single-boss org (ratio at most ~1.0).",
+  "bound": 1.0, "tolerance": 0.05, "step": [50, 59], "instrument": "meanPath",
+  "rationale": "The tiebreaker control (Rogers & Blenko 2006 'Who Has the D?': one named decider unclogs the matrix bottleneck). In the unified M19 form diffusionFactor = 1 + overrideDiffusionGain·(mu−1)·(1 − tiebreaker) collapses to 1 at tiebreaker=1, the latency/drop channels to 0, and the diffusion multiplies existing probabilities/service draws (adds no RNG draw), so dualBossClearDecider is byte-identical to singleBoss and the ratio is EXACTLY 1.0 (an exact identity, not a provisional estimate). The 0.05 tolerance is slack only." }
+```
+
+```json eigenorg:golden
+{ "id": "mxTiebreakerBeatsDeadlock", "scenario": "matrix",
+  "metric": "decisionLatency@dualBossClearDecider / decisionLatency@dualBossNoTiebreak", "comparator": "ratioBelow",
+  "predicate": "The two-bosses-with-a-decider matrix is at least ~15% faster than the deadlocked two-boss matrix - the tiebreaker is the documented fix, not the dual reporting itself.",
+  "bound": 0.85, "tolerance": 0.05, "step": [50, 59], "instrument": "meanPath",
+  "rationale": "The load-bearing tiebreaker contrast, robust to the exact surcharge coefficient: dualBossClearDecider recovers to single-boss latency while dualBossNoTiebreak carries the full mu=2 terminal-seat surcharge, so the ratio ≈ 1/1.35 ≈ 0.74. Isolates the [0,1] tiebreaker as the leverage point (McKinsey 2022 single point of accountability). (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "mxRelitigationMc", "scenario": "matrix",
+  "metric": "cumulativeOverrides.p50@dualBossNoTiebreak / cumulativeOverrides.p50@singleBoss", "comparator": "ratioAbove",
+  "predicate": "Even at the Monte Carlo median, the no-tiebreaker matrix relitigates at least 1.2x the single-boss org - the dual-authority reversal loop survives noise.",
+  "bound": 1.2, "tolerance": 0.1, "step": null, "instrument": "monteCarlo",
+  "rationale": "Band-level realism for the relitigation claim; p50 ratio is magnitude-independent and the §11.1 zero-denominator convention satisfies ratioAbove if the single-boss median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+### 11.11 Assertions — reviewBottleneck (5)
+
+```json eigenorg:golden
+{ "id": "rbQueueBuilds", "scenario": "reviewBottleneck",
+  "metric": "reviewQueueDepth@bottleneck", "comparator": "riseAtLeast",
+  "predicate": "With review capped below the AI completion rate, the review queue grows by at least 10 items over the run - the unstable rho ≥ 1 regime.",
+  "bound": 10, "tolerance": 0.2, "step": [10, 59], "instrument": "meanPath",
+  "rationale": "M20 capacity gate: producers (five AI execution agents, ~3.5 completions/step) outrun a fixed reviewer (2/step), so the queue grows ~linearly at (completionRate − reviewCapacity) per step (Goldratt ToC: surplus upstream of the constraint accumulates as WIP). Window starts at step 10 to skip warm-up transients. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "rbThroughputPlateau", "scenario": "reviewBottleneck",
+  "metric": "throughput@bottleneck / throughput@unbounded", "comparator": "ratioBelow",
+  "predicate": "The capped team ships at most 0.85x the done-throughput of the uncapped team in the settled window - done-throughput plateaus at the reviewer's rate no matter how fast the AI agents complete work.",
+  "bound": 0.85, "tolerance": 0.05, "step": [40, 59], "instrument": "meanPath",
+  "rationale": "The Theory-of-Constraints invariant (Goldratt 'The Goal'): system throughput-to-done is capped by the slowest stage. Bottleneck done-rate ≈ reviewCapacity (2/step) while the unbounded control clears the full ~3.5/step completion stream, so the ratio ≈ 0.57 - well under the 0.85 bound. Raising producer speed upstream cannot lift the plateau; only elevating the constraint can. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "rbWaitRises", "scenario": "reviewBottleneck",
+  "metric": "reviewWaitDays@bottleneck", "comparator": "above",
+  "predicate": "By the end of the run, completed work waits at least 4 working days for review in the capped team - lead time diverges as the queue grows.",
+  "bound": 4, "tolerance": 0.15, "step": null, "instrument": "meanPath",
+  "rationale": "Little's Law (W = L / throughput): with a growing queue L cleared at the fixed reviewCapacity, review wait rises superlinearly (M/M/1 rho/(1−rho) as rho → 1). Anchored well below the tens-of-days the divergent queue implies, and far above the well-run few-hours latency (Sadowski et al. 2018) the unbounded control tracks. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "rbControlBounded", "scenario": "reviewBottleneck",
+  "metric": "reviewQueueDepth@unbounded", "comparator": "below",
+  "predicate": "With reviewCapacityPerStep null (default), the review queue stays bounded and small (at most ~5 items) all run - unbounded parallelism reproduces the v1 review behaviour, no ToC plateau.",
+  "bound": 5, "tolerance": 0.1, "step": null, "instrument": "meanPath",
+  "rationale": "The neutral-identity anchor for M20: null capacity means every dwell-elapsed completion clears each step, so the queue never accumulates a runaway backlog and done-throughput is not gated - the v1 behaviour. reviewQueueDepth holds only the in-dwell population (≈ completionRate × reviewDwellDays ≈ 3.5). (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+```json eigenorg:golden
+{ "id": "rbQueueFloorMc", "scenario": "reviewBottleneck",
+  "metric": "reviewQueueDepth.p10@bottleneck", "comparator": "above",
+  "predicate": "Even the luckiest 10% of Monte Carlo runs end with at least 10 items queued for review in the capped team - the bottleneck is structural, not a mean-path artifact.",
+  "bound": 10, "tolerance": 0.2, "step": null, "instrument": "monteCarlo",
+  "rationale": "Band-level check that the review queue builds across seeds (mirrors ccEntropyFloorMc). rho ≥ 1 makes the queue grow deterministically in expectation, so even the p10 path accumulates a large backlog over 60 steps. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)." }
+```
+
+### 11.12 Neutral-identity regression (all 34 v1 golden assertions unchanged)
+
+The v2.0.0 amendment adds mechanics M19 (accountability diffusion) and M20 (review capacity
+queue), the config fields `org.layerOwnerCount`, `org.matrix`, and `team.reviewCapacityPerStep`,
+and the additive team series `reviewQueueDepth` / `reviewWaitDays`. **All 34 v1 golden
+assertions (§11.2 coordinationCollapse ×5, §11.3 prioritizationTax ×6, §11.4 fasterDysfunction
+×6, §11.5 dunbarCliff ×5, §11.6 hollowMiddle ×8 v1, §11.7 layerConfigurator ×4) evaluate
+byte-identically under v2.0.0 at default parameters** — they are the executable regression for
+the neutral-identity contract and must continue to pass verbatim. The argument, field by field:
+
+- **`org.layerOwnerCount` defaults to all-`1`** (μ = 1 at every seat), so the M19 diffusion
+  factor `1 + overrideDiffusionGain·(μ−1)·(1 − tiebreaker) = 1` **exactly** and the M19 latency
+  surcharge `∝ (μ−1)` is **0**. The diffusion term multiplies the *existing* M8 override
+  Bernoulli probability and the *existing* M6 Triangular service draw — it introduces **no new
+  RNG draw** — so the §5 draw order is preserved and the M8/M6 outputs reduce to their v1 forms
+  bit-for-bit.
+- **`org.matrix` defaults to `{ enabled: false }`**, so no seat is promoted to μ = 2 and the
+  identity above holds. (`dualBossClearDecider` further shows that even an *enabled* matrix with
+  `tiebreaker: 1` collapses the diffusion factor back to 1 — see `mxTiebreakerRecovers`.)
+- **`team.reviewCapacityPerStep` defaults to `null` (unbounded)**, so the M20 gate clears every
+  dwell-elapsed completion each step and §5.2 step 7 reduces to the v1 fixed-`reviewDwellDays`
+  path with no throughput gating. The additive `reviewQueueDepth` / `reviewWaitDays` series are
+  bounded (queue = in-dwell population, wait = `reviewDwellDays`) and consumers ignore unknown
+  output fields (§12.1), so no v1 team golden reads a changed value.
+- **The `committee` seat is unchanged from v1.** Its §9.9 latency/capacity/distortion factors are
+  byte-identical and it carries **no** intrinsic multiplicity, so every v1 `committee` config
+  reproduces its v1 series and verdicts byte-for-byte at the default `layerOwnerCount` of 1. A
+  committee's accountability diffusion is an **opt-in, additive** cost via `org.layerOwnerCount > 1`,
+  exercised only by the new `committeeInversion` scenario (§10.8); no v1 scenario, preset, or golden
+  sets it, so nothing locked changes. The amendment is fully additive — there is **no** exception to
+  byte-identity (§12.4/§12.5).
+- **The authority-gradient override attribution defaults to `0.0`**, so it re-weights nothing —
+  the per-event attribution is the v1 uniform draw (one uniform per event, unchanged draw count),
+  and `perLayer.overrideShare` is byte-identical. No v1 golden asserts `perLayer.overrideShare`;
+  a maintainer may later raise the default only after confirming no preset snapshots it.
+- **The M17 function-coverage map is unchanged**, so hollowMiddle's coverage goldens
+  (`hmStakeholderGap`, `hmExecutionCovered`) are intact.
+
+Live confirmation on a real config: `accountabilityDiffusion@singleOwner`
+(`layerOwnerCount [1,1,1]`) shares every structural field with `prioritizationTax@threeLayer`,
+so its series is **byte-identical** to that locked run (version-metadata excluded per §12.4).
+
+Post-amendment the suite is **52 goldens** (34 v1 + 18 new: §11.8 accountabilityDiffusion ×4,
+§11.9 committeeInversion ×3, §11.10 matrix ×5, §11.11 reviewBottleneck ×5, plus
+`hmReviewWaitNeutral` ×1 in §11.6). Because `model/goldens.json` gains rows, its sha256 changes;
+paired with the M8-formula change this is the MAJOR bump to 2.0.0 (§12.6), and §14 gets the
+corresponding changelog row.
+
 ---
 
 ## 12. Schema & versioning (authoritative over CONTRACTS.md)
@@ -2265,9 +2816,11 @@ this section wins.
   entropy weight, the five weights (`entropyWeightCoordination`, `…Latency`, `…Cohesion`,
   `…Brittleness`, `…Wip`) must still sum to 1 ± 0.001; `taskMixRoutineOrg +
   taskMixComplexOrg ≤ 1` (the novel share is the non-negative remainder); the team
-  `workStream.mix` fractions must sum to 1 ± 0.001; and, when `org.layerTypes` is present,
+  `workStream.mix` fractions must sum to 1 ± 0.001; when `org.layerTypes` is present,
   its length must equal `org.ownershipLayers` and every entry must be one of
-  `humanPm | humanDirector | aiAgent | committee` (§9.9).
+  `humanPm | humanDirector | aiAgent | committee` (§9.9); and, when `org.layerOwnerCount`
+  is present, its length must equal `org.ownershipLayers` (§4 M19). (These length
+  joint-constraints hold at both authoring and replay, per the replay bullet.)
 - **Replay validation is looser than authoring validation (share-URL contract).** A
   share-URL replay supplies `paramOverrides = resolvedParams`, the FULL effective
   coefficient set captured at run time (§12.4). Range membership is an **authoring-time**
@@ -2277,13 +2830,39 @@ this section wins.
   membership**, because a post-lock maintainer-reviewed amendment can narrow a range so that a value
   that was in-range when the link was created now sits outside it — and the promise is
   that an old link replays its embedded numbers exactly. See §12.5.
+- **New structural fields (§4 M19/M20), authoring-time validation.** `validate()`
+  additionally rejects: a non-integer or out-of-`[1, 8]` entry in `org.layerOwnerCount`
+  (each μ is an integer ≥ 1); a `layerOwnerCount[L−1] ≠ 1` (the terminal seat, 0-indexed to match M19/§A.1) **only on the matrix target layer L**
+  (the intrinsic μ = 2 wins — a conflicting explicit count is an authoring error, never
+  silently overridden; a `committee` seat, by contrast, **may** carry `layerOwnerCount ≠ 1`,
+  which composes with its §9.9 relay factors); an `org.matrix` with a non-boolean `enabled`,
+  a `tiebreaker` outside `[0, 1]`, or any key other than `enabled`/`tiebreaker`
+  (`deny_unknown_fields`); and a `team.reviewCapacityPerStep` that is present and `≤ 0` (the
+  field is optional — `null` or absent = unbounded, which is valid). If the terminal layer L
+  is **both** a `committee` **and** the matrix target, the committee contributes its §9.9
+  distortion factor **and** the matrix μ = 2 with no conflict (different mechanisms), and the
+  `layerOwnerCount ≠ 1` rejection still applies there because it is the matrix target.
+  These are "out-of-range structural values" in the sense of the reject bullet above.
+  **Replay looseness (§12.4) — with a structural exception for the μ ceiling.** Replay
+  looseness exists so an old share URL replays its embedded `resolvedParams` even after a
+  *tunable-coefficient* range is later narrowed. It does **not** extend to
+  `org.layerOwnerCount`'s upper bound: `μ ≤ 8` is a **structural safety constraint the §6 L1
+  boundedness proof and the unclamped M19 latency channel (`diffusionLatencyFactor`) depend
+  on**, so — exactly like the `length == ownershipLayers` joint-constraint — it is enforced
+  at **both authoring and replay** (a replayed `layerOwnerCount` entry must be an integer in
+  `[1, 8]`, never merely `≥ 1`). Replay re-checks type/domain (each `layerOwnerCount` entry an
+  integer in `[1, 8]`, `tiebreaker` a number in `[0, 1]`, `reviewCapacityPerStep` `null` or
+  `> 0`), the matrix-target intrinsic-μ rule, and the length joint-constraint below; the μ
+  ceiling is therefore **not** subject to the "narrow a range post-lock" looseness (the ceiling
+  is fixed for the life of `schemaVersion` "1"), while genuinely tunable coefficient ranges in
+  `resolvedParams` remain loose per the original policy.
 
 ### 12.2 Config
 
 ```json
 {
   "schemaVersion": "1",
-  "modelVersion": "1.0.0",
+  "modelVersion": "2.0.0",
   "sim": "org",
   "seed": 42,
   "iterations": 500,
@@ -2316,6 +2895,8 @@ this section wins.
 | `org.hierarchyDepth` | int 1–6 | reporting depth D (distortion, M8) |
 | `org.ownershipLayers` | int 1–5 | prioritization stack L (M6) |
 | `org.layerTypes` | array of `humanPm \| humanDirector \| aiAgent \| committee`, optional | length must equal `ownershipLayers`; default all `humanPm` (§9.9) — per-layer ownership-seat typing (P6 configurator); absent ⇒ base model |
+| `org.layerOwnerCount` | array of int 1–8, optional | length must equal `ownershipLayers`; default all `1` (§4 M19) — per-layer accountability multiplicity μ (co-equal owners of one seat); the matrix seat's μ is intrinsic and rejects a conflicting entry (§12.1), while a `committee` seat takes its μ from this field like any other non-matrix seat (so a committee may set it > 1); absent ⇒ base model |
+| `org.matrix` | `{enabled: bool (default false), tiebreaker: number 0–1 (default 0)}`, optional | lateral dual-authority seat at the terminal layer L, μ = 2 with a decision-rights tiebreaker (§4 M19); rejects unknown keys (`deny_unknown_fields`); absent or `enabled:false` ⇒ base model |
 | `org.modality` | `asyncFirst \| meetingHeavy` | |
 | `org.structuralHealth` | int 1–10 | §3.4 |
 | `org.misalignment` | number 0–1, optional | m₀; default derived from SH (M5) |
@@ -2326,13 +2907,14 @@ this section wins.
 | `team.modality` | as org, optional, default `asyncFirst` | |
 | `team.structuralHealth` | int 1–10 | |
 | `team.recoveryOwner` | entity id \| null | M10 ownership |
+| `team.reviewCapacityPerStep` | number > 0 (may be fractional), optional, default `null` (unbounded) | M20 review-to-done throughput gate (a finite value clears via an M6-style use-it-or-lose-it fractional accumulator, §4 M20); `null` ⇒ current unlimited-parallelism review (byte-identical to v1). `validate()`: if present, finite and `> 0`. Config field (sibling of `team.recoveryOwner`), **not** a params.json coefficient. Additive-optional under `schemaVersion` "1"; `deny_unknown_fields` still holds. |
 
 ### 12.3 Output
 
 ```json
 {
   "schemaVersion": "1",
-  "modelVersion": "1.0.0",
+  "modelVersion": "2.0.0",
   "sim": "org",
   "seed": 42,
   "iterations": 500,
@@ -2370,6 +2952,14 @@ this section wins.
   means older share URLs replay with that parameter at its then-current default (it is
   absent from their embedded set). The banner covers the disclosure; within one major
   schema this is the only permitted replay drift.
+  The "byte-identical series payload" replay comparison is over the series present in **both**
+  model versions; the additive new series (`reviewQueueDepth`, `reviewWaitDays`, and the additive
+  `perLayer` fields `ownerMultiplicity` / `diffusionFactor`) are **excluded** from the comparison,
+  consistent with the §12.1/§12.5 additive-output policy. Every pre-existing config — **including
+  one that uses a `committee` seat** — replays byte-for-byte at the neutral defaults, because a
+  committee's §9.9 factors are unchanged and its default μ is 1; the amendment adds **no** committee
+  replay drift. (A committee that a user later makes diffuse via `layerOwnerCount > 1` is a new,
+  explicitly-authored config, not a replay of an old one.)
 
 ### 12.5 Schema evolution
 
@@ -2378,6 +2968,19 @@ fields never change meaning or type. The `cost` block and `paramOverrides` map a
 pre-reserved v2 hooks; `org.layerTypes` (§9.9) is an additive optional field whose absence
 reproduces the pre-existing all-`humanPm` behavior. Unknown **major** schema versions are
 rejected gracefully by the UI with an upgrade message.
+`org.layerOwnerCount`, `org.matrix`, and `team.reviewCapacityPerStep` (§4 M19/M20) are
+additive optional fields on the same footing as `org.layerTypes`: when absent — μ all 1,
+matrix off, `reviewCapacityPerStep` `null` (unbounded), and `overrideAuthorityGradient` at its
+default 0 — they reproduce the pre-amendment output byte-for-byte (§12.4), and **every
+pre-existing config, preset, and golden is unchanged, including any that uses a `committee`
+seat** (a committee's §9.9 factors are untouched and its default μ is 1, so **no existing
+`layerTypes` value changes meaning**). A committee's accountability diffusion is now an
+**opt-in, explicit** cost via `org.layerOwnerCount > 1`, so making a committee diffuse is
+authoring a new config, not a drift in an existing one. An old share URL created before this
+amendment carries none of these fields and replays at those neutral defaults, seeing the new
+§9.10 coefficients at their then-current defaults (§12.4). **`schemaVersion` stays `"1"`:** all
+fields are additive-optional within the same major schema, so old configs still load and
+`deny_unknown_fields` still holds (the fields are now *known*-optional).
 
 **Range changes vs replay.** A parameter's `range` is authoring-time metadata, not
 part of the reproducibility contract. A maintainer-reviewed amendment may narrow or shift a range;
@@ -2488,6 +3091,19 @@ Structural limitations (also surfaced per-mechanic in the drawer):
    No mid-run restructuring events, hiring events, or attrition in v1.
 8. **Quality and entropy are internal indices** — comparable across runs of the same
    modelVersion, not benchmarkable against the outside world.
+9. **Review-queue congestion is not in the entropy composite.** The M20 review queue is
+   visible only through `reviewQueueDepth` / `reviewWaitDays`; it is not fed back into the
+   M13 entropy composite in v2.0.0. Coupling review congestion into entropy is a candidate
+   future MINOR.
+10. **Accountability diffusion is linear in (μ−1).** M19's three channels are linear in the
+   number of added co-equal owners, which overstates the override channel and understates the
+   latency channel beyond ~4 co-equal owners (the empirical diffusion saturates ~N^0.5; Brooks
+   pairwise-coordination cost is convex ~μ(μ−1)/2). A saturating override cap and a convex
+   Brooks latency form for μ > 4 are deferred refinements; realistic μ (matrix 2, a diffuse
+   committee ~3 via `layerOwnerCount`) sits in the linear regime.
+
+Tier counts: the four new §9.10 coefficients are all **editorial-heuristic**; the
+`peer-reviewed` (0) and `industry-report` (7) counts are unchanged.
 
 ---
 
@@ -2496,6 +3112,7 @@ Structural limitations (also surfaced per-mechanic in the drawer):
 | modelVersion | date | params.json sha256 | goldens.json sha256 | assumptions.json sha256 | changes |
 |---|---|---|---|---|---|
 | 1.0.0 | 2026-07-04 | `9b2ce2421c1a13c06dacae001914f5ea4bb6427e44e47c9afcb0fa5d77a080fb` | `3581b470fe333b7a56ad3c8bbb64d9b6d0616e9228355c3460f727dd84aa0173` | `147ec8b99e5e3d2c2593bd7ac763483b0f66418492370d0b824e3a701f6140d6` | Initial model: unified org/team spec with per-layer ownership typing (§9.9), 6 calibrated scenarios, 34 golden assertions, extraction pipeline. |
+| 2.0.0 | 2026-07-04 | `60e0ebd0c51b54562b585cf2adf7bc4c602113e23535be201265c5b541440b82` | `6e8b29fe89d8444295618a7c3499e1016bc621a77b63b117369bc9739aca7d03` | `ca4a16cf385a704c4d24ac1f005567da3df9d1bf4af91d4fe1d497d580839496` | Accountability multiplicity μ (§4 M19 `accountabilityDiffusion`) + review-capacity queue (§4 M20 `reviewCapacityQueue`). M8 gains a diffusion term (μ>1 co-equal owners raise relitigation) and an opt-in authority-gradient override attribution (default `0.0` = v1 uniform draw); four new params in **§9.10** (all editorial-heuristic; document order fixes params.json order/SHA). New additive-optional config fields `org.layerOwnerCount` (int 1–8), `org.matrix{enabled,tiebreaker}` (terminal-layer μ=2), `team.reviewCapacityPerStep` (config field, not a params.json coefficient); new team output series `reviewQueueDepth`, `reviewWaitDays` (additive; consumers ignore unknown output fields). Four new scenarios (§10.7–§10.10) and 18 new goldens ⇒ **ten scenarios, 52 golden assertions** (34 v1 unchanged + 18 new). **Neutral identity (fully additive):** μ=1 / matrix off / unbounded review / gradient 0 reproduces v1.0.0 series byte-for-byte AND all 34 v1 golden verdicts for **every** pre-existing config, **including any using a `committee` seat** (a committee's §9.9 factors are unchanged and its default μ is 1; its accountability diffusion is now the opt-in, additive `org.layerOwnerCount` cost, so no existing `layerTypes` value changes meaning). `schemaVersion` stays `"1"`. |
 
 ---
 

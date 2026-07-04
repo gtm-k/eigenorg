@@ -1,5 +1,5 @@
 {
-  "modelVersion": "1.0.0",
+  "modelVersion": "2.0.0",
   "schemaVersion": "1",
   "parameters": [
     {
@@ -1396,7 +1396,7 @@
       "anchor": "Editorial",
       "tier": "editorial-heuristic",
       "limitation": "Fixed dwell; review queues are not modeled in v1.",
-      "formula": "completed tasks wait reviewDwellDays before done when review is covered (Sec 5.2 step 6)",
+      "formula": "completed tasks enter the review dwell at execution (§5.2 step 6, T6r) and wait reviewDwellDays before clearing to done at review clearance (§5.2 step 7, T6d/M20) when review is covered",
       "plainLanguage": "Review adds about a day before work counts as shipped."
     },
     {
@@ -1593,6 +1593,66 @@
       "limitation": "Groupthink can defeat the many-eyes benefit; editorial default.",
       "formula": "layerDistortionFactor(committee) in layerDistortionMean → override distortion (M8, §9.9)",
       "plainLanguage": "A committee seat's many eyes cut relayed-context loss roughly in half - fewer overrides than a lone human seat."
+    },
+    {
+      "id": "overrideDiffusionGain",
+      "value": 0.4,
+      "range": [
+        0.25,
+        0.8
+      ],
+      "distribution": "point",
+      "unit": "override-probability gain per added co-equal owner",
+      "anchor": "Darley & Latane (1968, JPSP 8:377-383): decisive helping fell 85%->62%->31% for 1/2/5 responsible parties - the first added co-equal owner cut decisive ownership to ~73% of solo; Latane (1981, American Psychologist 36:343-356) Social Impact Theory fits felt-responsibility ~ N^-0.5. Default 0.4 = a x1.4 override multiplier at the first added owner (mu=2), matching that first-owner drop.",
+      "tier": "editorial-heuristic",
+      "limitation": "The felt-responsibility -> relitigation link is an author construct; no study measures decision-override rates directly, so despite the peer-reviewed diffusion anchor the coefficient is editorial. The linear (mu-1) form overstates diffusion beyond ~4 co-equal owners, where the data saturate (~N^0.5); a cap/power-law is a deferred refinement.",
+      "formula": "diffusionFactor_l = 1 + overrideDiffusionGain * (mu_l - 1) * (1 - tiebreaker_l); diffusionMean = mean over l in 2..=L of diffusionFactor_l feeds o(t) (M8/M19)",
+      "plainLanguage": "Each extra co-equal owner on one decision makes it about 40% more likely to be relitigated or overridden - and the first added owner is the costliest."
+    },
+    {
+      "id": "muLatencySurchargeRate",
+      "value": 0.35,
+      "range": [
+        0.2,
+        0.6
+      ],
+      "distribution": "point",
+      "unit": "service-time gain per added co-equal owner",
+      "anchor": "Darley & Latane (1968) found intervention latency rose monotonically with bystander count (interventions were fewer AND slower); McKinsey ('Revisiting the matrix organization,' 2016; 'Decision making in the age of urgency,' 2019) reports distributed accountability decides materially slower than single-point accountability. Default +35% per added owner matches the 2-4 owner regime.",
+      "tier": "editorial-heuristic",
+      "limitation": "Direction is well supported; the exact percentage is an anchored estimate, not a measured decision-cycle dataset. Modeled linear in (mu-1); the convex Brooks pairwise-channel form (n(n-1)/2) for >4 co-equal owners is a deferred refinement, kept distinct from the motivation-loss channel per Latane, Williams & Harkins (1979).",
+      "formula": "diffusionLatencyFactor_l = 1 + muLatencySurchargeRate * (mu_l - 1) * (1 - tiebreaker_l); multiplies the M6 per-layer service draw at every seat l in 1..L (M19)",
+      "plainLanguage": "Each extra co-equal owner adds about 35% to the time a decision sits at that seat - consultation and relitigation rounds pile up."
+    },
+    {
+      "id": "muWorkDropFraction",
+      "value": 0.03,
+      "range": [
+        0,
+        0.1
+      ],
+      "distribution": "point",
+      "unit": "extra progress fraction dropped per added co-equal owner",
+      "anchor": "Karau & Williams (1993, JPSP 65:681-706) social-loafing meta-analysis (78 studies): motivation-loss d ~= -0.44, ~9-18% per-owner effort loss; Latane, Williams & Harkins (1979, JPSP 37:822-832) isolate motivation loss from coordination loss. Default 0.03 is a deliberately small extra loss, distinct from the latency (coordination) channel.",
+      "tier": "editorial-heuristic",
+      "limitation": "Loafing is measured on additive output tasks, not decision ownership; kept small and applied only at the override event (T7) to avoid double-counting the coordination-latency channel. Set to 0 to disable the motivation-loss channel; identifiability (a named owner) also removes it (Williams, Harkins & Latane 1981).",
+      "formula": "on override (T7): progress *= wipResetFraction * max(0, 1 - dropMean), dropMean = mean over l in 2..=L of muWorkDropFraction * (mu_l - 1) * (1 - tiebreaker_l) (M19)",
+      "plainLanguage": "A little extra work falls between co-equal owners: when a diffuse decision is overridden it keeps slightly less of its progress than a single-owner one."
+    },
+    {
+      "id": "overrideAuthorityGradient",
+      "value": 0,
+      "range": [
+        0,
+        2
+      ],
+      "distribution": "point",
+      "unit": "attribution weight per layer above layer 1",
+      "anchor": "Authority-gradient / HiPPO effect: steeper authority gradients concentrate reversal power at the top (crew-resource-management authority-gradient research, Fischer & Orasanu 2000; 'HiPPO' - highest-paid-person's-opinion overriding lower-level calls, popularized in evidence-based-management practice). Directional; magnitude editorial. Default 0 = uniform attribution, identical to the v1.0.0 draw - the gradient is exposed as an opt-in lever.",
+      "tier": "editorial-heuristic",
+      "limitation": "Reweights only WHICH seat an override is credited to for the perLayer.overrideShare output; it does not change the override rate, the RNG draw count/order (still exactly one uniform per event), the WIP reset, or any series - so no golden is affected at any value. Default 0.0 keeps the uniform draw, so perLayer.overrideShare is byte-identical to v1 (calibration-safety). A maintainer may elect a default of 0.5 (the HiPPO tilt) only after confirming that no www/presets/*.json Rust plausibility test snapshots perLayer.overrideShare (none do in v1). The gradient's slope is an editorial default; real reversal authority is lumpy, not a smooth linear ramp.",
+      "formula": "override event attributed to seat l in {2..L} with probability proportional to w_l = 1 + overrideAuthorityGradient * (l - 1) (M8/M19); one uniform per event",
+      "plainLanguage": "Off by default: an override is credited to a uniformly-random higher seat, exactly as v1. Turn it up and the higher seats absorb more of the credit - the boss overturns more calls than the layer just above the work (HiPPO)."
     }
   ]
 }

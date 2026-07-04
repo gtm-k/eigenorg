@@ -1,5 +1,5 @@
 {
-  "modelVersion": "1.0.0",
+  "modelVersion": "2.0.0",
   "assertions": [
     {
       "id": "ccThroughputPeakDecline",
@@ -423,6 +423,21 @@
       "rationale": "Median-run realism for the brittleness narrative."
     },
     {
+      "id": "hmReviewWaitNeutral",
+      "scenario": "hollowMiddle",
+      "metric": "reviewWaitDays@hollow",
+      "comparator": "within",
+      "predicate": "With review capacity unbounded (default null), review wait sits at the review dwell (1 working day) at every step - the M20 capacity gate is inert and reproduces v1 review byte-for-byte.",
+      "bound": [
+        1,
+        1
+      ],
+      "tolerance": 0,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "Neutral-identity lock for M20: reviewCapacityPerStep = null must leave the realized review sojourn at reviewDwellDays, proving the queue changes nothing at default (the calibration-safety contract). reviewWaitDays is deterministic here (every sojourn = reviewDwellDays = 1), so within [1,1] at tol 0 holds under the p50 semantics. Exact identity, not a provisional bound."
+    },
+    {
       "id": "lcRoutineLatencyDrops",
       "scenario": "layerConfigurator",
       "metric": "decisionLatency@aiMiddle / decisionLatency@allHuman",
@@ -472,6 +487,231 @@
       "step": null,
       "instrument": "monteCarlo",
       "rationale": "Band-level realism: the per-layer novel exposure survives Monte Carlo, not just the deterministic accumulator."
+    },
+    {
+      "id": "adLatencyRatio",
+      "scenario": "accountabilityDiffusion",
+      "metric": "decisionLatency@coOwned / decisionLatency@singleOwner",
+      "comparator": "ratioAbove",
+      "predicate": "Three co-equal owners per seat make settled first-pass decisions at least 1.4x slower than a single owner in the same org - the consultation/relitigation surcharge is real.",
+      "bound": 1.4,
+      "tolerance": 0.1,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "M19 latency surcharge: each added co-equal owner adds consultation rounds before a decision clears (muLatencySurchargeRate; ~1.7x at mu=3). decisionLatency samples first-pass approvals (overrideCount == 0; §11.1), so the ratio isolates the per-seat surcharge; the diffusion-driven queue growth in coOwned only widens it. Direction is well supported (Darley & Latané 1968: interventions both fewer AND slower with more responsible parties). (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "adOverrideRatio",
+      "scenario": "accountabilityDiffusion",
+      "metric": "cumulativeOverrides@coOwned / cumulativeOverrides@singleOwner",
+      "comparator": "ratioAbove",
+      "predicate": "The three-co-owner stack accumulates at least 1.4x the overrides of the single-owner stack by the end - accountability multiplicity multiplies relitigation.",
+      "bound": 1.4,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "M19 feeds the M8 override probability as an additional multiplicative diffusionMean = 1 + overrideDiffusionGain·(mu−1) ≈ 1.8 at mu=3 (Latané 1981 Social Impact Theory, felt responsibility ∝ N^−0.5). Both runs are 3-layer so both override; the ratio isolates the diffusion multiplier. singleOwner is the base-model override rate (identical to prioritizationTax@threeLayer). Zero-denominator convention (§11.1) keeps the ratio valid if the single-owner cumulative is small. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "adWipRatio",
+      "scenario": "accountabilityDiffusion",
+      "metric": "wip@coOwned / wip@singleOwner",
+      "comparator": "ratioAbove",
+      "predicate": "The three-co-owner org carries at least 1.2x the work-in-progress of the single-owner org - diffused ownership piles up relitigated, half-reset work.",
+      "bound": 1.2,
+      "tolerance": 0.1,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "Combined visible symptom: more overrides re-inject WIP at wipResetFraction (M8) and the latency surcharge holds tasks in-pipeline longer, so queued+inProgress+blocked rises. Mirrors ptWipRatio; the bound is lower than prioritizationTax's 1.5 because both runs share the same 3-layer stack and only the multiplicity differs. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "adOverrideRatioMc",
+      "scenario": "accountabilityDiffusion",
+      "metric": "cumulativeOverrides.p50@coOwned / cumulativeOverrides.p50@singleOwner",
+      "comparator": "ratioAbove",
+      "predicate": "Even at the Monte Carlo median, the three-co-owner stack runs at least 1.3x the overrides of the single-owner stack - the diffusion effect is structural, not a mean-path artifact.",
+      "bound": 1.3,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "monteCarlo",
+      "rationale": "Band-level realism for the relitigation narrative (mirrors hmBrittlenessFloorMc / lcBrittleFloorMc). Using the p50 ratio makes the claim magnitude-independent and robust to the sparse-integer override counts; the zero-denominator convention (§11.1) satisfies ratioAbove if the single-owner median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "adCommitteeDiffusionCost",
+      "scenario": "committeeInversion",
+      "metric": "cumulativeOverrides@committeeDiffuse / cumulativeOverrides@committeeSingle",
+      "comparator": "ratioAbove",
+      "predicate": "A diffuse committee (three co-equal owners) accumulates at least 1.15x the overrides of the SAME committee at a single accountable owner - the accountability-diffusion cost now appears on the committee seat, driven entirely by layerOwnerCount.",
+      "bound": 1.15,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "M19 additive diffusion: committeeDiffuse's layerOwnerCount 3 on the middle seat raises diffusionMean = mean over l in 2..=L of (1 + overrideDiffusionGain*(mu_l-1)) to ~1.4 (one of two averaged seats at mu=3), scaling the M8 override probability; committeeSingle (layerOwnerCount 1) is the v1 committee with diffusionMean = 1. Both runs share the identical committee §9.9 relay factors, so the ratio isolates the diffusion cost. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "adCommitteeRelayBenefit",
+      "scenario": "committeeInversion",
+      "metric": "cumulativeOverrides@committeeSingle / cumulativeOverrides@allHuman",
+      "comparator": "ratioBelow",
+      "predicate": "A single-owner committee still accumulates FEWER overrides than the all-human stack (ratio at most ~0.95) - the many-eyes relay benefit persists, so the committee is not inverted into a penalty (anti-inversion evidence).",
+      "bound": 0.95,
+      "tolerance": 0.05,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "At mu = 1 on both runs the M8 override PROBABILITY o(t) differs only through the distortion term: the committee middle seat's layerDistortionFactorCommittee (0.5) vs humanPm (1.0) lowers layerDistortionMean, so the distortion-driven override component is strictly lower for the committee - the v1 many-eyes relay discount, untouched by the amendment. (The committee seat's slower layerLatencyFactorCommittee / layerCapacityFactorCommittee act on queueing, M6, a second-order influence on the override COUNT - which is precisely why this bound is provisional and the load-bearing claim is the direction, ratio < 1.) (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "adCommitteeDiffusionCostMc",
+      "scenario": "committeeInversion",
+      "metric": "cumulativeOverrides.p50@committeeDiffuse / cumulativeOverrides.p50@committeeSingle",
+      "comparator": "ratioAbove",
+      "predicate": "Even at the Monte Carlo median, the diffuse committee runs at least 1.1x the overrides of the single-owner committee - the diffusion cost is structural, not a mean-path artifact.",
+      "bound": 1.1,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "monteCarlo",
+      "rationale": "Band-level realism for the diffusion-cost claim (mirrors adOverrideRatioMc). The p50 ratio is magnitude-independent and robust to sparse-integer override counts; the §11.1 zero-denominator convention satisfies ratioAbove if the single-owner median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "mxLatencyRatio",
+      "scenario": "matrix",
+      "metric": "decisionLatency@dualBossNoTiebreak / decisionLatency@singleBoss",
+      "comparator": "ratioAbove",
+      "predicate": "Two bosses with no tiebreaker make settled decisions at least 1.2x slower than a single boss - dual authority strangles the decision.",
+      "bound": 1.2,
+      "tolerance": 0.1,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "M19 at mu=2, tiebreaker=0 applies the shared muLatencySurchargeRate to the terminal matrix seat (diffusionLatencyFactor_L ≈ 1.35; there is NO separate dual-authority coefficient - the matrix folds entirely into M19). Davis & Lawrence 1977 'decision strangulation'; McKinsey 2016/2019: distributed accountability decides materially slower. The bound is conservative because only the terminal of two seats carries the surcharge, so the aggregate ratio sits between 1 and ~1.35. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "mxRelitigationRatio",
+      "scenario": "matrix",
+      "metric": "cumulativeOverrides@dualBossNoTiebreak / cumulativeOverrides@singleBoss",
+      "comparator": "ratioAbove",
+      "predicate": "The no-tiebreaker matrix relitigates at least 1.3x as many decisions as the single-boss org - either boss can reopen what the other cleared.",
+      "bound": 1.3,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "M19 multiplies M8 override probability by diffusionMean ≈ 1.4 at mu=2 for the L=2 stack (Davis & Lawrence 'power struggles'; McKinsey 2022: multiple veto-holders create loops/reversals a single decider removes). singleBoss's 2-layer stack provides the base override channel the diffusion factor scales; §11.1 zero-denominator convention keeps the ratio valid. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "mxTiebreakerRecovers",
+      "scenario": "matrix",
+      "metric": "decisionLatency@dualBossClearDecider / decisionLatency@singleBoss",
+      "comparator": "ratioBelow",
+      "predicate": "Naming a clear decider recovers single-boss decision speed: the tiebreaker=1 matrix runs no slower than the single-boss org (ratio at most ~1.0).",
+      "bound": 1,
+      "tolerance": 0.05,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "The tiebreaker control (Rogers & Blenko 2006 'Who Has the D?': one named decider unclogs the matrix bottleneck). In the unified M19 form diffusionFactor = 1 + overrideDiffusionGain·(mu−1)·(1 − tiebreaker) collapses to 1 at tiebreaker=1, the latency/drop channels to 0, and the diffusion multiplies existing probabilities/service draws (adds no RNG draw), so dualBossClearDecider is byte-identical to singleBoss and the ratio is EXACTLY 1.0 (an exact identity, not a provisional estimate). The 0.05 tolerance is slack only."
+    },
+    {
+      "id": "mxTiebreakerBeatsDeadlock",
+      "scenario": "matrix",
+      "metric": "decisionLatency@dualBossClearDecider / decisionLatency@dualBossNoTiebreak",
+      "comparator": "ratioBelow",
+      "predicate": "The two-bosses-with-a-decider matrix is at least ~15% faster than the deadlocked two-boss matrix - the tiebreaker is the documented fix, not the dual reporting itself.",
+      "bound": 0.85,
+      "tolerance": 0.05,
+      "step": [
+        50,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "The load-bearing tiebreaker contrast, robust to the exact surcharge coefficient: dualBossClearDecider recovers to single-boss latency while dualBossNoTiebreak carries the full mu=2 terminal-seat surcharge, so the ratio ≈ 1/1.35 ≈ 0.74. Isolates the [0,1] tiebreaker as the leverage point (McKinsey 2022 single point of accountability). (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "mxRelitigationMc",
+      "scenario": "matrix",
+      "metric": "cumulativeOverrides.p50@dualBossNoTiebreak / cumulativeOverrides.p50@singleBoss",
+      "comparator": "ratioAbove",
+      "predicate": "Even at the Monte Carlo median, the no-tiebreaker matrix relitigates at least 1.2x the single-boss org - the dual-authority reversal loop survives noise.",
+      "bound": 1.2,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "monteCarlo",
+      "rationale": "Band-level realism for the relitigation claim; p50 ratio is magnitude-independent and the §11.1 zero-denominator convention satisfies ratioAbove if the single-boss median is 0. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "rbQueueBuilds",
+      "scenario": "reviewBottleneck",
+      "metric": "reviewQueueDepth@bottleneck",
+      "comparator": "riseAtLeast",
+      "predicate": "With review capped below the AI completion rate, the review queue grows by at least 10 items over the run - the unstable rho ≥ 1 regime.",
+      "bound": 10,
+      "tolerance": 0.2,
+      "step": [
+        10,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "M20 capacity gate: producers (five AI execution agents, ~3.5 completions/step) outrun a fixed reviewer (2/step), so the queue grows ~linearly at (completionRate − reviewCapacity) per step (Goldratt ToC: surplus upstream of the constraint accumulates as WIP). Window starts at step 10 to skip warm-up transients. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "rbThroughputPlateau",
+      "scenario": "reviewBottleneck",
+      "metric": "throughput@bottleneck / throughput@unbounded",
+      "comparator": "ratioBelow",
+      "predicate": "The capped team ships at most 0.85x the done-throughput of the uncapped team in the settled window - done-throughput plateaus at the reviewer's rate no matter how fast the AI agents complete work.",
+      "bound": 0.85,
+      "tolerance": 0.05,
+      "step": [
+        40,
+        59
+      ],
+      "instrument": "meanPath",
+      "rationale": "The Theory-of-Constraints invariant (Goldratt 'The Goal'): system throughput-to-done is capped by the slowest stage. Bottleneck done-rate ≈ reviewCapacity (2/step) while the unbounded control clears the full ~3.5/step completion stream, so the ratio ≈ 0.57 - well under the 0.85 bound. Raising producer speed upstream cannot lift the plateau; only elevating the constraint can. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "rbWaitRises",
+      "scenario": "reviewBottleneck",
+      "metric": "reviewWaitDays@bottleneck",
+      "comparator": "above",
+      "predicate": "By the end of the run, completed work waits at least 4 working days for review in the capped team - lead time diverges as the queue grows.",
+      "bound": 4,
+      "tolerance": 0.15,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "Little's Law (W = L / throughput): with a growing queue L cleared at the fixed reviewCapacity, review wait rises superlinearly (M/M/1 rho/(1−rho) as rho → 1). Anchored well below the tens-of-days the divergent queue implies, and far above the well-run few-hours latency (Sadowski et al. 2018) the unbounded control tracks. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "rbControlBounded",
+      "scenario": "reviewBottleneck",
+      "metric": "reviewQueueDepth@unbounded",
+      "comparator": "below",
+      "predicate": "With reviewCapacityPerStep null (default), the review queue stays bounded and small (at most ~5 items) all run - unbounded parallelism reproduces the v1 review behaviour, no ToC plateau.",
+      "bound": 5,
+      "tolerance": 0.1,
+      "step": null,
+      "instrument": "meanPath",
+      "rationale": "The neutral-identity anchor for M20: null capacity means every dwell-elapsed completion clears each step, so the queue never accumulates a runaway backlog and done-throughput is not gated - the v1 behaviour. reviewQueueDepth holds only the in-dwell population (≈ completionRate × reviewDwellDays ≈ 3.5). (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
+    },
+    {
+      "id": "rbQueueFloorMc",
+      "scenario": "reviewBottleneck",
+      "metric": "reviewQueueDepth.p10@bottleneck",
+      "comparator": "above",
+      "predicate": "Even the luckiest 10% of Monte Carlo runs end with at least 10 items queued for review in the capped team - the bottleneck is structural, not a mean-path artifact.",
+      "bound": 10,
+      "tolerance": 0.2,
+      "step": null,
+      "instrument": "monteCarlo",
+      "rationale": "Band-level check that the review queue builds across seeds (mirrors ccEntropyFloorMc). rho ≥ 1 makes the queue grow deterministically in expectation, so even the p10 path accumulates a large backlog over 60 steps. (bound provisional - retune against the pre-lock mean-path/MC harness, seed 42, before lock)."
     }
   ]
 }
