@@ -1,0 +1,169 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://eigenorg/schema/config.v1.json",
+  "title": "eigenorg config (schemaVersion 1)",
+  "description": "Hand-derived from MODEL.md §12.2. Kept in agreement with the serde Config types + validate() ranges: every committed fixture must pass BOTH this schema (ajv) and serde+validate() — a fixture accepted by exactly one is a drift bug (T3).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sim", "seed"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "modelVersion": { "type": "string" },
+    "sim": { "enum": ["org", "team"] },
+    "seed": { "type": "integer", "minimum": 0 },
+    "iterations": { "type": "integer", "minimum": 50, "maximum": 5000 },
+    "horizon": { "type": "integer", "minimum": 10, "maximum": 600 },
+    "paramOverrides": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "number" },
+          { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+        ]
+      }
+    },
+    "cost": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": { "enabled": { "type": "boolean" } }
+    },
+    "org": { "$ref": "#/definitions/org" },
+    "team": { "$ref": "#/definitions/team" }
+  },
+  "definitions": {
+    "org": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "headcountStart",
+        "headcountGrowthPerStep",
+        "topology",
+        "hierarchyDepth",
+        "ownershipLayers",
+        "modality",
+        "structuralHealth",
+        "aiInjection"
+      ],
+      "properties": {
+        "headcountStart": { "type": "integer", "minimum": 4, "maximum": 500 },
+        "headcountGrowthPerStep": { "type": "number", "minimum": 0, "maximum": 2 },
+        "topology": { "enum": ["flat", "hierarchical", "pods", "federated"] },
+        "hierarchyDepth": { "type": "integer", "minimum": 1, "maximum": 6 },
+        "ownershipLayers": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "layerTypes": {
+          "type": "array",
+          "items": { "enum": ["humanPm", "humanDirector", "aiAgent", "committee"] },
+          "minItems": 1,
+          "maxItems": 5
+        },
+        "layerOwnerCount": {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 1, "maximum": 8 },
+          "minItems": 1,
+          "maxItems": 5
+        },
+        "matrix": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "tiebreaker": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "modality": { "enum": ["asyncFirst", "meetingHeavy"] },
+        "structuralHealth": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "misalignment": { "type": "number", "minimum": 0, "maximum": 1 },
+        "initialBacklog": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "aiInjection": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "atStep"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "atStep": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "team": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entities", "workStream", "structuralHealth"],
+      "properties": {
+        "entities": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 12,
+          "items": { "$ref": "#/definitions/entity" }
+        },
+        "workStream": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["arrivalPerStep", "mix"],
+          "properties": {
+            "arrivalPerStep": { "type": "number", "minimum": 0.2, "maximum": 5 },
+            "mix": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["routine", "complex", "novel"],
+              "properties": {
+                "routine": { "type": "number", "minimum": 0, "maximum": 1 },
+                "complex": { "type": "number", "minimum": 0, "maximum": 1 },
+                "novel": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            },
+            "highStakesShare": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "modality": { "enum": ["asyncFirst", "meetingHeavy"] },
+        "structuralHealth": { "type": "integer", "minimum": 1, "maximum": 10 },
+        "recoveryOwner": { "type": ["string", "null"] },
+        "reviewCapacityPerStep": { "type": ["number", "null"], "exclusiveMinimum": 0 }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "archetype",
+        "throughput",
+        "judgmentQuality",
+        "handoffFriction",
+        "reliability",
+        "functions"
+      ],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "enum": ["human", "ai"] },
+        "archetype": { "type": "string" },
+        "throughput": { "type": "number", "minimum": 1, "maximum": 10 },
+        "judgmentQuality": { "type": "number", "minimum": 1, "maximum": 10 },
+        "handoffFriction": { "type": "number", "minimum": 1, "maximum": 10 },
+        "reliability": { "type": "number", "minimum": 1, "maximum": 10 },
+        "rampTimeWeeks": { "type": "number", "minimum": 0, "maximum": 6 },
+        "availability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "functions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "prioritization",
+              "review",
+              "coordination",
+              "execution",
+              "stakeholderCommunication",
+              "synthesis",
+              "ambiguityResolution"
+            ]
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0, "maximum": 10 }
+        }
+      }
+    }
+  }
+}
