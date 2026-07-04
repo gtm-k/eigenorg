@@ -52,4 +52,19 @@ export default [
       },
     },
   },
+  {
+    // Node-run test files (node --test). Node globals, not browser (P3).
+    files: ["www/js/tests/**/*.mjs", "www/js/tests/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: {
+        process: "readonly",
+        console: "readonly",
+        URL: "readonly",
+        TextDecoder: "readonly",
+        TextEncoder: "readonly"
+      },
+    },
+  },
 ];

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "1", "sim": "org", "seed": 42, "iterations": 500, "horizon": 60,
+  "org": { "headcountStart": 12, "headcountGrowthPerStep": 0, "topology": "matrixy",
+    "hierarchyDepth": 2, "ownershipLayers": 1, "modality": "meetingHeavy",
+    "structuralHealth": 6, "aiInjection": { "enabled": false, "atStep": 0 } }
+}

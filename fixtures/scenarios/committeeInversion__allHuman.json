@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+  "iterations": 500, "horizon": 60,
+  "org": { "headcountStart": 20, "headcountGrowthPerStep": 0,
+    "topology": "hierarchical", "hierarchyDepth": 3, "ownershipLayers": 3,
+    "layerTypes": ["humanPm", "humanPm", "humanPm"],
+    "modality": "asyncFirst", "structuralHealth": 5,
+    "aiInjection": { "enabled": false, "atStep": 0 } }
+}
