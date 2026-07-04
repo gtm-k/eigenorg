@@ -665,17 +665,14 @@
     {
       "id": "rbThroughputPlateau",
       "scenario": "reviewBottleneck",
-      "metric": "throughput@bottleneck / throughput@unbounded",
+      "metric": "cumThroughput@bottleneck / cumThroughput@unbounded",
       "comparator": "ratioBelow",
-      "predicate": "The capped team ships at most 0.85x the done-throughput of the uncapped team in the settled window - done-throughput plateaus at the reviewer's rate no matter how fast the AI agents complete work.",
+      "predicate": "By the end of the run the capped team has shipped at most 0.85x the cumulative done-throughput of the uncapped team - done-throughput plateaus at the reviewer's rate no matter how fast the AI agents complete work.",
       "bound": 0.85,
       "tolerance": 0.05,
-      "step": [
-        40,
-        59
-      ],
+      "step": null,
       "instrument": "meanPath",
-      "rationale": "The Theory-of-Constraints invariant (Goldratt 'The Goal'): system throughput-to-done is capped by the slowest stage. Bottleneck done-rate ≈ reviewCapacity (1/step) while the unbounded control clears the full ~1.46/step completion stream, so the TRUE plateau ratio ≈ 0.68 (robust done-rate ratio; equivalently cumThroughput totals 58/85 = 0.68). Raising producer speed upstream cannot lift the plateau; only elevating the constraint can. CALIBRATION CAVEAT (2026-07-04): `throughput` is a per-step integer count (~1/step here) and this golden's metric is the p50 of that per-step count; at ~1/step the median cannot distinguish 1 from 1.46, so the measured evaluator value is 0.95 (NOT the true 0.68), and the 0.85 bound is NOT met by the p50 metric. The plateau itself is proven by rbQueueBuilds + rbWaitRises (a growing queue cleared at a fixed rate IS the plateau). Recommended fix (a §11.11 metric change, pending a user gate): switch this metric to cumThroughput@bottleneck / cumThroughput@unbounded at the final step (ratio 0.6824 measured), which a 0.85 ratioBelow bound clears with margin. (bound provisional - BLOCKED on the metric decision above; not satisfiable with the current p50-of-per-step-throughput metric.)"
+      "rationale": "The Theory-of-Constraints invariant (Goldratt 'The Goal'): system throughput-to-done is capped by the slowest stage. Bottleneck done-rate ≈ reviewCapacity (1/step) while the unbounded control clears the full ~1.46/step completion stream, so the capped team's cumulative done-throughput ends well below the uncapped control's. Raising producer speed upstream cannot lift the plateau; only elevating the constraint can. METRIC BASIS (mini-G2 approved 2026-07-04): the metric is the ratio of the cumulative `cumThroughput` series (the §7.2 running total of completions, already the carrier for hmEarlyThroughputBoost) at the final step, NOT the per-step `throughput` count. At the reviewer's ~1/step rate the per-step `throughput` is a small integer whose p50 cannot distinguish 1 from 1.46 (it reads 0.95, masking the plateau); the cumulative total is a large integer (bottleneck ≈58 vs unbounded ≈85 over 60 steps) whose p50 ratio robustly measures the plateau. Calibration-confirmed against the rebuilt scoped team calibrator, seed 42, 500 iters, 2026-07-04: measured 0.6824, which the 0.85 ratioBelow bound (kept predicate-consistent) clears with ~20% margin. cumThroughput is an existing team output series (no new series / schema change); referencing it mirrors hmEarlyThroughputBoost."
     },
     {
       "id": "rbWaitRises",
