@@ -181,7 +181,7 @@
       "formula": "mu_modality = meetingHeavyMultiplier when modality == meetingHeavy (M4)",
       "tier": "industry-report",
       "limitation": "The 1.4-1.6x range is an inference from meeting-waste research, not a direct measurement of the multiplier.",
-      "anchor": "SI Labs (2026) meeting research: ~60% of meeting time produces no concrete output; PRD red-team range 1.4-1.6x",
+      "anchor": "SI Labs (2026) meeting research: ~60% of meeting time produces no concrete output; design red-team range 1.4-1.6x",
       "value": 1.5,
       "range": [
         1.4,
@@ -521,7 +521,7 @@
       "formula": "sigma((n - center)/(bandWidthFactor * center)) (M3)",
       "tier": "editorial-heuristic",
       "limitation": "Width is a smoothing choice, not an observation.",
-      "anchor": "Editorial: makes band crossings gradual, per the PRD red-team requirement (no cliffs)",
+      "anchor": "Editorial: makes band crossings gradual, per the design red-team requirement (no cliffs)",
       "value": 0.15,
       "range": [
         0.05,
@@ -537,7 +537,7 @@
       "formula": "V = 100 / ((1 + (L-1) * layerFrictionFactor) * congestion) (M7)",
       "tier": "editorial-heuristic",
       "limitation": "Context-dependent; user-adjustable by design.",
-      "anchor": "PRD v2.0 default derived from SI Labs hierarchy-latency pattern",
+      "anchor": "eigenorg editorial default derived from the SI Labs hierarchy-latency pattern",
       "value": 0.35,
       "range": [
         0.2,
@@ -553,7 +553,7 @@
       "formula": "service ~ Triangular(decisionLatencyPerLayerDays) per layer (M6)",
       "tier": "industry-report",
       "limitation": "Documented mainly in large hierarchical orgs; flat orgs and startups differ (Flat Paradox).",
-      "anchor": "SI Labs (2026): ~3 days average processing per approval layer; PRD default 2-3 days",
+      "anchor": "SI Labs (2026): ~3 days average processing per approval layer; design default 2-3 days",
       "value": [
         2,
         2.5,
@@ -637,7 +637,7 @@
       "formula": "progress *= wipResetFraction on override (M8)",
       "tier": "editorial-heuristic",
       "limitation": "Real rework cost depends on how contested the direction was.",
-      "anchor": "PRD red-team fix: overridden tasks re-enter at 50% completion (partial rework), not 0%",
+      "anchor": "design red-team fix: overridden tasks re-enter at 50% completion (partial rework), not 0%",
       "value": 0.5,
       "range": [
         0.25,
@@ -781,7 +781,7 @@
       "formula": "shBrittleFactor(SH <= shRiskThreshold) = aiAmplificationLowSH (M9)",
       "tier": "editorial-heuristic",
       "limitation": "Practitioner-report-based, not a controlled study; the model's most load-bearing editorial coefficient.",
-      "anchor": "PRD red-team range 1.3-1.8x, synthesized from AI-transformation failure reports (rework.com 2025, aimagicx 2026)",
+      "anchor": "design red-team range 1.3-1.8x, synthesized from AI-transformation failure reports (rework.com 2025, aimagicx 2026)",
       "value": 1.55,
       "range": [
         1.3,
@@ -813,7 +813,7 @@
       "formula": "amplification is full at SH <= shRiskThreshold (M9)",
       "tier": "editorial-heuristic",
       "limitation": "The 1-10 SH scale is itself a diagnostic heuristic (Sec 3.4).",
-      "anchor": "PRD: 'when Structural Health is low (<= 4)'",
+      "anchor": "design red-team: 'when Structural Health is low (<= 4)'",
       "value": 4,
       "range": [
         3,
@@ -861,7 +861,7 @@
       "formula": "M_recovery window multiplier, unowned (M10)",
       "tier": "editorial-heuristic",
       "limitation": "Range is an editorial synthesis.",
-      "anchor": "PRD red-team fix: 1.5-2.5x latency for 3-5 steps when no recovery owner",
+      "anchor": "design red-team fix: 1.5-2.5x latency for 3-5 steps when no recovery owner",
       "value": [
         1.5,
         2,
@@ -881,7 +881,7 @@
       "formula": "recovery window duration, unowned (M10)",
       "tier": "editorial-heuristic",
       "limitation": "As recoveryLatencyMultiplierUnowned.",
-      "anchor": "PRD red-team fix: next 3-5 time steps",
+      "anchor": "design red-team fix: next 3-5 time steps",
       "value": [
         3,
         4,
@@ -1081,7 +1081,7 @@
       "formula": "target -= cohesionHollownessPenalty when prioritization, coordination, or stakeholderCommunication has zero human coverage (M12)",
       "tier": "editorial-heuristic",
       "limitation": "Binary trigger; real hollowing is gradual.",
-      "anchor": "Editorial, modeling the PRD's Hollow Middle finding (front-line teams lose the human relationship layer)",
+      "anchor": "Editorial, modeling the Hollow Middle red-team finding (front-line teams lose the human relationship layer)",
       "value": 8,
       "range": [
         3,
@@ -1658,7 +1658,7 @@
       "formula": "Per step, each inProgress task is overridden with probability o(t) = overrideBaseRate * (L - 1) * (1 + overrideMisalignmentGain * m(t)) * (1 + distortionOverrideCoupling * distortion); distortion = distortionPerHumanLayer * (D - 1). On override: task returns to layer 1, progress *= wipResetFraction.",
       "citations": [
         "SI Labs (2026). Why Hierarchies Slow Down Companies. https://www.si-labs.com/en/articles/slow-decisions/",
-        "eigenorg PRD red-team finding (2026): overridden WIP re-enters at partial completion rather than disappearing from throughput."
+        "eigenorg design red-team (2026): overridden WIP re-enters at partial completion rather than disappearing from throughput."
       ],
       "limitations": [
         "Override probability and the 50% reset fraction are editorial defaults; real override cost varies with how far the work had progressed.",
@@ -1673,7 +1673,7 @@
       "citations": [
         "rework.com (2025). Why Most AI Transformations Fail. https://resources.rework.com/libraries/ai-transformation-strategy/why-most-ai-transformations-fail",
         "aimagicx.com (2026). Why 80% of AI Transformation Projects Fail.",
-        "eigenorg PRD red-team finding (2026): Structural Health precondition gates whether AI injection reduces or amplifies entropy."
+        "eigenorg design red-team (2026): Structural Health precondition gates whether AI injection reduces or amplifies entropy."
       ],
       "limitations": [
         "The 1.3-1.8x amplification range comes from practitioner reports and editorial synthesis, not controlled studies - it is the model's most load-bearing editorial coefficient and is deliberately adjustable.",
@@ -1686,11 +1686,11 @@
       "plainLanguage": "When an AI agent hits a case beyond its ceiling, the failure does not just cost that one task. If a named human owns recovery, the mess is contained: a day or two, small slowdown. If nobody owns recovery, everything nearby slows down 1.5-2.5x for the next 3-5 days while people figure out whose problem it is.",
       "formula": "A brittleness event draws ONE duration d ~ Triangular(recoveryDurationUnownedSteps | recoveryDurationOwnedSteps), rounded to whole steps (min 1), shared by the task block and the recovery window; the window is active for steps [t_event, t_event + d). While any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned). Owned: multiplier = recoveryLatencyMultiplierOwned (point value, no draw).",
       "citations": [
-        "eigenorg PRD red-team finding (2026): Failure Recovery Owner assignment; unowned high-AI-coverage functions apply a 1.5-2.5x latency multiplier for 3-5 steps after a brittleness event.",
+        "eigenorg design red-team (2026): Failure Recovery Owner assignment; unowned high-AI-coverage functions apply a 1.5-2.5x latency multiplier for 3-5 steps after a brittleness event.",
         "HatchWorks (2025). AI agent design best practices - agent failure modes on novel inputs."
       ],
       "limitations": [
-        "Multiplier and duration ranges are editorial defaults from the PRD red team, not field measurements.",
+        "Multiplier and duration ranges are editorial defaults from the eigenorg design red-team, not field measurements.",
         "Concurrent events take the max multiplier, not a compounding product - a deliberate boundedness choice."
       ]
     },
@@ -1783,7 +1783,7 @@
       "plainLanguage": "For each of the seven functions, how much qualified attention is actually pointed at it, relative to how much the team needs? A brilliant director who is 25% available and juggling three functions covers less than it looks. Red means the function is effectively unowned - and the simulation makes you feel it.",
       "formula": "coverage(f) = min(1, sum over entities e assigned to f of (capabilities_e(f)/10) * attention_e * availability_e / demand(f)); demand(execution) = functionDemandExecution * (n_e/8); demand(other f) = functionDemandDefault * (n_e/8). attention_e = 1 for AI; min(1, humanAttentionSpan/count(functions_e)) for humans. Rating: green if coverage >= coverageGreenThreshold, amber if >= coverageAmberThreshold, else red.",
       "citations": [
-        "eigenorg PRD (2026) - functions vs roles: work that must happen regardless of what title handles it."
+        "eigenorg design red-team (2026) - functions vs roles: work that must happen regardless of what title handles it."
       ],
       "limitations": [
         "Demand scaling with team size is a linear editorial default.",

@@ -330,7 +330,7 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
   "plainLanguage": "With more layers above the work, higher layers more often reverse lower-layer decisions - especially when ownership is unclear and information has been distorted on its way up the hierarchy. An overridden task is not lost: it re-enters the pipeline keeping about half its progress. That partial rework, plus a fresh trip through every approval layer, is the true cost of an override.",
   "citations": [
     "SI Labs (2026). Why Hierarchies Slow Down Companies. https://www.si-labs.com/en/articles/slow-decisions/",
-    "eigenorg PRD red-team finding (2026): overridden WIP re-enters at partial completion rather than disappearing from throughput."
+    "eigenorg design red-team (2026): overridden WIP re-enters at partial completion rather than disappearing from throughput."
   ],
   "limitations": [
     "Override probability and the 50% reset fraction are editorial defaults; real override cost varies with how far the work had progressed.",
@@ -349,7 +349,7 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
   "citations": [
     "rework.com (2025). Why Most AI Transformations Fail. https://resources.rework.com/libraries/ai-transformation-strategy/why-most-ai-transformations-fail",
     "aimagicx.com (2026). Why 80% of AI Transformation Projects Fail.",
-    "eigenorg PRD red-team finding (2026): Structural Health precondition gates whether AI injection reduces or amplifies entropy."
+    "eigenorg design red-team (2026): Structural Health precondition gates whether AI injection reduces or amplifies entropy."
   ],
   "limitations": [
     "The 1.3-1.8x amplification range comes from practitioner reports and editorial synthesis, not controlled studies - it is the model's most load-bearing editorial coefficient and is deliberately adjustable.",
@@ -366,11 +366,11 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
   "formula": "A brittleness event draws ONE duration d ~ Triangular(recoveryDurationUnownedSteps | recoveryDurationOwnedSteps), rounded to whole steps (min 1), shared by the task block and the recovery window; the window is active for steps [t_event, t_event + d). While any window is active, new decision-service draws are multiplied by M_recovery(t) = max over active windows of their multiplier. Unowned recovery (org: SH < recoveryOwnershipThreshold; team: recoveryOwner == null): multiplier ~ Triangular(recoveryLatencyMultiplierUnowned). Owned: multiplier = recoveryLatencyMultiplierOwned (point value, no draw).",
   "plainLanguage": "When an AI agent hits a case beyond its ceiling, the failure does not just cost that one task. If a named human owns recovery, the mess is contained: a day or two, small slowdown. If nobody owns recovery, everything nearby slows down 1.5-2.5x for the next 3-5 days while people figure out whose problem it is.",
   "citations": [
-    "eigenorg PRD red-team finding (2026): Failure Recovery Owner assignment; unowned high-AI-coverage functions apply a 1.5-2.5x latency multiplier for 3-5 steps after a brittleness event.",
+    "eigenorg design red-team (2026): Failure Recovery Owner assignment; unowned high-AI-coverage functions apply a 1.5-2.5x latency multiplier for 3-5 steps after a brittleness event.",
     "HatchWorks (2025). AI agent design best practices - agent failure modes on novel inputs."
   ],
   "limitations": [
-    "Multiplier and duration ranges are editorial defaults from the PRD red team, not field measurements.",
+    "Multiplier and duration ranges are editorial defaults from the eigenorg design red-team, not field measurements.",
     "Concurrent events take the max multiplier, not a compounding product - a deliberate boundedness choice."
   ]
 }
@@ -491,7 +491,7 @@ multiplies it by `federatedAutonomyFactor` (delegated ownership absorbs some amb
   "formula": "coverage(f) = min(1, sum over entities e assigned to f of (capabilities_e(f)/10) * attention_e * availability_e / demand(f)); demand(execution) = functionDemandExecution * (n_e/8); demand(other f) = functionDemandDefault * (n_e/8). attention_e = 1 for AI; min(1, humanAttentionSpan/count(functions_e)) for humans. Rating: green if coverage >= coverageGreenThreshold, amber if >= coverageAmberThreshold, else red.",
   "plainLanguage": "For each of the seven functions, how much qualified attention is actually pointed at it, relative to how much the team needs? A brilliant director who is 25% available and juggling three functions covers less than it looks. Red means the function is effectively unowned - and the simulation makes you feel it.",
   "citations": [
-    "eigenorg PRD (2026) - functions vs roles: work that must happen regardless of what title handles it."
+    "eigenorg design red-team (2026) - functions vs roles: work that must happen regardless of what title handles it."
   ],
   "limitations": [
     "Demand scaling with team size is a linear editorial default.",
@@ -637,7 +637,7 @@ target gap — true for all defaults and all values within the declared ranges.
 
 Every series is emitted as a tidy percentile series
 `metricId → [{t, p10, p50, p90}]` (one entry per step). Deterministic quantities emit
-p10 = p50 = p90. Downstream phases must consume THIS list — never the PRD's.
+p10 = p50 = p90. Downstream phases must consume THIS list — no other output list exists.
 
 ### 7.1 Org Entropy Simulator series (16)
 
@@ -693,7 +693,7 @@ SH varied. The engine does not emit a delta series; the UI must not invent one e
 - `functionCoverage`: `{functionId: {score (0–1, 2-decimal), rating: "green"|"amber"|"red"}}`
   for all seven functions (M17; deterministic).
 
-**PRD output mapping (so nothing is lost):** 1 throughput curve w/ bands → `throughput`;
+**Red-team requirement mapping (so nothing is lost):** 1 throughput curve w/ bands → `throughput`;
 2 quality histogram → `qualityHistogram`; 3 function coverage map → `functionCoverage`;
 4 coordination tax → `coordinationTax`; 5 cohesion trend → `cohesion`; 6 brittleness +
 recovery cost → `brittlenessRate` + `cumulativeBrittleness` (+ recovery visible as
@@ -865,7 +865,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "meetingHeavyMultiplier", "value": 1.5, "range": [1.4, 1.6], "distribution": "point", "unit": "multiplier",
-  "anchor": "SI Labs (2026) meeting research: ~60% of meeting time produces no concrete output; PRD red-team range 1.4-1.6x", "tier": "industry-report",
+  "anchor": "SI Labs (2026) meeting research: ~60% of meeting time produces no concrete output; design red-team range 1.4-1.6x", "tier": "industry-report",
   "limitation": "The 1.4-1.6x range is an inference from meeting-waste research, not a direct measurement of the multiplier.",
   "formula": "mu_modality = meetingHeavyMultiplier when modality == meetingHeavy (M4)",
   "plainLanguage": "Meeting-heavy cultures pay about one and a half times the coordination tax of async-first cultures." }
@@ -1035,7 +1035,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "bandWidthFactor", "value": 0.15, "range": [0.05, 0.3], "distribution": "point", "unit": "fraction of band center",
-  "anchor": "Editorial: makes band crossings gradual, per the PRD red-team requirement (no cliffs)", "tier": "editorial-heuristic",
+  "anchor": "Editorial: makes band crossings gradual, per the design red-team requirement (no cliffs)", "tier": "editorial-heuristic",
   "limitation": "Width is a smoothing choice, not an observation.",
   "formula": "sigma((n - center)/(bandWidthFactor * center)) (M3)",
   "plainLanguage": "How gradual each band crossing feels - the model never has a cliff at exactly 150." }
@@ -1045,7 +1045,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "layerFrictionFactor", "value": 0.35, "range": [0.2, 0.6], "distribution": "point", "unit": "dimensionless",
-  "anchor": "PRD v2.0 default derived from SI Labs hierarchy-latency pattern", "tier": "editorial-heuristic",
+  "anchor": "eigenorg editorial default derived from the SI Labs hierarchy-latency pattern", "tier": "editorial-heuristic",
   "limitation": "Context-dependent; user-adjustable by design.",
   "formula": "V = 100 / ((1 + (L-1) * layerFrictionFactor) * congestion) (M7)",
   "plainLanguage": "How much each extra ownership layer drags on the decision-velocity score." }
@@ -1053,7 +1053,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "decisionLatencyPerLayerDays", "value": [2, 2.5, 3], "range": [2, 3], "distribution": "triangular", "unit": "working days/layer",
-  "anchor": "SI Labs (2026): ~3 days average processing per approval layer; PRD default 2-3 days", "tier": "industry-report",
+  "anchor": "SI Labs (2026): ~3 days average processing per approval layer; design default 2-3 days", "tier": "industry-report",
   "limitation": "Documented mainly in large hierarchical orgs; flat orgs and startups differ (Flat Paradox).",
   "formula": "service ~ Triangular(decisionLatencyPerLayerDays) per layer (M6)",
   "plainLanguage": "Each approval layer sits on a decision for two to three working days." }
@@ -1093,7 +1093,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "wipResetFraction", "value": 0.5, "range": [0.25, 0.75], "distribution": "point", "unit": "fraction of progress kept",
-  "anchor": "PRD red-team fix: overridden tasks re-enter at 50% completion (partial rework), not 0%", "tier": "editorial-heuristic",
+  "anchor": "design red-team fix: overridden tasks re-enter at 50% completion (partial rework), not 0%", "tier": "editorial-heuristic",
   "limitation": "Real rework cost depends on how contested the direction was.",
   "formula": "progress *= wipResetFraction on override (M8)",
   "plainLanguage": "An overridden task keeps about half its progress - rework, not restart." }
@@ -1167,7 +1167,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "aiAmplificationLowSH", "value": 1.55, "range": [1.3, 1.8], "distribution": "point", "unit": "multiplier",
-  "anchor": "PRD red-team range 1.3-1.8x, synthesized from AI-transformation failure reports (rework.com 2025, aimagicx 2026)", "tier": "editorial-heuristic",
+  "anchor": "design red-team range 1.3-1.8x, synthesized from AI-transformation failure reports (rework.com 2025, aimagicx 2026)", "tier": "editorial-heuristic",
   "limitation": "Practitioner-report-based, not a controlled study; the model's most load-bearing editorial coefficient.",
   "formula": "shBrittleFactor(SH <= shRiskThreshold) = aiAmplificationLowSH (M9)",
   "plainLanguage": "In a structurally unhealthy org, AI injection multiplies novel-task failures by about 1.5x - faster dysfunction." }
@@ -1183,7 +1183,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "shRiskThreshold", "value": 4, "range": [3, 5], "distribution": "point", "unit": "SH score",
-  "anchor": "PRD: 'when Structural Health is low (<= 4)'", "tier": "editorial-heuristic",
+  "anchor": "design red-team: 'when Structural Health is low (<= 4)'", "tier": "editorial-heuristic",
   "limitation": "The 1-10 SH scale is itself a diagnostic heuristic (Sec 3.4).",
   "formula": "amplification is full at SH <= shRiskThreshold (M9)",
   "plainLanguage": "At Structural Health 4 or below, AI amplifies dysfunction at full strength." }
@@ -1207,7 +1207,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "recoveryLatencyMultiplierUnowned", "value": [1.5, 2.0, 2.5], "range": [1.5, 2.5], "distribution": "triangular", "unit": "multiplier",
-  "anchor": "PRD red-team fix: 1.5-2.5x latency for 3-5 steps when no recovery owner", "tier": "editorial-heuristic",
+  "anchor": "design red-team fix: 1.5-2.5x latency for 3-5 steps when no recovery owner", "tier": "editorial-heuristic",
   "limitation": "Range is an editorial synthesis.",
   "formula": "M_recovery window multiplier, unowned (M10)",
   "plainLanguage": "An unowned failure roughly doubles decision times while people figure out whose problem it is." }
@@ -1215,7 +1215,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "recoveryDurationUnownedSteps", "value": [3, 4, 5], "range": [3, 5], "distribution": "triangular", "unit": "steps",
-  "anchor": "PRD red-team fix: next 3-5 time steps", "tier": "editorial-heuristic",
+  "anchor": "design red-team fix: next 3-5 time steps", "tier": "editorial-heuristic",
   "limitation": "As recoveryLatencyMultiplierUnowned.",
   "formula": "recovery window duration, unowned (M10)",
   "plainLanguage": "The unowned-failure slowdown lasts most of a week." }
@@ -1313,7 +1313,7 @@ parameters require a mini-G2 user gate.
 
 ```json eigenorg:parameter
 { "id": "cohesionHollownessPenalty", "value": 8, "range": [3, 15], "distribution": "point", "unit": "index points",
-  "anchor": "Editorial, modeling the PRD's Hollow Middle finding (front-line teams lose the human relationship layer)", "tier": "editorial-heuristic",
+  "anchor": "Editorial, modeling the Hollow Middle red-team finding (front-line teams lose the human relationship layer)", "tier": "editorial-heuristic",
   "limitation": "Binary trigger; real hollowing is gradual.",
   "formula": "target -= cohesionHollownessPenalty when prioritization, coordination, or stakeholderCommunication has zero human coverage (M12)",
   "plainLanguage": "Replacing the human relationship layer (like the PM people actually talked to) costs the team extra glue." }
@@ -1782,7 +1782,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "predicate": "Throughput rises with headcount, peaks mid-run, then declines as coordination overhead dominates: the final value is at most 85% of the steps-20-100 peak.",
   "bound": { "peakWindow": [20, 100], "finalRatioMax": 0.85 }, "tolerance": 0.05, "step": null,
   "instrument": "meanPath",
-  "rationale": "The PRD stress test's core shape: more hands, then plateau, then decline (Brooks channels + band penalties outgrow added capacity)." }
+  "rationale": "The scenario's red-teamed core shape: more hands, then plateau, then decline (Brooks channels + band penalties outgrow added capacity)." }
 ```
 
 ```json eigenorg:golden
@@ -1798,7 +1798,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cohesionTeamAvg@main", "comparator": "below",
   "predicate": "Cohesion degrades below 65 after the ~15-person band is crossed.",
   "bound": 65, "tolerance": 0.05, "step": null, "instrument": "meanPath",
-  "rationale": "The PRD stress test: cohesion starts degrading as the 15-member inner-circle threshold is crossed." }
+  "rationale": "The red-teamed expectation: cohesion starts degrading as the 15-member inner-circle threshold is crossed." }
 ```
 
 ```json eigenorg:golden
@@ -1840,7 +1840,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "wip@threeLayer / wip@oneLayer", "comparator": "ratioAbove",
   "predicate": "The 3-layer org carries at least 1.5x the work-in-progress of the 1-layer org - items stack up waiting for approval.",
   "bound": 1.5, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
-  "rationale": "WIP accumulation is the visible symptom of approval queues (PRD stress test 3)." }
+  "rationale": "WIP accumulation is the visible symptom of approval queues (red-team stress test 3)." }
 ```
 
 ```json eigenorg:golden
@@ -1874,7 +1874,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "entropy@sh3", "comparator": "riseAtLeast",
   "predicate": "In the SH=3 org, entropy RISES by at least 5 points after AI injection (step 15 to end) - AI on broken structure makes things worse.",
   "bound": 5, "tolerance": 0.15, "step": [15, 59], "instrument": "meanPath",
-  "rationale": "The product's central claim: layering AI on low Structural Health amplifies dysfunction (PRD stress test 4)." }
+  "rationale": "The product's central claim: layering AI on low Structural Health amplifies dysfunction (red-team stress test 4)." }
 ```
 
 ```json eigenorg:golden
@@ -1890,7 +1890,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cumulativeBrittleness@sh3 / cumulativeBrittleness@sh7", "comparator": "ratioAbove",
   "predicate": "Total brittleness events in the SH=3 org run at least 1.3x the SH=7 org's total by the end.",
   "bound": 1.3, "tolerance": 0.1, "step": null, "instrument": "meanPath",
-  "rationale": "Direct check of the PRD's amplification claim at the scenario endpoints (cumulative form: per-step medians of sparse counts are degenerate)." }
+  "rationale": "Direct check of the red-teamed amplification claim at the scenario endpoints (cumulative form: per-step medians of sparse counts are degenerate)." }
 ```
 
 ```json eigenorg:golden
@@ -1906,7 +1906,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "throughput@sh3", "comparator": "twoWindowRatioAbove",
   "predicate": "Right after injection (steps 16-22) SH=3 throughput runs at least 3% above its pre-injection level (steps 8-14): the dysfunction is FASTER - that is the seduction.",
   "bound": { "windowA": [16, 22], "windowB": [8, 14], "minRatio": 1.05 }, "tolerance": 0.03, "step": null, "instrument": "meanPath",
-  "rationale": "PRD stress test 4: throughput increases while entropy worsens; both must be visible or the story reads as 'AI bad'. Mechanism: the M11 approval-bandwidth multiplier - AI routes work into the broken structure faster." }
+  "rationale": "Red-team stress test 4: throughput increases while entropy worsens; both must be visible or the story reads as 'AI bad'. Mechanism: the M11 approval-bandwidth multiplier - AI routes work into the broken structure faster." }
 ```
 
 ```json eigenorg:golden
@@ -1924,7 +1924,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cohesionTeamAvg@main", "comparator": "above",
   "predicate": "Per-pod cohesion stays healthy (>= 65) all the way to 8 pods - each pod is fine.",
   "bound": 65, "tolerance": 0.05, "step": null, "instrument": "meanPath",
-  "rationale": "The 'healthy teams' half of the healthy-teams-sick-org insight (PRD stress test 5)." }
+  "rationale": "The 'healthy teams' half of the healthy-teams-sick-org insight (red-team stress test 5)." }
 ```
 
 ```json eigenorg:golden
@@ -1940,7 +1940,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "healthGap@main", "comparator": "riseAtLeast",
   "predicate": "The gap between team cohesion and org health widens by at least 12 points - the two lines visibly diverge on one chart.",
   "bound": 12, "tolerance": 0.2, "step": [0, 119], "instrument": "meanPath",
-  "rationale": "PRD red-team fix: the Multi-Level Health divergence is the shareable insight and must be structural." }
+  "rationale": "Design red-team fix: the Multi-Level Health divergence is the shareable insight and must be structural." }
 ```
 
 ```json eigenorg:golden
@@ -1966,7 +1966,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "decisionLatencyRoutine@hollow / decisionLatencyRoutine@humanPm", "comparator": "ratioBelow",
   "predicate": "The AI prioritization agent routes routine work at most 0.6x the human PM's latency - the acceleration is real.",
   "bound": 0.6, "tolerance": 0.1, "step": [50, 59], "instrument": "meanPath",
-  "rationale": "PRD stress test 2: initial acceleration on routine prioritization is what makes the Hollow Middle tempting." }
+  "rationale": "Red-team stress test 2: initial acceleration on routine prioritization is what makes the Hollow Middle tempting." }
 ```
 
 ```json eigenorg:golden
@@ -1982,7 +1982,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cumulativeBrittleness@hollow / cumulativeBrittleness@humanPm", "comparator": "ratioAbove",
   "predicate": "Total brittleness events in the hollow team run at least 2x the human-PM team by the end.",
   "bound": 2, "tolerance": 0.1, "step": null, "instrument": "meanPath",
-  "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (PRD stress test 2)." }
+  "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (red-team stress test 2)." }
 ```
 
 ```json eigenorg:golden
@@ -1990,7 +1990,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "coverage.stakeholderCommunication.score@hollow", "comparator": "scalarBelow",
   "predicate": "Stakeholder Communication coverage is at most 0.5 (red) in the hollow team - the function the AI cannot actually do.",
   "bound": 0.5, "tolerance": 0, "step": null, "instrument": "meanPath",
-  "rationale": "PRD: the function coverage map must show Stakeholder Communication under-covered when the human PM is removed." }
+  "rationale": "Red-team requirement: the function coverage map must show Stakeholder Communication under-covered when the human PM is removed." }
 ```
 
 ```json eigenorg:golden
@@ -1998,7 +1998,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "coverage.execution.score@hollow", "comparator": "scalarAbove",
   "predicate": "Execution coverage stays at least 0.8 (green) - the hollow team's problem is not capacity.",
   "bound": 0.8, "tolerance": 0, "step": null, "instrument": "meanPath",
-  "rationale": "PRD: Execution and routine prioritization stay green while judgment functions go red - that contrast is the insight." }
+  "rationale": "Red-team requirement: Execution and routine prioritization stay green while judgment functions go red - that contrast is the insight." }
 ```
 
 ```json eigenorg:golden
@@ -2006,7 +2006,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "cohesion@humanPm - cohesion@hollow", "comparator": "above",
   "predicate": "The hollow team ends at least 8 cohesion points below the human-PM team.",
   "bound": 8, "tolerance": 0.1, "step": null, "instrument": "meanPath",
-  "rationale": "Front-line teams lose the human relationship layer of their PM (PRD stress test 2; WEF/AMCIS cohesion findings)." }
+  "rationale": "Front-line teams lose the human relationship layer of their PM (red-team stress test 2; WEF/AMCIS cohesion findings)." }
 ```
 
 ```json eigenorg:golden
@@ -2014,7 +2014,7 @@ override cost is asserted separately via `overrideRate` and `wip`.
   "metric": "coordinationTax@hollow / coordinationTax@humanPm", "comparator": "ratioBelow",
   "predicate": "The hollow team pays strictly less coordination tax (ratio <= 0.995) - AI routing has lower handoff friction.",
   "bound": 0.995, "tolerance": 0, "step": null, "instrument": "meanPath",
-  "rationale": "PRD stress test 2: coordination tax drops for routine routing - part of why the trap works." }
+  "rationale": "Red-team stress test 2: coordination tax drops for routine routing - part of why the trap works." }
 ```
 
 ```json eigenorg:golden
@@ -2243,7 +2243,7 @@ Structural limitations (also surfaced per-mechanic in the drawer):
 
 | modelVersion | date | params.json sha256 | changes |
 |---|---|---|---|
-| 1.0.0 | 2026-07-03 | `3d6fbcd4ec7476bfc71c0736966481182ac2c981397ce37b318feeeaa71b30ca` | Initial model: unified org/team spec, 5 calibrated scenarios, 30 golden assertions, extraction pipeline. |
+| 1.0.0 | 2026-07-03 | `4eab90f344dfe24336acda7fcb56cd077ca5fe224a5ba666262ef8a8fe19cd39` | Initial model: unified org/team spec, 5 calibrated scenarios, 30 golden assertions, extraction pipeline. |
 
 ---
 

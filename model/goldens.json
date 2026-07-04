@@ -17,7 +17,7 @@
       "tolerance": 0.05,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "The PRD stress test's core shape: more hands, then plateau, then decline (Brooks channels + band penalties outgrow added capacity)."
+      "rationale": "The scenario's red-teamed core shape: more hands, then plateau, then decline (Brooks channels + band penalties outgrow added capacity)."
     },
     {
       "id": "ccCoordinationTaxFinal",
@@ -41,7 +41,7 @@
       "tolerance": 0.05,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "The PRD stress test: cohesion starts degrading as the 15-member inner-circle threshold is crossed."
+      "rationale": "The red-teamed expectation: cohesion starts degrading as the 15-member inner-circle threshold is crossed."
     },
     {
       "id": "ccEntropyRise",
@@ -116,7 +116,7 @@
         59
       ],
       "instrument": "meanPath",
-      "rationale": "WIP accumulation is the visible symptom of approval queues (PRD stress test 3)."
+      "rationale": "WIP accumulation is the visible symptom of approval queues (red-team stress test 3)."
     },
     {
       "id": "ptOverrideVisible",
@@ -173,7 +173,7 @@
         59
       ],
       "instrument": "meanPath",
-      "rationale": "The product's central claim: layering AI on low Structural Health amplifies dysfunction (PRD stress test 4)."
+      "rationale": "The product's central claim: layering AI on low Structural Health amplifies dysfunction (red-team stress test 4)."
     },
     {
       "id": "fdEntropyImprovesHealthy",
@@ -200,7 +200,7 @@
       "tolerance": 0.1,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "Direct check of the PRD's amplification claim at the scenario endpoints (cumulative form: per-step medians of sparse counts are degenerate)."
+      "rationale": "Direct check of the red-teamed amplification claim at the scenario endpoints (cumulative form: per-step medians of sparse counts are degenerate)."
     },
     {
       "id": "fdSeparability",
@@ -234,7 +234,7 @@
       "tolerance": 0.03,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "PRD stress test 4: throughput increases while entropy worsens; both must be visible or the story reads as 'AI bad'. Mechanism: the M11 approval-bandwidth multiplier - AI routes work into the broken structure faster."
+      "rationale": "Red-team stress test 4: throughput increases while entropy worsens; both must be visible or the story reads as 'AI bad'. Mechanism: the M11 approval-bandwidth multiplier - AI routes work into the broken structure faster."
     },
     {
       "id": "fdWorseThanNothing",
@@ -261,7 +261,7 @@
       "tolerance": 0.05,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "The 'healthy teams' half of the healthy-teams-sick-org insight (PRD stress test 5)."
+      "rationale": "The 'healthy teams' half of the healthy-teams-sick-org insight (red-team stress test 5)."
     },
     {
       "id": "dcOrgEntropyRises",
@@ -291,7 +291,7 @@
         119
       ],
       "instrument": "meanPath",
-      "rationale": "PRD red-team fix: the Multi-Level Health divergence is the shareable insight and must be structural."
+      "rationale": "Design red-team fix: the Multi-Level Health divergence is the shareable insight and must be structural."
     },
     {
       "id": "dcInterTeamExplosion",
@@ -333,7 +333,7 @@
         59
       ],
       "instrument": "meanPath",
-      "rationale": "PRD stress test 2: initial acceleration on routine prioritization is what makes the Hollow Middle tempting."
+      "rationale": "Red-team stress test 2: initial acceleration on routine prioritization is what makes the Hollow Middle tempting."
     },
     {
       "id": "hmEarlyThroughputBoost",
@@ -357,7 +357,7 @@
       "tolerance": 0.1,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (PRD stress test 2)."
+      "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (red-team stress test 2)."
     },
     {
       "id": "hmStakeholderGap",
@@ -369,7 +369,7 @@
       "tolerance": 0,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "PRD: the function coverage map must show Stakeholder Communication under-covered when the human PM is removed."
+      "rationale": "Red-team requirement: the function coverage map must show Stakeholder Communication under-covered when the human PM is removed."
     },
     {
       "id": "hmExecutionCovered",
@@ -381,7 +381,7 @@
       "tolerance": 0,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "PRD: Execution and routine prioritization stay green while judgment functions go red - that contrast is the insight."
+      "rationale": "Red-team requirement: Execution and routine prioritization stay green while judgment functions go red - that contrast is the insight."
     },
     {
       "id": "hmCohesionErosion",
@@ -393,7 +393,7 @@
       "tolerance": 0.1,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "Front-line teams lose the human relationship layer of their PM (PRD stress test 2; WEF/AMCIS cohesion findings)."
+      "rationale": "Front-line teams lose the human relationship layer of their PM (red-team stress test 2; WEF/AMCIS cohesion findings)."
     },
     {
       "id": "hmTaxDrops",
@@ -405,7 +405,7 @@
       "tolerance": 0,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "PRD stress test 2: coordination tax drops for routine routing - part of why the trap works."
+      "rationale": "Red-team stress test 2: coordination tax drops for routine routing - part of why the trap works."
     },
     {
       "id": "hmBrittlenessFloorMc",
