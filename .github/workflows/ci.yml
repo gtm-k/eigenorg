@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  # Auto-triggers disabled during dev to conserve GitHub Actions minutes.
+  # The orchestrator dispatches this workflow at every phase gate.
+  # Re-enable before release (P9):
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust gates + wasm build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: |
+          set -o pipefail
+          cargo fmt --check
+
+      - name: Clippy (native)
+        run: |
+          set -o pipefail
+          cargo clippy -- -D warnings
+
+      - name: Clippy (wasm32 — lints the wasm-bindgen boundary in src/api.rs)
+        run: |
+          set -o pipefail
+          cargo clippy --target wasm32-unknown-unknown -- -D warnings
+
+      - name: Test (native — engine core is wasm-free)
+        run: |
+          set -o pipefail
+          cargo test
+
+      - name: Install wasm-pack (locked; cached by rust-cache)
+        run: |
+          set -o pipefail
+          if ! command -v wasm-pack >/dev/null 2>&1; then
+            cargo install --locked wasm-pack
+          fi
+          wasm-pack --version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm ci (source for the vendored Chart.js bundle)
+        run: |
+          set -o pipefail
+          npm ci
+
+      - name: Build site via scripts/build.sh (proves the one true build path in CI)
+        run: |
+          set -o pipefail
+          bash scripts/build.sh
+
+      - name: Assert wasm binary present and pkg/.gitignore deleted (PREMORTEM T2)
+        run: |
+          set -o pipefail
+          test -f www/pkg/eigenorg_bg.wasm
+          test ! -f www/pkg/.gitignore
+          test -f www/vendor/chart.umd.min.js
+          test -f www/.nojekyll
+
+  js:
+    name: JS gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm ci
+        run: |
+          set -o pipefail
+          npm ci
+
+      - name: Lint
+        run: |
+          set -o pipefail
+          npm run lint
+
+      - name: Typecheck
+        run: |
+          set -o pipefail
+          npm run typecheck
+
+      - name: node --test (skips cleanly while no JS tests exist)
+        run: |
+          set -o pipefail
+          if find . -path ./node_modules -prune -o -type f \( -name "*.test.js" -o -name "*.test.mjs" \) -print -quit | grep -q .; then
+            npm test
+          else
+            echo "no JS test files yet — skipping"
+          fi
+
+      - name: Drift gate — extractor idempotence (inert until P1 lands)
+        run: |
+          set -o pipefail
+          if [ -f scripts/extract_params.mjs ]; then
+            node scripts/extract_params.mjs
+            git diff --exit-code -- model/ www/assumptions.json
+          else
+            echo "scripts/extract_params.mjs not present yet — skipping drift gate"
+          fi
+
+      - name: External-request grep — zero external requests from www/ (binding delta #2; allowlist nothing)
+        run: |
+          set -o pipefail
+          status=0
+          if grep -rInE 'fetch\(.{0,3}https?://' www/; then
+            echo '^^ fetch() to an absolute http(s) URL'
+            status=1
+          fi
+          if grep -rInE '<script[^>]*src=.{0,2}https?://' www/; then
+            echo '^^ <script src> to an absolute http(s) URL'
+            status=1
+          fi
+          if grep -rIn 'sendBeacon' www/; then
+            echo '^^ sendBeacon usage'
+            status=1
+          fi
+          if [ "$status" -ne 0 ]; then
+            echo 'FAIL: external-request patterns found in www/ — the site must make zero external requests'
+            exit 1
+          fi
+          echo 'external-request grep clean'
