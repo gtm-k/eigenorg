@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 42,
+  "iterations": 500, "horizon": 120,
+  "org": { "headcountStart": 24, "headcountGrowthPerStep": 0.33333,
+    "topology": "pods", "hierarchyDepth": 3, "ownershipLayers": 2,
+    "modality": "meetingHeavy", "structuralHealth": 6,
+    "aiInjection": { "enabled": false, "atStep": 0 } }
+}
