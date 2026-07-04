@@ -15,6 +15,6 @@
     "modality": "asyncFirst",
     "structuralHealth": 6,
     "recoveryOwner": "pm",
-    "reviewCapacityPerStep": 2
+    "reviewCapacityPerStep": 1
   }
 }
