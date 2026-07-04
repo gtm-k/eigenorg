@@ -1,7 +1,3 @@
-// @ts-nocheck -- dev-only Node server; the P0 scaffold ships no @types/node
-// (P2 may add only the chart.js devDependency), so node: module imports are
-// unresolvable to tsc. Runtime-only file, exercised on every local run.
-//
 // Local GitHub-Pages-equivalent server (PLAN P2, PREMORTEM T2):
 //   1. Serves the repo's www/ at http://localhost:PORT/eigenorg/ — emulating
 //      the Pages *project subpath* so import.meta.url / relative-path bugs
@@ -22,6 +18,7 @@ const SUBPATH = '/eigenorg';
 const PORT = Number(process.argv[2] || process.env.PORT || 8080);
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'www');
 
+/** @type {Record<string, string>} */
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -38,9 +35,16 @@ const MIME = {
 };
 
 /**
+ * @typedef {{ status: number, reason: string, fsPath?: undefined, isDir?: undefined }} ResolveMiss
+ * @typedef {{ fsPath: string, isDir: boolean, status?: undefined, reason?: undefined }} ResolveHit
+ */
+
+/**
  * Walk segments from ROOT requiring an exact-case directory-entry match at
  * every level (the Pages-on-Linux behavior). Returns { fsPath, isDir } or
  * { status, reason }.
+ * @param {string[]} segments
+ * @returns {Promise<ResolveMiss | ResolveHit>}
  */
 async function resolveExactCase(segments) {
   let cur = ROOT;
@@ -67,6 +71,11 @@ async function resolveExactCase(segments) {
   return { fsPath: cur, isDir: st.isDirectory() };
 }
 
+/**
+ * @param {import('node:http').ServerResponse} res
+ * @param {number} status
+ * @param {string} reason
+ */
 function deny(res, status, reason) {
   res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end(`${status} — ${reason}\n`);
@@ -75,11 +84,11 @@ function deny(res, status, reason) {
 const server = http.createServer(async (req, res) => {
   let pathname;
   try {
-    pathname = decodeURIComponent(new URL(req.url, `http://localhost:${PORT}`).pathname);
+    pathname = decodeURIComponent(new URL(req.url ?? '/', `http://localhost:${PORT}`).pathname);
   } catch {
     return deny(res, 400, 'malformed URL');
   }
-  const log = (status, extra = '') =>
+  const log = (/** @type {number} */ status, extra = '') =>
     console.log(`${status} ${req.method} ${pathname}${extra ? ` (${extra})` : ''}`);
 
   // Convenience: the bare origin redirects into the subpath (dev nicety only —
@@ -108,8 +117,8 @@ const server = http.createServer(async (req, res) => {
     return deny(res, 400, 'path traversal rejected');
   }
 
-  const resolved = await resolveExactCase(segments).catch(() => ({ status: 404, reason: 'not found' }));
-  if (resolved.status) {
+  const resolved = await resolveExactCase(segments).catch(() => /** @type {ResolveMiss} */ ({ status: 404, reason: 'not found' }));
+  if (resolved.status !== undefined) {
     log(resolved.status, resolved.reason);
     return deny(res, resolved.status, resolved.reason);
   }
@@ -122,8 +131,8 @@ const server = http.createServer(async (req, res) => {
       res.end();
       return log(301, 'directory trailing-slash redirect');
     }
-    const idx = await resolveExactCase([...segments, 'index.html']).catch(() => ({ status: 404, reason: 'no index.html' }));
-    if (idx.status) {
+    const idx = await resolveExactCase([...segments, 'index.html']).catch(() => /** @type {ResolveMiss} */ ({ status: 404, reason: 'no index.html' }));
+    if (idx.status !== undefined) {
       log(404, idx.reason);
       return deny(res, 404, idx.reason);
     }
