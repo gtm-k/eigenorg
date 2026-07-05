@@ -84,17 +84,23 @@ per worker (the P5 before/after pane is two sequential runs).
 - Fragment: `#s=` + base64url( deflate-raw( UTF-8 JSON
   `{ v: 1, sim, seed, config, resolvedParams }` ) ), `v` the codec version,
   `resolvedParams` the full effective coefficient set from the run's output.
-- **Replay always runs from the embedded `resolvedParams`:** the decoder sets
-  `config.paramOverrides = resolvedParams` (full-set override, wins over any
-  original overrides). The modelVersion-mismatch banner is informational; the run
-  proceeds on embedded params.
-- **Replay detection (engine):** a `paramOverrides` map covering the full
-  parameter set is treated as a replay — it validates structure/type/finiteness
-  and the joint + μ-ceiling constraints, but **skips current-range membership**
-  (an old link replays its embedded numbers even after a range is later narrowed,
-  §12.5). Any smaller override set is an authored override and enforces the
-  current range. The `μ ≤ 8` ceiling is a structural safety bound and is enforced
-  in **both** modes.
+- **Replay always runs from the embedded `resolvedParams`:** the P5 url-codec, when
+  it reconstructs a config from a share URL, sets `config.paramOverrides =
+  resolvedParams` (full-set override, wins over any original overrides) **and sets
+  the explicit `config.replay = true` flag**. The modelVersion-mismatch banner is
+  informational; the run proceeds on embedded params.
+- **Replay detection (engine):** replay is the **explicit `config.replay` boolean**
+  (default `false`), not an inference from the size of the `paramOverrides` map. When
+  `replay == true` the engine validates structure/type/finiteness and the joint +
+  μ-ceiling constraints but **skips current-range membership** for overrides (an old
+  link replays its embedded numbers even after a range is later narrowed, §12.5). When
+  `replay` is absent or `false` the config gets **full authoring validation**, range
+  membership included — even a `paramOverrides` map that happens to cover every
+  parameter. The `μ ≤ 8` ceiling is a structural safety bound and is enforced in
+  **both** modes. Because detection is an explicit flag, a future amendment that adds a
+  parameter can never turn an authored full-set map into an accidental replay, and an
+  **older share URL that omits a later-added param replays with the current default for
+  that missing key** (§12.4 evolution caveat) rather than breaking.
 - **"Reproduces identically" = byte-identical on the series payload;**
   version-metadata fields and additive-only new series
   (`reviewQueueDepth`, `reviewWaitDays`, the additive `perLayer` fields

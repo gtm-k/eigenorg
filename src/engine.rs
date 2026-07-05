@@ -9,7 +9,6 @@
 use crate::config::{Config, Sim};
 use crate::montecarlo::OrgRun;
 use crate::output::Output;
-use crate::params;
 
 /// Typed engine error, surfaced to JS as `{ "error": { "type", "message" } }`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -61,14 +60,13 @@ pub fn parse_and_validate(
     Ok(config)
 }
 
-/// A `paramOverrides` map that covers the full parameter set is a share-URL
-/// replay (`resolvedParams`), which skips current-range membership (§12.1/§12.4);
-/// any smaller set is an authored override that enforces the current range.
-fn is_replay(config: &Config) -> bool {
-    config.param_overrides.len() == params::param_count()
-}
-
 /// Native monolithic run: validate, dispatch, run every iteration, aggregate.
+///
+/// Replay looseness is driven by the explicit `config.replay` flag (§12.4), not by
+/// the size of the `paramOverrides` map: `replay == true` skips current-range
+/// membership for overrides only; every other check (unknown key, NaN/Inf, value
+/// shape, joint constraints, and the μ ≤ 8 structural ceiling in `validate()`)
+/// runs in both modes.
 pub fn run_config(config: Config) -> Result<Output, EngineError> {
     config.validate().map_err(EngineError::Validation)?;
     match config.sim {
@@ -76,7 +74,7 @@ pub fn run_config(config: Config) -> Result<Output, EngineError> {
             "team simulator lands in P7a (the wasm export signature is frozen here)".to_string(),
         )),
         Sim::Org => {
-            let replay = is_replay(&config);
+            let replay = config.replay;
             let mut run = OrgRun::new(config, replay).map_err(EngineError::Validation)?;
             run.run_chunk(run.total_iterations());
             Ok(run.finalize())
@@ -113,7 +111,7 @@ impl Run {
                     .to_string(),
             )),
             Sim::Org => {
-                let replay = is_replay(&config);
+                let replay = config.replay;
                 let run = OrgRun::new(config, replay).map_err(EngineError::Validation)?;
                 Ok(Run::Org(run))
             }

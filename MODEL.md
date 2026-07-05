@@ -2825,15 +2825,25 @@ this section wins.
   `humanPm | humanDirector | aiAgent | committee` (§9.9); and, when `org.layerOwnerCount`
   is present, its length must equal `org.ownershipLayers` (§4 M19). (These length
   joint-constraints hold at both authoring and replay, per the replay bullet.)
-- **Replay validation is looser than authoring validation (share-URL contract).** A
-  share-URL replay supplies `paramOverrides = resolvedParams`, the FULL effective
-  coefficient set captured at run time (§12.4). Range membership is an **authoring-time**
-  check only: replay validates structure and type (every key exists in
-  `model/params.json`; each value is a number or a `[min,mode,max]` triple with
-  `min ≤ mode ≤ max`; NaN/Inf rejected; joint constraints above still hold) but **does NOT re-check current-range
-  membership**, because a post-lock maintainer-reviewed amendment can narrow a range so that a value
-  that was in-range when the link was created now sits outside it — and the promise is
-  that an old link replays its embedded numbers exactly. See §12.5.
+- **Replay validation is looser than authoring validation (share-URL contract).** Replay
+  is signaled by the explicit **`config.replay` boolean** (default `false`) — the P5
+  url-codec sets it `true` when it reconstructs a config from a share URL — **not**
+  inferred from the size of the `paramOverrides` map. A share-URL replay supplies
+  `paramOverrides = resolvedParams`, the FULL effective coefficient set captured at run
+  time (§12.4), together with `replay: true`. Range membership is an **authoring-time**
+  check only: with `replay: true` the engine validates structure and type (every key
+  exists in `model/params.json`; each value is a number or a `[min,mode,max]` triple with
+  `min ≤ mode ≤ max`; NaN/Inf rejected; joint constraints above still hold) but **does NOT
+  re-check current-range membership**, because a post-lock maintainer-reviewed amendment
+  can narrow a range so that a value that was in-range when the link was created now sits
+  outside it — and the promise is that an old link replays its embedded numbers exactly.
+  With `replay` absent or `false` the config gets full authoring validation, range
+  membership included, **even when the override map happens to cover every parameter**
+  (an authored full-set map is no longer mistaken for a replay). The `replay` flag is
+  **client-set**; because it only loosens the overrides range check while every
+  structural, finiteness, joint, and μ-ceiling guard still runs, a tampered `replay: true`
+  affects only the tamperer's own session — it cannot corrupt another user's run or the
+  shipped model. See §12.5.
 - **New structural fields (§4 M19/M20), authoring-time validation.** `validate()`
   additionally rejects: a non-integer or out-of-`[1, 8]` entry in `org.layerOwnerCount`
   (each μ is an integer ≥ 1); a `layerOwnerCount[L−1] ≠ 1` (the terminal seat, 0-indexed to match M19/§A.1) **only on the matrix target layer L**
@@ -2891,7 +2901,8 @@ this section wins.
 | `seed` | u64 | Monte Carlo master seed |
 | `iterations` | int 50–5000, default 500 | |
 | `horizon` | int 10–600, default 60 | steps |
-| `paramOverrides` | map `paramId → number \| [min,mode,max]`, optional | **applied by the engine in v1** (UI sliders are v2); keys must exist in params.json. Authored configs enforce the current declared range; full-set `resolvedParams` replays (share URLs) validate structure/type + joint constraints only, bypassing range membership (§12.1/§12.5) |
+| `replay` | bool, optional, default `false` | share-URL replay marker (§12.4): the P5 url-codec sets it `true` to loosen `paramOverrides` range membership only. Client-set; a tampered value affects only that session (§12.1) |
+| `paramOverrides` | map `paramId → number \| [min,mode,max]`, optional | **applied by the engine in v1** (UI sliders are v2); keys must exist in params.json. With `replay` absent/false (authoring) every override enforces the current declared range; with `replay: true` (share URLs) the embedded `resolvedParams` validate structure/type + joint + μ-ceiling constraints only, bypassing range membership (§12.1/§12.5) |
 | `cost` | `{ "enabled": false }`, optional | **reserved v2 block**; `enabled: true` → typed NotImplemented error |
 | `org.headcountStart` | int 4–500 | |
 | `org.headcountGrowthPerStep` | number 0–2 | people/step |
@@ -2946,9 +2957,11 @@ this section wins.
   effective coefficient set from the run's output.
 - **Replay ALWAYS runs from the embedded `resolvedParams`:** the decoder constructs
   `config.paramOverrides = resolvedParams` (full-set override, winning over any original
-  overrides). The modelVersion-mismatch banner ("created with model vX.Y — this link
-  replays its embedded parameters") is informational only; the run proceeds on embedded
-  params.
+  overrides) **and sets `config.replay = true`** (the explicit replay flag, §12.1). The
+  modelVersion-mismatch banner ("created with model vX.Y — this link replays its embedded
+  parameters") is informational only; the run proceeds on embedded params. An older link
+  that omits a parameter added by a later amendment replays with the current default for
+  that missing key (the evolution caveat below).
 - **"Reproduces identically" means byte-identical on the series payload** —
   version-metadata fields are excluded from the comparison (a post-capture amendment
   bumps modelVersion without changing replayed numbers).

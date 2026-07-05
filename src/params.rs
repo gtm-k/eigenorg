@@ -63,12 +63,6 @@ pub fn model_version() -> &'static str {
     &file().model_version
 }
 
-/// The number of parameters — a full-set `paramOverrides` map (this many keys)
-/// is a share-URL replay (§12.4).
-pub fn param_count() -> usize {
-    file().parameters.len()
-}
-
 /// The five entropy-weight ids whose joint sum must stay 1 (§12.1).
 const ENTROPY_WEIGHT_IDS: [&str; 5] = [
     "entropyWeightCoordination",

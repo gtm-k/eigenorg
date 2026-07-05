@@ -13,6 +13,7 @@
     "seed": { "type": "integer", "minimum": 0 },
     "iterations": { "type": "integer", "minimum": 50, "maximum": 5000 },
     "horizon": { "type": "integer", "minimum": 10, "maximum": 600 },
+    "replay": { "type": "boolean" },
     "paramOverrides": {
       "type": "object",
       "additionalProperties": {

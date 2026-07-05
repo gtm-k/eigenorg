@@ -63,6 +63,17 @@ pub struct Config {
     pub iterations: u32,
     #[serde(default = "default_horizon")]
     pub horizon: u32,
+    /// Share-URL replay marker (§12.4). The P5 url-codec sets `replay: true` when
+    /// it reconstructs a config from a share link's embedded `resolvedParams`;
+    /// authored configs leave it `false` (the default). It is client-set and only
+    /// loosens `paramOverrides` range membership for the tamperer's own session —
+    /// it never bypasses unknown-key, finiteness, shape, joint, or the μ ≤ 8
+    /// structural checks (§12.1). Replaces the removed replay-by-cardinality
+    /// heuristic: an old link missing a later-added param replays with the current
+    /// default for that key, and a future param never turns an authored full-set
+    /// map into an accidental replay.
+    #[serde(default)]
+    pub replay: bool,
     #[serde(default)]
     pub param_overrides: BTreeMap<String, ParamValue>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
