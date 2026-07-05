@@ -94,10 +94,10 @@ jobs:
           set -o pipefail
           bash scripts/check_no_external_requests.sh www
 
-      - name: Cross-target output hash — wasm half (loads the built wasm; asserts == the committed native hash)
+      - name: Cross-target output hash + worker protocol — wasm half (loads the built wasm; hash == committed native hash; worker.js handler driven for real)
         run: |
           set -o pipefail
-          node --test www/js/tests/cross-target-hash.test.mjs
+          node --test www/js/tests/cross-target-hash.test.mjs www/js/tests/worker.test.mjs
 
   js:
     name: JS gates

@@ -178,8 +178,12 @@ test('engine error envelopes surface as typed EngineErrors (scripted transport)'
   });
 });
 
-test('transport swap requires zero caller changes', async () => {
-  // The SAME caller function runs against two different transport instances.
+test('transport swap requires zero caller changes (stub-vs-stub; real-worker conformance runs in worker.test.mjs)', async () => {
+  // The SAME caller function runs against two different STUB transport
+  // instances — this proves the caller is transport-agnostic without a wasm
+  // build. The REAL worker adapter (createWorkerTransport over www/js/
+  // worker.js driving the built wasm) is exercised with identical caller code
+  // in worker.test.mjs, which is the real-transport conformance claim.
   /** @param {import('../engine-client.js').Transport} transport */
   async function caller(transport) {
     const client = createEngineClient(transport);
@@ -197,6 +201,4 @@ test('transport swap requires zero caller changes', async () => {
   assert.equal(viaStubA.modelVersion, viaStubB.modelVersion);
   assert.equal(viaStubA.bytes, viaStubB.bytes);
   assert.ok(viaStubA.progressEvents > 0 && viaStubB.progressEvents > 0);
-  // (The real-worker transport speaks the identical protocol; it is exercised
-  //  end-to-end in the browser slice + cross-target-hash wasm test.)
 });
