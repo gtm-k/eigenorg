@@ -276,7 +276,20 @@ pub fn evaluate(a: &Assertion, runs: &BTreeMap<String, Output>) -> Outcome {
             let (measured, pass) = match a.comparator.as_str() {
                 "riseAtLeast" => (vt - vf, (vt - vf) >= bound * (1.0 - tol)),
                 "dropAtLeast" => (vf - vt, (vf - vt) >= bound * (1.0 - tol)),
-                _ => (ratio(vt, vf), ratio(vt, vf) >= bound * (1.0 - tol)),
+                // growthRatioAbove: a non-finite growth ratio is degenerate — 0/0
+                // (NaN) or x/0 (+inf). Both FAIL loudly rather than silently
+                // satisfying the comparator (§11.1, same convention as
+                // ratioAbove/ratioBelow).
+                _ => {
+                    let r = ratio(vt, vf);
+                    if !r.is_finite() {
+                        return fail(
+                            &a.id,
+                            "ratio non-finite (0/0 NaN or x/0 +inf) or unresolved",
+                        );
+                    }
+                    (r, r >= bound * (1.0 - tol))
+                }
             };
             outcome(
                 &a.id,
@@ -309,6 +322,15 @@ pub fn evaluate(a: &Assertion, runs: &BTreeMap<String, Output>) -> Outcome {
                 return fail(&a.id, "window unresolved");
             };
             let r = ratio(ma, mb);
+            // A non-finite window ratio is degenerate — 0/0 (NaN) or x/0 (+inf).
+            // Both FAIL loudly rather than silently satisfying `twoWindowRatioAbove`
+            // (§11.1, same convention as ratioAbove/ratioBelow).
+            if !r.is_finite() {
+                return fail(
+                    &a.id,
+                    "ratio non-finite (0/0 NaN or x/0 +inf) or unresolved",
+                );
+            }
             outcome(
                 &a.id,
                 r >= min_ratio * (1.0 - tol),
@@ -420,5 +442,93 @@ mod tests {
         assert!(ratio(1.0, 0.0).is_infinite());
         assert!(ratio(0.0, 0.0).is_nan());
         assert_eq!(ratio(2.0, 4.0), 0.5);
+    }
+
+    /// A single-series synthetic run holding two steps at the given p50 values
+    /// (p10 == p50 == p90) — enough to exercise the ratio-family comparators.
+    fn synthetic_run(series_id: &str, v0: f64, v1: f64) -> BTreeMap<String, Output> {
+        use crate::config::Sim;
+        use crate::output::Percentile;
+        let pt = |t: u32, v: f64| Percentile {
+            t,
+            p10: v,
+            p50: v,
+            p90: v,
+        };
+        let mut series = BTreeMap::new();
+        series.insert(series_id.to_string(), vec![pt(0, v0), pt(1, v1)]);
+        let out = Output {
+            schema_version: "1".to_string(),
+            model_version: "2.0.0".to_string(),
+            sim: Sim::Org,
+            seed: 42,
+            iterations: 500,
+            horizon: 2,
+            series,
+            per_layer: None,
+            band_markers: None,
+            quality_histogram: None,
+            function_coverage: None,
+            resolved_params: BTreeMap::new(),
+        };
+        let mut runs = BTreeMap::new();
+        runs.insert("r".to_string(), out);
+        runs
+    }
+
+    #[test]
+    fn growth_ratio_above_fails_on_zero_denominator() {
+        // step[0] value 0, step[1] value 5 => ratio(5, 0) = +inf. Pre-fix this
+        // silently satisfied growthRatioAbove (+inf >= bound); the fix requires a
+        // finite ratio, so the assertion FAILS with the non-finite detail (§11.1).
+        // (Confirmed against the pre-fix arm: `_ => (ratio(vt, vf), ratio(vt, vf) >=
+        // bound * (1.0 - tol))` returns pass = true for +inf, so this assertion is
+        // in the direction that fails on the old code.)
+        let runs = synthetic_run("m", 0.0, 5.0);
+        let assertion = Assertion {
+            id: "gtNonFinite".to_string(),
+            scenario: "synthetic".to_string(),
+            metric: "m@r".to_string(),
+            comparator: "growthRatioAbove".to_string(),
+            predicate: String::new(),
+            bound: serde_json::json!(1.0),
+            tolerance: 0.0,
+            step: serde_json::json!([0, 1]),
+            instrument: "monteCarlo".to_string(),
+        };
+        let out = evaluate(&assertion, &runs);
+        assert!(
+            !out.pass,
+            "a +inf growth ratio (positive/0) must not satisfy growthRatioAbove"
+        );
+        assert!(
+            out.detail.contains("non-finite"),
+            "failure detail must name the non-finite ratio, got {:?}",
+            out.detail
+        );
+    }
+
+    #[test]
+    fn two_window_ratio_above_fails_on_zero_denominator() {
+        // windowB mean is 0 (both steps 0) => ratio(windowA, 0) = +inf, which the fix
+        // rejects with the non-finite detail rather than silently passing.
+        let runs = synthetic_run("m", 5.0, 0.0);
+        let assertion = Assertion {
+            id: "twNonFinite".to_string(),
+            scenario: "synthetic".to_string(),
+            metric: "m@r".to_string(),
+            comparator: "twoWindowRatioAbove".to_string(),
+            predicate: String::new(),
+            bound: serde_json::json!({ "windowA": [0, 0], "windowB": [1, 1], "minRatio": 1.0 }),
+            tolerance: 0.0,
+            step: serde_json::Value::Null,
+            instrument: "monteCarlo".to_string(),
+        };
+        let out = evaluate(&assertion, &runs);
+        assert!(
+            !out.pass,
+            "a +inf window ratio (positive/0) must not satisfy twoWindowRatioAbove"
+        );
+        assert!(out.detail.contains("non-finite"));
     }
 }

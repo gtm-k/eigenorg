@@ -88,10 +88,13 @@ fn replay_accepts_a_partial_map_with_defaults_for_missing_keys() {
         out.resolved_params["layerFrictionFactor"],
         ParamValue::Point(0.9)
     );
-    // A key absent from the override map is present at its default value.
+    // A key absent from the override map is present at its default value. Read the
+    // expected default from Params::defaults() rather than hard-coding it, so the
+    // assertion stays "missing key == current default" (not "== 0.036") if the default
+    // is ever retuned.
     assert_eq!(
         out.resolved_params["channelCostFraction"],
-        ParamValue::Point(0.036),
+        ParamValue::Point(Params::defaults().p("channelCostFraction")),
         "missing keys replay at the current default"
     );
 }

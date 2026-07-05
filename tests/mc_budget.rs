@@ -2,7 +2,7 @@
 
 mod common;
 
-use common::read_fixture;
+use common::{fixture_path, read_fixture};
 use eigenorg::engine::run_json;
 use std::time::Instant;
 
@@ -13,17 +13,39 @@ fn heaviest_output_stays_under_200kb() {
     // / dunbarCliff at 120). It is a product constraint on shipped content, not a
     // schema bound: a schema-max horizon-600 config carries ~5x the per-step points
     // (~0.6-1 MB) and is deliberately out of this budget's scope. Payload is
-    // independent of iteration count (percentiles collapse iterations), so the
-    // horizon-120 fixture bounds the share-URL/output budget for shipped content (T5).
-    let out = run_json(&read_fixture(
-        "fixtures/scenarios/coordinationCollapse__main.json",
-    ))
-    .unwrap();
-    let bytes = serde_json::to_string(&out).unwrap().len();
-    assert!(
-        bytes < 200 * 1024,
-        "output {bytes} bytes exceeds the 200 KB budget"
-    );
+    // independent of iteration count (percentiles collapse iterations).
+    //
+    // Assert the budget over EVERY committed org scenario fixture, not one hand-picked
+    // config, so a newly-added heavy scenario cannot slip past unmeasured (T5). Team
+    // fixtures are skipped — the team engine returns notImplemented until P7a.
+    let dir = fixture_path("fixtures/scenarios");
+    let mut checked = 0usize;
+    for entry in std::fs::read_dir(&dir).expect("read fixtures/scenarios") {
+        let path = entry.unwrap().path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        let json = std::fs::read_to_string(&path).unwrap();
+        let sim = serde_json::from_str::<serde_json::Value>(&json)
+            .unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
+            .get("sim")
+            .and_then(|s| s.as_str())
+            .unwrap_or_default()
+            .to_string();
+        if sim != "org" {
+            continue;
+        }
+        let out =
+            run_json(&json).unwrap_or_else(|e| panic!("run {}: {}", path.display(), e.to_json()));
+        let bytes = serde_json::to_string(&out).unwrap().len();
+        assert!(
+            bytes < 200 * 1024,
+            "{} output {bytes} bytes exceeds the 200 KB budget",
+            path.display()
+        );
+        checked += 1;
+    }
+    assert!(checked > 0, "no org scenario fixtures were checked");
 }
 
 #[test]
