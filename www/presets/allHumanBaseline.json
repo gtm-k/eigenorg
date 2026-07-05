@@ -20,7 +20,7 @@
             "judgmentQuality": 7,
             "handoffFriction": 5,
             "reliability": 8,
-            "rampTimeWeeks": 0,
+            "rampTimeWeeks": 4,
             "availability": 1,
             "functions": [
               "prioritization",
@@ -41,7 +41,7 @@
             "judgmentQuality": 6,
             "handoffFriction": 4,
             "reliability": 8,
-            "rampTimeWeeks": 0,
+            "rampTimeWeeks": 4,
             "availability": 1,
             "functions": [
               "execution"
@@ -58,7 +58,7 @@
             "judgmentQuality": 6,
             "handoffFriction": 4,
             "reliability": 8,
-            "rampTimeWeeks": 0,
+            "rampTimeWeeks": 4,
             "availability": 1,
             "functions": [
               "execution"
@@ -75,7 +75,7 @@
             "judgmentQuality": 6,
             "handoffFriction": 4,
             "reliability": 8,
-            "rampTimeWeeks": 0,
+            "rampTimeWeeks": 4,
             "availability": 1,
             "functions": [
               "execution"
@@ -92,7 +92,7 @@
             "judgmentQuality": 6,
             "handoffFriction": 4,
             "reliability": 8,
-            "rampTimeWeeks": 0,
+            "rampTimeWeeks": 4,
             "availability": 1,
             "functions": [
               "execution"
@@ -109,7 +109,7 @@
             "judgmentQuality": 8,
             "handoffFriction": 4,
             "reliability": 9,
-            "rampTimeWeeks": 0,
+            "rampTimeWeeks": 2,
             "availability": 1,
             "functions": [
               "review"
@@ -126,7 +126,7 @@
             "judgmentQuality": 8,
             "handoffFriction": 3,
             "reliability": 8,
-            "rampTimeWeeks": 0,
+            "rampTimeWeeks": 2,
             "availability": 0.25,
             "functions": [
               "ambiguityResolution",
