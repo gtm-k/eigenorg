@@ -2,13 +2,14 @@
 //!
 //! Executes the normative step order exactly (structure → recovery → arrivals →
 //! unblock → pipeline → overrides → execution → cohesion → metrics); the §5 draw
-//! order is part of the reproducibility contract (§8.1). Scope note (PLAN P3b):
-//! this implements the mechanics that §10.1 + §10.7–10.9 reference — structure
-//! (M1–M5), the decision pipeline (M6), overrides + accountability diffusion
-//! (M8/M19), cohesion (M12), and the entropy composite (M13). The AI-injection
-//! execution boost / coordination relief (M11 a–c) and per-layer AI novel
-//! exposure stay P4; they are exact no-ops for every P3b scenario (no config
-//! enables AI), so leaving them out changes no required series.
+//! order is part of the reproducibility contract (§8.1). Covers the full org
+//! mechanic set: structure (M1–M5), the decision pipeline (M6), overrides +
+//! accountability diffusion (M8/M19), Structural-Health amplification + AI
+//! coordination relief (M9), brittleness recovery (M10), the AI-injection
+//! effects (M11 a–c + per-layer novel exposure), cohesion incl. the org AI
+//! share (M12), and the entropy composite (M13). Every AI term is an exact
+//! no-op while `aiInjection` is inactive, so no-AI configs are byte-identical
+//! to the P3 kernel (cross-target hash + §11.12 neutral identity).
 
 use crate::config::{Modality, OrgConfig, Topology};
 use crate::mechanics::{layer_type_name, mean_over_upper, LayerResolved};
@@ -177,6 +178,22 @@ pub fn run_iteration(
     let alpha = params.p("metricSmoothingAlpha");
     let cohesion_base = params.p("cohesionBase");
 
+    // AI-injection factors (M9/M11/M12, P4) — all exact no-ops while the
+    // injection is inactive: the boost and routing multiply only when
+    // `ai_active`, relief falls back to 0.0, and the cohesion AI term
+    // subtracts 0.0, so every no-AI config stays byte-identical (the
+    // cross-target hash + §11.12 neutral-identity contracts).
+    let inject_enabled = org.ai_injection.enabled;
+    let inject_at = org.ai_injection.at_step;
+    let uniform_boost = ai_uniform_boost(params);
+    let ai_routing = ai_routing_factor(sh, params);
+    let ai_share = params.p("aiRoutineShareOrg") * params.p("taskMixRoutineOrg");
+    // §9.9 per-layer AI novel exposure (config-static; M11).
+    let layer_exposure = layers
+        .iter()
+        .map(|s| s.novel_exposure)
+        .fold(0.0_f64, f64::max);
+
     // Per-layer stats accumulators.
     let mut layer_stats: Vec<LayerIterStats> = layers
         .iter()
@@ -217,6 +234,9 @@ pub fn run_iteration(
     let mut series: Vec<[f64; 16]> = Vec::with_capacity(horizon as usize);
 
     for t in 0..horizon {
+        // Org-level AI injection is active from `atStep` onward (M9/M11).
+        let ai_active = inject_enabled && t >= inject_at;
+
         // --- 1. Structure ---
         let n = (f64::from(org.headcount_start) + org.headcount_growth_per_step * f64::from(t))
             .round()
@@ -242,8 +262,13 @@ pub fn run_iteration(
             * (f64::from(teams) * f64::from(teams - 1) / 2.0)
             * (1.0 + params.p("conwayMisalignmentPenalty") * m);
         let bands = cognitive_band(nf, params);
-        // AI relief is 0 for every P3b scenario (no injection); kept explicit.
-        let relief_ai = 0.0;
+        // M9 coordination relief — only while the injection is active, and only
+        // above the risk threshold (relief_ramp is 0 at SH <= shRiskThreshold).
+        let relief_ai = if ai_active {
+            ai_relief(sh, params)
+        } else {
+            0.0
+        };
         let mu_modality = if meeting_heavy {
             params.p("meetingHeavyMultiplier")
         } else {
@@ -276,15 +301,18 @@ pub fn run_iteration(
         if t == 0 {
             arrivals += org.initial_backlog.unwrap_or(0);
         }
+        // M11 novel exposure: an org-level active injection exposes novel work
+        // fully (1.0); an aiAgent-typed seat exposes it at layerNovelExposure
+        // even with no injection; max of the two.
+        let novel_exposure = if ai_active {
+            layer_exposure.max(1.0)
+        } else {
+            layer_exposure
+        };
+        let mut brittle_events_step = 0.0_f64;
         for _ in 0..arrivals {
             let class = draw_class(params, rng);
             let effort = draw_effort(class, params, rng);
-            // novelExposure is 0 for every P3b scenario; the brittleness branch
-            // is dead code for them but keeps the FSM's T2/T8 path honest.
-            let novel_exposure = layers
-                .iter()
-                .map(|s| s.novel_exposure)
-                .fold(0.0_f64, f64::max);
             let brittle = class == TaskClass::Novel
                 && novel_exposure > 0.0
                 && rng.bernoulli(
@@ -301,11 +329,17 @@ pub fn run_iteration(
                     dur.0,
                 ));
                 cum_brittle += 1.0;
+                brittle_events_step += 1.0;
             } else {
-                let service = rng.triangular(lat_tri[0], lat_tri[1], lat_tri[2])
+                let mut service = rng.triangular(lat_tri[0], lat_tri[1], lat_tri[2])
                     * m_recovery
                     * layers[0].latency_factor
                     * layers[0].diffusion_latency_factor;
+                // M11(b): AI routing accelerates ROUTINE service draws only, and
+                // only in structurally healthy orgs (factor 1.0 at low SH).
+                if ai_active && class == TaskClass::Routine {
+                    service *= ai_routing;
+                }
                 record_entry(&mut layer_stats, 0, service, t, window_start);
                 tasks.push(Task::arriving(
                     next_id,
@@ -320,6 +354,8 @@ pub fn run_iteration(
         }
 
         // --- 4. Unblock ---
+        // (Blocked tasks are Novel by construction — T2 fires on novel arrivals
+        // only — so the M11(b) routine routing factor never applies here.)
         for task in tasks.iter_mut() {
             if task.state == TaskState::Blocked {
                 task.block_remaining = task.block_remaining.saturating_sub(1);
@@ -355,9 +391,15 @@ pub fn run_iteration(
                     .then(tasks[a].id.cmp(&tasks[b].id))
             });
 
-            let cap = params.p("layerCapacityPerStep")
+            // M11(c): an active injection multiplies EVERY layer's capacity by
+            // the uniform boost at ANY Structural Health (mechanical bandwidth
+            // is structure-blind; its quality is M9's concern).
+            let mut cap = params.p("layerCapacityPerStep")
                 * params.p("layerCapacityDecay").powi(l as i32 - 1)
                 * layers[l as usize - 1].capacity_factor;
+            if ai_active {
+                cap *= uniform_boost;
+            }
             let budget = layer_acc[l as usize - 1] + cap;
             let moved = ready.len().min(budget.floor().max(0.0) as usize);
 
@@ -367,6 +409,13 @@ pub fn run_iteration(
                         * m_recovery
                         * layers[l as usize].latency_factor
                         * layers[l as usize].diffusion_latency_factor;
+                    // M11(b): routine routing factor on the base service draw;
+                    // the escalation surcharge below is a separate additive draw
+                    // for unclear cross-cutting ownership — AI routing does not
+                    // shrink it.
+                    if ai_active && tasks[idx].class == TaskClass::Routine {
+                        service *= ai_routing;
+                    }
                     if l + 1 == l_count && rng.bernoulli(m * params.p("crossCutShare")) {
                         let esc = params.tri("escalationExtraDays");
                         service += rng.triangular(esc[0], esc[1], esc[2]);
@@ -438,7 +487,15 @@ pub fn run_iteration(
                 break;
             }
             let g = max_per_task.min(pool);
-            tasks[idx].allocate(g);
+            // M11(a): the uniform expected-value boost multiplies ROUTINE
+            // allocations' progress credit (no per-task draw); the pool debit is
+            // the human capacity g either way.
+            let credit = if ai_active && tasks[idx].class == TaskClass::Routine {
+                g * uniform_boost
+            } else {
+                g
+            };
+            tasks[idx].allocate(credit);
             pool -= g;
             if tasks[idx].is_complete() {
                 tasks[idx].complete();
@@ -450,12 +507,20 @@ pub fn run_iteration(
 
         // --- 8. Cohesion (report pre-update value) ---
         let cohesion_report = cohesion;
+        // M12 org arm: effectiveAiShare = aiRoutineShareOrg × taskMixRoutineOrg
+        // while the injection is active, else 0 (hollow is always false org-side).
+        let ai_cohesion_penalty = if ai_active {
+            params.p("cohesionAiPenalty") * ai_share
+        } else {
+            0.0
+        };
         let target = cohesion_base
             - params.p("cohesionSizePenalty")
                 * sigma(
                     (s_size - params.p("cognitiveBandClose"))
                         / (params.p("bandWidthFactor") * params.p("cognitiveBandClose")),
-                );
+                )
+            - ai_cohesion_penalty;
         let next_cohesion = (cohesion + params.p("cohesionRecoveryRate") * (target - cohesion)
             - params.p("cohesionEntropyCoupling")
                 * (prev_entropy - params.p("entropyStressThreshold")).max(0.0)
@@ -471,7 +536,9 @@ pub fn run_iteration(
         };
         latency_ema = alpha * raw_latency + (1.0 - alpha) * latency_ema;
         latency_raw_prev = raw_latency;
-        let brittle_rate = 0.0; // no AI in any P3b scenario
+        // §7.1: brittlenessRate = raw events this step (T2 fires only with an
+        // active injection or an aiAgent-typed seat; 0 otherwise).
+        let brittle_rate = brittle_events_step;
         brittle_ema = alpha * brittle_rate + (1.0 - alpha) * brittle_ema;
 
         let x_coord = tau / params.p("maxCoordinationTax");
@@ -569,6 +636,41 @@ fn sh_brittle_factor(sh: f64, params: &Params) -> f64 {
     }
 }
 
+/// M9 relief ramp: `clamp((SH − shRiskThreshold)/(shSafeThreshold −
+/// shRiskThreshold), 0, 1)` — 0 at/below the risk threshold, 1 at/above the
+/// safe threshold. Shared by the coordination relief (M9) and the routine
+/// routing factor (M11 b): AI helps coordination only in structurally
+/// healthy orgs.
+fn relief_ramp(sh: f64, params: &Params) -> f64 {
+    let risk = params.p("shRiskThreshold");
+    let safe = params.p("shSafeThreshold");
+    ((sh - risk) / (safe - risk)).clamp(0.0, 1.0)
+}
+
+/// M9 AI coordination relief `relief_ai = aiCoordinationRelief ×
+/// reliefRamp(SH)` — applied to τ only while the injection is active.
+fn ai_relief(sh: f64, params: &Params) -> f64 {
+    params.p("aiCoordinationRelief") * relief_ramp(sh, params)
+}
+
+/// M11(a)/(c) uniform expected-value boost `1 + aiRoutineShareOrg ×
+/// (aiThroughputBoostOrg − 1)` — the closed-form mean of boosting the routine
+/// share, applied deterministically (no per-task draw) to every routine
+/// execution allocation AND to every decision layer's capacity at ANY
+/// Structural Health (mechanical bandwidth is structure-blind; its QUALITY is
+/// not — that is M9's job).
+fn ai_uniform_boost(params: &Params) -> f64 {
+    1.0 + params.p("aiRoutineShareOrg") * (params.p("aiThroughputBoostOrg") - 1.0)
+}
+
+/// M11(b) routine routing factor `1 − (1 − aiRoutineLatencyFactor) ×
+/// reliefRamp(SH)` multiplying routine-task service draws while the injection
+/// is active — AI routing accelerates routine decisions only in structurally
+/// healthy orgs (identity 1.0 at SH ≤ shRiskThreshold).
+fn ai_routing_factor(sh: f64, params: &Params) -> f64 {
+    1.0 - (1.0 - params.p("aiRoutineLatencyFactor")) * relief_ramp(sh, params)
+}
+
 /// A brittleness recovery window `(duration steps, latency multiplier)` (M10).
 fn draw_recovery(org: &OrgConfig, params: &Params, rng: &mut SimRng) -> (u32, f64) {
     let unowned = f64::from(org.structural_health) < params.p("recoveryOwnershipThreshold");
@@ -646,5 +748,217 @@ pub fn make_per_layer(
         owner_multiplicity: stat.mu,
         diffusion_factor: stat.diffusion_factor,
         bottleneck,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::run_json;
+    use crate::output::{Output, Quantile};
+
+    // ---- Hand-computed values (defaults from MODEL.md §9.5/§9.6; every
+    // expected number below is derived by hand in the comment beside it). ----
+
+    #[test]
+    fn m9_sh_brittle_factor_hand_values() {
+        let p = Params::defaults();
+        // SH <= shRiskThreshold (4): aiAmplificationLowSH = 1.55.
+        assert_eq!(sh_brittle_factor(3.0, &p), 1.55);
+        assert_eq!(sh_brittle_factor(4.0, &p), 1.55);
+        // SH >= shSafeThreshold (7): aiGuardrailedHighSH = 0.2.
+        assert_eq!(sh_brittle_factor(7.0, &p), 0.2);
+        assert_eq!(sh_brittle_factor(9.0, &p), 0.2);
+        // Interpolation at SH 5: 1.55 + (0.2 - 1.55)*(5-4)/(7-4) = 1.55 - 0.45 = 1.1.
+        assert!((sh_brittle_factor(5.0, &p) - 1.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn m9_relief_ramp_and_relief_hand_values() {
+        let p = Params::defaults();
+        // Ramp: 0 at SH 3 (below risk 4), 1 at SH 7 (safe), 0.5 at SH 5.5.
+        assert_eq!(relief_ramp(3.0, &p), 0.0);
+        assert_eq!(relief_ramp(7.0, &p), 1.0);
+        assert!((relief_ramp(5.5, &p) - 0.5).abs() < 1e-12);
+        // relief = aiCoordinationRelief (0.35) * ramp.
+        assert_eq!(ai_relief(3.0, &p), 0.0);
+        assert!((ai_relief(7.0, &p) - 0.35).abs() < 1e-12);
+        assert!((ai_relief(5.5, &p) - 0.175).abs() < 1e-12);
+    }
+
+    #[test]
+    fn m11_uniform_boost_hand_value() {
+        let p = Params::defaults();
+        // 1 + aiRoutineShareOrg (0.6) * (aiThroughputBoostOrg (1.25) - 1) = 1.15.
+        assert!((ai_uniform_boost(&p) - 1.15).abs() < 1e-12);
+    }
+
+    #[test]
+    fn m11_routing_factor_hand_values() {
+        let p = Params::defaults();
+        // SH 3: ramp 0 => factor 1 (no routine acceleration on broken structure).
+        assert_eq!(ai_routing_factor(3.0, &p), 1.0);
+        // SH 7: 1 - (1 - aiRoutineLatencyFactor 0.25) * 1 = 0.25.
+        assert!((ai_routing_factor(7.0, &p) - 0.25).abs() < 1e-12);
+        // SH 5: ramp = 1/3 => 1 - 0.75/3 = 0.75.
+        assert!((ai_routing_factor(5.0, &p) - 0.75).abs() < 1e-12);
+    }
+
+    #[test]
+    fn m9_m11_brittleness_probability_hand_value() {
+        let p = Params::defaults();
+        // Novel arrival under active injection at SH 3, exposure 1:
+        // aiNovelFailureBase (0.22) * shBrittleFactor(3) (1.55) * 1 = 0.341.
+        let prob = p.p("aiNovelFailureBase") * sh_brittle_factor(3.0, &p) * 1.0;
+        assert!((prob - 0.341).abs() < 1e-12);
+    }
+
+    #[test]
+    fn m12_org_effective_ai_share_hand_value() {
+        let p = Params::defaults();
+        // effectiveAiShare = aiRoutineShareOrg (0.6) * taskMixRoutineOrg (0.6) = 0.36;
+        // cohesion target penalty = cohesionAiPenalty (15) * 0.36 = 5.4 points.
+        let share = p.p("aiRoutineShareOrg") * p.p("taskMixRoutineOrg");
+        assert!((share - 0.36).abs() < 1e-12);
+        assert!((p.p("cohesionAiPenalty") * share - 5.4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn m3_cognitive_bands_are_gradual_no_cliff() {
+        let p = Params::defaults();
+        // Derivative test (M3 "gradual, not cliffs"): B(n) is monotone
+        // nondecreasing, and no single added person moves it by more than the
+        // analytic bound sum_b bandPenalty_b * 0.25 / (bandWidthFactor * center_b)
+        // (mean-value theorem on the logistic; sigma' <= 1/4). Hand value:
+        // 0.05*0.25/(0.15*5) + 0.1*0.25/(0.15*15) + 0.12*0.25/(0.15*50)
+        //   + 0.15*0.25/(0.15*150) = 0.016667 + 0.011111 + 0.004 + 0.001667
+        //   = 0.033444... — a tiny fraction of the 0.42 total band range.
+        let bound = 0.0334445;
+        let mut prev = cognitive_band(1.0, &p);
+        for n in 2..=500 {
+            let b = cognitive_band(f64::from(n), &p);
+            assert!(b >= prev, "B(n) must be nondecreasing at n={n}");
+            assert!(
+                b - prev <= bound,
+                "B({n}) - B({}) = {} exceeds the no-cliff bound {bound}",
+                n - 1,
+                b - prev
+            );
+            prev = b;
+        }
+        // Total range check: B(1) ~= 1 and B(500) < 1 + sum of penalties (0.42).
+        assert!(cognitive_band(500.0, &p) < 1.42);
+    }
+
+    // ---- Integration behavior (engine-level; these FAIL until the P4 wiring
+    // lands: the P3 guard rejected aiInjection.enabled and brittlenessRate was
+    // pinned to 0). ----
+
+    fn org_cfg(sh: u32, enabled: bool, at_step: u32) -> String {
+        format!(
+            r#"{{"schemaVersion":"1","modelVersion":"2.0.0","sim":"org","seed":42,
+            "iterations":60,"horizon":40,
+            "org":{{"headcountStart":40,"headcountGrowthPerStep":0,"topology":"pods",
+            "hierarchyDepth":3,"ownershipLayers":1,"initialBacklog":30,
+            "modality":"meetingHeavy","structuralHealth":{sh},
+            "aiInjection":{{"enabled":{enabled},"atStep":{at_step}}}}}}}"#
+        )
+    }
+
+    fn p50_at(out: &Output, series: &str, t: u32) -> f64 {
+        out.series_value(series, Quantile::P50, t).unwrap()
+    }
+
+    #[test]
+    fn ai_injection_with_at_step_beyond_horizon_is_a_byte_identical_noop() {
+        // enabled=true but atStep past the horizon: every per-step factor is the
+        // neutral identity, so the series payload must be byte-identical to
+        // enabled=false (the additive-no-op contract that protects the committed
+        // cross-target hash and every P3 scenario).
+        let off = run_json(&org_cfg(6, false, 0)).unwrap();
+        let on_never = run_json(&org_cfg(6, true, 4_000_000_000)).unwrap();
+        assert_eq!(
+            serde_json::to_string(&off.series).unwrap(),
+            serde_json::to_string(&on_never.series).unwrap(),
+            "inactive injection must not perturb a single bit of the series"
+        );
+    }
+
+    #[test]
+    fn brittleness_rate_series_is_consistent_with_cumulative() {
+        // Per-iteration invariant: final cumulativeBrittleness == sum over steps
+        // of brittlenessRate (the P3 kernel pinned the rate to 0 while the
+        // cumulative rose — this is the regression test for that inconsistency).
+        let p = Params::defaults();
+        let org: crate::config::OrgConfig = serde_json::from_str(
+            r#"{"headcountStart":40,"headcountGrowthPerStep":0,"topology":"pods",
+            "hierarchyDepth":3,"ownershipLayers":1,"initialBacklog":30,
+            "modality":"meetingHeavy","structuralHealth":3,
+            "aiInjection":{"enabled":true,"atStep":10}}"#,
+        )
+        .unwrap();
+        let layers = crate::mechanics::resolve_layers(&org, &p);
+        let mut rng = crate::rng::SimRng::for_iteration(42, 0);
+        let it = run_iteration(&org, &p, &layers, 40, &mut rng);
+        let rate_sum: f64 = it.series.iter().map(|row| row[M_BRITTLE_RATE]).sum();
+        let cum_final = it.series.last().unwrap()[M_CUM_BRITTLE];
+        assert!(
+            cum_final > 0.0,
+            "SH-3 injection must produce brittleness events"
+        );
+        assert_eq!(
+            rate_sum, cum_final,
+            "brittlenessRate must sum to cumulativeBrittleness"
+        );
+    }
+
+    #[test]
+    fn coordination_relief_applies_at_high_sh_only() {
+        // M9: relief_ai > 0 only above the risk threshold. At SH 7 the with-AI
+        // run's settled coordinationTax must sit below the no-AI run's; at SH 3
+        // the ramp is 0 and tau must be bit-identical.
+        let sh7_on = run_json(&org_cfg(7, true, 10)).unwrap();
+        let sh7_off = run_json(&org_cfg(7, false, 0)).unwrap();
+        let last = 39;
+        assert!(
+            p50_at(&sh7_on, "coordinationTax", last) < p50_at(&sh7_off, "coordinationTax", last),
+            "SH-7 injection must relieve coordination tax"
+        );
+        let sh3_on = run_json(&org_cfg(3, true, 10)).unwrap();
+        let sh3_off = run_json(&org_cfg(3, false, 0)).unwrap();
+        assert_eq!(
+            p50_at(&sh3_on, "coordinationTax", last).to_bits(),
+            p50_at(&sh3_off, "coordinationTax", last).to_bits(),
+            "SH-3 relief ramp is 0: tau must be untouched"
+        );
+    }
+
+    #[test]
+    fn cohesion_ai_penalty_lowers_settled_cohesion() {
+        // M12 org arm: effectiveAiShare = 0.36 pulls the cohesion target down
+        // 5.4 points while the injection is active.
+        let on = run_json(&org_cfg(7, true, 10)).unwrap();
+        let off = run_json(&org_cfg(7, false, 0)).unwrap();
+        assert!(
+            p50_at(&on, "cohesionTeamAvg", 39) < p50_at(&off, "cohesionTeamAvg", 39),
+            "active injection must erode cohesion via the AI-share penalty"
+        );
+    }
+
+    #[test]
+    fn injection_boosts_throughput_into_the_backlog() {
+        // M11(a)+(c): with a standing backlog, the uniform boost on routine
+        // execution and layer bandwidth must lift near-term throughput after
+        // injection relative to the no-AI twin (the "faster" in Faster
+        // Dysfunction) — at low SH, where neither relief nor routing helps.
+        let on = run_json(&org_cfg(3, true, 15)).unwrap();
+        let off = run_json(&org_cfg(3, false, 0)).unwrap();
+        let window = |o: &Output, a: u32, b: u32| -> f64 {
+            (a..=b).map(|t| p50_at(o, "throughput", t)).sum::<f64>() / f64::from(b - a + 1)
+        };
+        assert!(
+            window(&on, 16, 22) > window(&off, 16, 22),
+            "post-injection throughput must beat the no-AI twin in the same window"
+        );
     }
 }
