@@ -1,5 +1,31 @@
-/* eigenorg — walking-skeleton styles.
-   Deliberately minimal: the DESIGN.md (Linear) token pass happens at P5. */
+/* eigenorg — P5a vertical-slice styles.
+   Tokens from DESIGN.md (Linear system, repo root): near-black canvas,
+   hairline-bordered charcoal panels, a single lavender-blue accent, Inter as
+   the cross-platform substitute for Linear's custom sans. P5b performs the
+   full visual pass (frontend-design skill) on top of these tokens. */
+
+:root {
+  /* DESIGN.md colors */
+  --color-primary: #5e6ad2;
+  --color-primary-hover: #828fff;
+  --color-primary-focus: #5e69d1;
+  --color-ink: #f7f8f8;
+  --color-ink-muted: #d0d6e0;
+  --color-ink-subtle: #8a8f98;
+  --color-canvas: #010102;
+  --color-surface-1: #0f1011;
+  --color-hairline: #23252a;
+  --color-hairline-strong: #34343a;
+  --color-success: #27a644;
+  --color-error: #e5484d; /* semantic error; DESIGN.md marketing surface has none */
+
+  /* DESIGN.md spacing rhythm (8px system) */
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+}
 
 * {
   box-sizing: border-box;
@@ -7,85 +33,150 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: Inter, "SF Pro Display", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
-  color: #1a1a1f;
-  background: #fafafa;
+  font-size: 16px;
+  letter-spacing: -0.05px;
+  color: var(--color-ink);
+  background: var(--color-canvas);
 }
 
 main {
   max-width: 44rem;
   margin: 0 auto;
-  padding: 2rem 1rem 4rem;
+  padding: var(--space-8) var(--space-4) 4rem;
+}
+
+.page-header {
+  margin-bottom: var(--space-6);
 }
 
 h1 {
   font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.6px;
   margin: 0 0 0.25rem;
 }
 
-.tagline {
-  margin: 0 0 2rem;
-  color: #55555e;
+.framing {
+  margin: 0;
+  color: var(--color-ink-subtle);
+  font-size: 0.875rem;
 }
 
 .panel {
-  background: #ffffff;
-  border: 1px solid #e4e4e9;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-hairline);
   border-radius: 8px;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1.5rem;
+  padding: var(--space-4) var(--space-6);
+  margin-bottom: var(--space-6);
 }
 
 .panel h2 {
   font-size: 1.1rem;
-  margin: 0 0 0.75rem;
+  font-weight: 500;
+  letter-spacing: -0.2px;
+  margin: 0 0 var(--space-3);
+}
+
+.panel-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.meta {
+  color: var(--color-ink-subtle);
+  font-size: 0.75rem;
+}
+
+.preset-line {
+  margin: 0 0 var(--space-4);
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+}
+
+.run-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+button {
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #ffffff;
+  background: var(--color-primary);
+  border: none;
+  border-radius: 8px;
+  padding: 0.625rem 1.25rem;
+  min-height: 44px; /* tappable target (PLAN P5 mobile acceptance) */
+  min-width: 44px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+progress {
+  flex: 1 1 10rem;
+  height: 8px;
+  accent-color: var(--color-primary);
 }
 
 .status {
   margin: 0;
-}
-
-.status .row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0.35rem 0;
-  border-top: 1px solid #f0f0f3;
-}
-
-.status .row:first-child {
-  border-top: none;
-}
-
-.status dt {
-  flex: 1 1 16rem;
-  color: #55555e;
-}
-
-.status dd {
-  flex: 1 1 12rem;
-  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-ink-muted);
   font-variant-numeric: tabular-nums;
-  word-break: break-word;
 }
 
-.status dd.ok {
-  color: #0a7a33;
+.status.ok {
+  color: var(--color-success);
 }
 
-.status dd.error {
-  color: #b3261e;
+.status.error {
+  color: var(--color-error);
 }
 
 .note {
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--space-3);
   font-size: 0.85rem;
-  color: #55555e;
+  color: var(--color-ink-subtle);
 }
 
 .chart-box {
   position: relative;
   width: 100%;
-  height: 260px;
+  height: 280px;
+}
+
+@media (max-width: 480px) {
+  main {
+    padding: var(--space-6) var(--space-3) 3rem;
+  }
+
+  .panel {
+    padding: var(--space-4);
+  }
+
+  .chart-box {
+    height: 240px;
+  }
 }

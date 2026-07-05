@@ -154,3 +154,8 @@ jobs:
         run: |
           set -o pipefail
           bash scripts/check_no_external_requests.sh www
+
+      - name: UI-thread wasm isolation — only www/js/worker.js imports www/pkg (PLAN P5 gate; node tests excluded, they run off-page)
+        run: |
+          set -o pipefail
+          bash scripts/check_pkg_import_isolation.sh

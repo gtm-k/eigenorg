@@ -9,47 +9,36 @@
   <link rel="stylesheet" href="./style.css">
   <!-- Inline favicon: stops the browser's automatic /favicon.ico request,
        which would 404 at the origin root (outside the project subpath). -->
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%234c6ef5'/%3E%3Ctext x='8' y='12' font-size='11' font-family='monospace' fill='white' text-anchor='middle'%3Ee%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%235e6ad2'/%3E%3Ctext x='8' y='12' font-size='11' font-family='monospace' fill='white' text-anchor='middle'%3Ee%3C/text%3E%3C/svg%3E">
 </head>
 <body>
   <main>
-    <h1>eigenorg</h1>
-    <p class="tagline">
-      Walking skeleton — Rust/WebAssembly engine inside a module worker.
-      Nothing leaves your browser.
-    </p>
+    <header class="page-header">
+      <h1>eigenorg</h1>
+      <p class="framing">A thinking aid grounded in research — not a prediction engine. Nothing leaves your browser.</p>
+    </header>
 
-    <section class="panel" aria-labelledby="engine-heading">
-      <h2 id="engine-heading">Engine</h2>
-      <dl class="status">
-        <div class="row">
-          <dt>Status</dt>
-          <dd id="engine-status">starting worker…</dd>
-        </div>
-        <div class="row">
-          <dt>Model version</dt>
-          <dd id="model-version">—</dd>
-        </div>
-        <div class="row">
-          <dt>Echo round-trip</dt>
-          <dd id="echo-result">—</dd>
-        </div>
-        <div class="row">
-          <dt>π probe (500-iteration Monte Carlo)</dt>
-          <dd id="pi-result">—</dd>
-        </div>
-        <div class="row">
-          <dt>Probe timing</dt>
-          <dd id="pi-timing">—</dd>
-        </div>
-      </dl>
+    <section class="panel" aria-labelledby="run-heading">
+      <div class="panel-header">
+        <h2 id="run-heading">Org Entropy Simulator</h2>
+        <span id="model-version" class="meta">model —</span>
+      </div>
+      <p class="preset-line">
+        Preset: <strong id="preset-label">loading…</strong>
+        <span class="meta">(Structural Health 3, AI injected at step 15)</span>
+      </p>
+      <div class="run-row">
+        <button id="run-button" type="button" disabled>Run simulation</button>
+        <progress id="run-progress" max="500" value="0" aria-label="simulation progress"></progress>
+      </div>
+      <p id="run-status" class="status" role="status" aria-live="polite">starting engine…</p>
     </section>
 
-    <section class="panel" aria-labelledby="chart-heading">
-      <h2 id="chart-heading">Placeholder chart</h2>
-      <p class="note">Static placeholder data — proves the vendored Chart.js bundle renders under the subpath.</p>
+    <section class="panel" aria-labelledby="entropy-heading">
+      <h2 id="entropy-heading">Entropy</h2>
+      <p class="note">Composite disorder index (0–100), p50 line inside the p10–p90 Monte Carlo band. Watch the AI injection at step 15 on a low-Structural-Health org.</p>
       <div class="chart-box">
-        <canvas id="placeholder-chart" role="img" aria-label="Placeholder line chart with static demo data"></canvas>
+        <canvas id="entropy-chart" role="img" aria-label="Entropy over time: median line with 10th to 90th percentile band"></canvas>
       </div>
     </section>
   </main>

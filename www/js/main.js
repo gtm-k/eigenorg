@@ -1,8 +1,14 @@
-// eigenorg UI thread — walking skeleton.
-// Talks to the module worker (which owns the wasm) and renders results.
-// This file must never import www/pkg directly (P5 wires a grep gate).
+// eigenorg UI thread — P5a minimal vertical slice.
+// One preset (fasterDysfunction), one chart (entropy), a run button and live
+// progress: proves worker → engine-client → chart end-to-end on the
+// subpath-emulating server. P5b adds the full controls, charts, share UI and
+// landing flow on top of these modules.
+//
+// This file must never import www/pkg (ci.yml grep gate) — only worker.js
+// talks to the wasm.
 
-const ECHO_INPUT = 'eigenorg round-trip ✓';
+import { createEngineClient, createWorkerTransport } from './engine-client.js';
+import { createPercentileChart, updatePercentileChart } from './charts/entropy.js';
 
 /** @param {string} sel @returns {HTMLElement} */
 function el(sel) {
@@ -18,119 +24,75 @@ function setStatus(node, text, tone = '') {
   if (tone) node.classList.add(tone);
 }
 
-// ---- worker client (tiny id-correlated request/response) --------------------
+// ---- engine wiring (real worker transport) -----------------------------------
 
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+const client = createEngineClient(createWorkerTransport(worker));
 
-let nextId = 1;
-/** @type {Map<number, { resolve: (v: any) => void, reject: (e: Error) => void, sentAt: number }>} */
-const pending = new Map();
+// ---- page flow -----------------------------------------------------------------
 
-/**
- * @param {string} type
- * @param {unknown} [payload]
- * @returns {Promise<{ payload: any, roundTripMs: number }>}
- */
-function call(type, payload) {
-  const id = nextId++;
-  return new Promise((resolve, reject) => {
-    pending.set(id, { resolve, reject, sentAt: performance.now() });
-    worker.postMessage({ id, type, payload });
-  });
+const runButton = /** @type {HTMLButtonElement} */ (el('#run-button'));
+const progressBar = /** @type {HTMLProgressElement} */ (el('#run-progress'));
+const statusEl = el('#run-status');
+const chart = createPercentileChart(
+  /** @type {HTMLCanvasElement} */ (el('#entropy-chart')),
+  { label: 'entropy', unit: 'entropy index (0–100)' },
+);
+
+/** @type {any} */
+let presetConfig = null;
+
+async function loadPreset() {
+  // Relative fetch — must work under the /eigenorg/ Pages subpath.
+  const response = await fetch('./presets/fasterDysfunction.json');
+  if (!response.ok) throw new Error(`preset fetch failed: HTTP ${response.status}`);
+  const preset = await response.json();
+  presetConfig = preset.runs.sh3; // broken org (SH 3) + AI injection at step 15
+  el('#preset-label').textContent = preset.label;
+  runButton.disabled = false;
+  setStatus(statusEl, 'ready — 500 Monte Carlo iterations, nothing leaves your browser', '');
 }
 
-/** @type {Promise<void>} */
-const workerReady = new Promise((resolve, reject) => {
-  pending.set(0, {
-    resolve: () => resolve(undefined),
-    reject,
-    sentAt: performance.now(),
-  });
-});
-
-worker.onmessage = (/** @type {MessageEvent} */ event) => {
-  const { id, type, payload } = event.data;
-  const entry = pending.get(id);
-  if (!entry) return;
-  pending.delete(id);
-  if (type === 'error') {
-    entry.reject(new Error(String(payload)));
-  } else {
-    entry.resolve({ payload, roundTripMs: performance.now() - entry.sentAt });
+async function runOnce() {
+  if (client.busy) {
+    client.cancel();
+    return;
   }
-};
-
-worker.onerror = (/** @type {ErrorEvent} */ event) => {
-  const err = new Error(event.message || 'worker error');
-  for (const entry of pending.values()) entry.reject(err);
-  pending.clear();
-  setStatus(el('#engine-status'), `worker error: ${err.message}`, 'error');
-};
-
-// ---- page flow ---------------------------------------------------------------
-
-async function run() {
-  const statusEl = el('#engine-status');
+  runButton.textContent = 'Cancel';
+  progressBar.value = 0;
+  setStatus(statusEl, 'running…', '');
+  const t0 = performance.now();
   try {
-    await workerReady;
-    setStatus(statusEl, 'wasm initialized in module worker', 'ok');
-
-    const version = await call('version');
-    setStatus(el('#model-version'), String(version.payload), 'ok');
-
-    const echo = await call('echo', ECHO_INPUT);
-    const echoOk = echo.payload === ECHO_INPUT;
+    const { output } = await client.run({
+      config: presetConfig,
+      onProgress: ({ completedCount, totalIterations }) => {
+        progressBar.max = totalIterations;
+        progressBar.value = completedCount;
+        setStatus(statusEl, `running… ${completedCount}/${totalIterations} iterations`, '');
+      },
+    });
+    const elapsedMs = performance.now() - t0;
+    updatePercentileChart(chart, output.series.entropy);
+    el('#model-version').textContent = `model v${output.modelVersion}`;
     setStatus(
-      el('#echo-result'),
-      echoOk ? `"${echo.payload}" — identical` : `MISMATCH: got "${echo.payload}"`,
-      echoOk ? 'ok' : 'error',
-    );
-
-    const probe = await call('probe', { iterations: 500, seed: 42 });
-    const { estimate, iterations, computeMs } = probe.payload;
-    setStatus(el('#pi-result'), `π ≈ ${estimate.toFixed(4)} (${iterations} iterations)`, 'ok');
-    setStatus(
-      el('#pi-timing'),
-      `${computeMs.toFixed(2)} ms compute in wasm · ${probe.roundTripMs.toFixed(2)} ms worker round-trip`,
+      statusEl,
+      `${output.iterations} iterations in ${(elapsedMs / 1000).toFixed(2)} s — entropy p50 ends at ${output.series.entropy.at(-1).p50.toFixed(1)}`,
       'ok',
     );
   } catch (err) {
-    setStatus(statusEl, `engine failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    if (/** @type {any} */ (err).cancelled) {
+      setStatus(statusEl, 'run cancelled', '');
+    } else {
+      setStatus(statusEl, `run failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    }
+  } finally {
+    runButton.textContent = 'Run simulation';
+    progressBar.value = 0;
   }
 }
 
-function renderPlaceholderChart() {
-  // Vendored Chart.js UMD bundle (no CDN) attaches a global; jsconfig has no
-  // type declarations for it, hence the localized any-cast.
-  const ChartCtor = /** @type {any} */ (globalThis).Chart;
-  if (!ChartCtor) {
-    setStatus(el('#engine-status'), 'vendored Chart.js failed to load', 'error');
-    return;
-  }
-  const canvas = el('#placeholder-chart');
-  new ChartCtor(canvas, {
-    type: 'line',
-    data: {
-      labels: [0, 5, 10, 15, 20, 25, 30],
-      datasets: [
-        {
-          label: 'placeholder series (static demo data)',
-          data: [12, 19, 14, 22, 18, 27, 24],
-          borderColor: '#4c6ef5',
-          backgroundColor: 'rgba(76, 110, 245, 0.12)',
-          fill: true,
-          tension: 0.3,
-        },
-      ],
-    },
-    options: {
-      animation: false,
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: true } },
-    },
-  });
-}
+runButton.addEventListener('click', () => void runOnce());
 
-renderPlaceholderChart();
-run();
+loadPreset().catch((err) => {
+  setStatus(statusEl, `failed to load preset: ${err instanceof Error ? err.message : String(err)}`, 'error');
+});
