@@ -221,7 +221,11 @@ fn presets_are_plausible_and_drift_free() {
     let org_files = json_files(&preset_dir, "www/presets");
     let team_files = json_files(&team_dir, "www/presets/team");
     assert_eq!(org_files.len(), 5, "expected 5 org presets at www/presets/");
-    assert_eq!(team_files.len(), 5, "expected 5 team presets at www/presets/team/");
+    assert_eq!(
+        team_files.len(),
+        5,
+        "expected 5 team presets at www/presets/team/"
+    );
     let mut files = org_files;
     files.extend(team_files);
 
