@@ -19,6 +19,7 @@ import {
   computeBandCrossings,
   completionPolicy,
   autoRunsOnInteraction,
+  stagesGeneration,
 } from '../ui/runplan.js';
 import { CONTROL_DEFS, readOrgValues, applyOrgValue, stripReplay, clampControlValue } from '../ui/org.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, primaryRunConfig } from '../ui/presets.js';
@@ -351,6 +352,39 @@ test('completionPolicy: a matching generation is fresh (arms share); a bumped on
   const stale = completionPolicy(5, 6);
   assert.equal(stale.stale, true);
   assert.equal(stale.armShare, false);
+});
+
+test('MED-1: a compare toggle mid-run stages a generation bump, so the in-flight plan completes stale (compare panel not painted, share not armed)', () => {
+  // MED-1: toggling "compare to all-human" during an in-flight run flips the
+  // NEXT run's SHAPE (adds/drops the sequential all-human twin), but the
+  // in-flight plan captured the OLD shape. Before the fix onCompareToggle only
+  // set a status string and did NOT bump the generation, so the plan completed
+  // FRESH and painted the compare/legibility panel for the stale shape (the
+  // no-twin note under a checked box) while its success status overwrote the
+  // "comparison changed — run to update" prompt. The fix routes the compare
+  // toggle through the SAME generation guard as a config edit (stagesGeneration
+  // mirrors P5b-F1's stageConfigChange bump).
+  assert.equal(stagesGeneration('compareToggle'), true, 'a compare toggle stages a generation bump (MED-1)');
+  assert.equal(stagesGeneration('edit'), true);
+  assert.equal(stagesGeneration('preset'), true);
+  assert.equal(stagesGeneration('shareBoot'), true);
+  assert.equal(stagesGeneration('run'), false, 'a plain Run/Cancel toggle stages nothing');
+
+  // Model runAll's guard end to end: a plan captures the generation at start; a
+  // mid-run compare toggle bumps it; the completion is then STALE, so runAll
+  // skips paintResults — the sole caller of configurator.renderRun(primary,
+  // twin) — and never arms share.
+  let generation = 7;
+  const planGeneration = generation; // runAll captures at plan start
+  if (stagesGeneration('compareToggle')) generation += 1; // onCompareToggle bumps
+  const decision = completionPolicy(planGeneration, generation);
+  assert.equal(decision.stale, true, 'the in-flight plan is stale after a compare toggle → compare panel not painted for the stale shape');
+  assert.equal(decision.armShare, false, 'a stale compare-toggled completion never arms share');
+
+  // Contrast: with no compare toggle the generation is unchanged, so a normal
+  // completion is fresh and DOES paint + arm (the byte-identical landing path).
+  const fresh = completionPolicy(3, 3);
+  assert.deepEqual(fresh, { stale: false, armShare: true });
 });
 
 test('decision 6: a preset pick auto-runs after a mid-run cancel; a plain edit / Run-toggle never auto-runs', () => {

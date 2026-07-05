@@ -75,6 +75,19 @@
       <div id="org-controls" class="controls-grid"></div>
     </section>
 
+    <!-- ============ prioritization layer configurator (P6, signature) ============ -->
+    <section class="panel" aria-labelledby="configurator-heading">
+      <p class="eyebrow">Prioritization stack</p>
+      <div class="panel-header">
+        <h2 id="configurator-heading">Prioritization Layer Configurator</h2>
+        <button id="run-button-3" type="button" class="ghost" disabled>Run simulation</button>
+      </div>
+      <p class="note">Build the approval stack a decision must clear — 1 to 5 layers, each a Human PM, Human Director, AI Prioritization Agent, or Committee seat. Tap a seat type to assign it; changes apply on the next run. The flow diagram and the all-human comparison below read straight from the run.</p>
+      <!-- The configurator builds its own controls, flow table and comparison
+           into this mount (P5 module convention). -->
+      <div id="configurator" class="configurator"></div>
+    </section>
+
     <!-- ============ charts ============ -->
     <div class="charts-grid">
       <section class="panel" aria-labelledby="entropy-heading">

@@ -198,6 +198,15 @@ export function renderControls(root, opts) {
   };
 
   for (const def of CONTROL_DEFS) {
+    // SUBSUMPTION (P6, PLAN decision log 2026-07-05 #4): the Prioritization
+    // Layer Configurator is the single editing surface for layer structure, so
+    // it owns `ownershipLayers` (+ layerTypes). Skip rendering the duplicate
+    // slider here to prevent two widgets editing one field (failure B5). The
+    // CONTROL_DEFS entry + applyOrgValue('ownershipLayers') stay (still the
+    // canonical range for clamping, still node-tested) — only the DOM widget
+    // moves to ui/prioritization.js.
+    if (def.id === 'ownershipLayers') continue;
+
     const field = document.createElement('div');
     field.className = 'field';
 
