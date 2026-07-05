@@ -1309,3 +1309,22 @@ progress {
 .diagnostic-result:not(:empty) {
   margin: var(--space-3) 0 0;
 }
+
+/* ==================================================================== */
+/* P8 — output / share card                                            */
+/* The canvas backing store is 1200×628 (the exported PNG size); CSS    */
+/* scales the preview down to fit the column.                           */
+/* ==================================================================== */
+
+.card-preview {
+  margin-bottom: var(--space-4);
+}
+
+.card-preview canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+}

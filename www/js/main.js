@@ -27,6 +27,7 @@ import { renderOnboarding, readDiagnosticSeen } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
+import { wireCard } from './share/card.js';
 import { fetchAssumptions, renderAssumptionsDrawer } from './ui/assumptions.js';
 import { modelVersionBanner, extractShareFragment } from './url-codec.js';
 
@@ -371,6 +372,32 @@ function paintResults(r) {
 
   share.arm(plan.primary, output);
 
+  // P8 card: arm with a snapshot of THIS run (never the edit buffer — same
+  // discipline as share.arm). Scenario label follows the current source.
+  const scenarioLabel = r.replayPayload
+    ? 'Shared run'
+    : state.presetId
+      ? (state.presets.get(state.presetId)?.label ?? 'Custom configuration')
+      : 'Custom configuration';
+  card.arm({
+    scenarioLabel,
+    beforeSh: plan.beforeSh,
+    afterSh: plan.afterSh,
+    primarySh: Number(config.org.structuralHealth),
+    beforeEntropy: beforeRun.output.series.entropy,
+    afterEntropy: afterRun.output.series.entropy,
+    decisionLatency: output.series.decisionLatency,
+    throughput: output.series.throughput,
+    coordinationTax: output.series.coordinationTax,
+    entropy: output.series.entropy,
+    aiActive: aiOn,
+    injectStep: aiOn ? Number(config.org.aiInjection.atStep) : null,
+    aiOffThroughput: aiOff ? aiOff.output.series.throughput : null,
+    aiOffEntropy: aiOff ? aiOff.output.series.entropy : null,
+    modelVersion: output.modelVersion,
+    seed: config.seed,
+  });
+
   // P8 onboarding: shown ONCE, after the FIRST preset/authored result — NOT on
   // share-URL replay arrivals (decision default 3; a share visitor is
   // reproducing a specific run). It appears under the results, never blocking
@@ -438,6 +465,7 @@ function stageConfigChange(interaction) {
   state.replayPayload = null; // editing/picking = authoring (CONTRACTS §4)
   state.replayConfig = null;
   share.disarm(); // (e) no share until a matching fresh run completes
+  card.disarm(); // the last card is now stale — no export until a fresh run
   clearShareHash();
 }
 
@@ -511,6 +539,7 @@ const configurator = renderConfigurator(el('#configurator'), {
     // convention). Never auto-run (decision 6).
     stageGeneration('compareToggle');
     share.disarm();
+    card.disarm();
     setStatus(statusEl, 'comparison changed — run to update the all-human comparison', '');
   },
 });
@@ -546,6 +575,17 @@ const share = wireShareButton(shareButton, shareStatusEl, {
     probe.shareFragment = fragment;
   },
 });
+
+// P8 output/share card — armed on every non-stale paint with a snapshot of the
+// run, disarmed by any staged change (same lifecycle as the share button). The
+// renderCard probe hook lets the og-image export render the same card at 1200×630.
+const card = wireCard({
+  canvas: /** @type {HTMLCanvasElement} */ (el('#card-canvas')),
+  downloadButton: /** @type {HTMLButtonElement} */ (el('#card-download')),
+  shareButton: /** @type {HTMLButtonElement} */ (el('#card-share')),
+  statusEl: el('#card-status'),
+});
+probe.renderCard = (/** @type {number} */ w, /** @type {number} */ h) => card.renderDataUrl(w, h);
 
 for (const b of runButtons) b.addEventListener('click', () => void runAll());
 
