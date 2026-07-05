@@ -21,8 +21,9 @@ import {
   autoRunsOnInteraction,
   stagesGeneration,
 } from './ui/runplan.js';
-import { renderControls } from './ui/org.js';
+import { renderControls, applyOrgValue } from './ui/org.js';
 import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
+import { renderOnboarding, readDiagnosticSeen } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
@@ -370,6 +371,15 @@ function paintResults(r) {
 
   share.arm(plan.primary, output);
 
+  // P8 onboarding: shown ONCE, after the FIRST preset/authored result — NOT on
+  // share-URL replay arrivals (decision default 3; a share visitor is
+  // reproducing a specific run). It appears under the results, never blocking
+  // landing (the user has already seen a full result by now — PREMORTEM A2).
+  if (!r.replayPayload && !diagnosticHandled) {
+    diagnosticHandled = true;
+    onboarding.show();
+  }
+
   // Replay banner: informational, computed against the version the engine
   // actually stamped on this output (decision log round 1).
   if (r.replayPayload) {
@@ -502,6 +512,27 @@ const configurator = renderConfigurator(el('#configurator'), {
     stageGeneration('compareToggle');
     share.disarm();
     setStatus(statusEl, 'comparison changed — run to update the all-human comparison', '');
+  },
+});
+
+// P8 onboarding diagnostic — the 5-question Structural-Health check, shown ONCE
+// after the first (non-replay) result, skippable to the plain slider (decision
+// default 2: set the slider + prompt to re-run, NEVER auto-run — matches the
+// P5/P6 "edits stage, never auto-run" convention). readDiagnosticSeen carries
+// the once-only guarantee across sessions (localStorage, try/catch inside).
+let diagnosticHandled = readDiagnosticSeen();
+const onboarding = renderOnboarding(el('#diagnostic'), {
+  onComplete(score) {
+    // Set the plain SH slider through the SAME authoring path a control edit
+    // uses (stageAndRefresh) so share disarms, replay clears and the slider
+    // display updates — then prompt a re-run (no auto-run, decision default 2).
+    stageAndRefresh(applyOrgValue(state.config, 'structuralHealth', score));
+    setStatus(statusEl, `Structural Health set to ${score} from your diagnostic — run to see how this structure behaves.`, '');
+  },
+  onSkip() {
+    // The plain slider remains the standing control; move focus to it.
+    el('#ctl-structuralHealth').focus();
+    setStatus(statusEl, 'Set Structural Health with the slider, then run.', '');
   },
 });
 

@@ -1178,3 +1178,134 @@ progress {
   margin-bottom: var(--space-1);
   overflow-wrap: anywhere;
 }
+
+/* ==================================================================== */
+/* P8 — Structural-Health onboarding diagnostic                        */
+/* Non-modal panel, shown once after the first result. fieldset/legend  */
+/* radio groups (keyboard + screen-reader native); nothing colour-alone.*/
+/* ==================================================================== */
+
+.panel.diagnostic {
+  border-left: 3px solid var(--color-primary);
+}
+
+.diagnostic-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  margin: 0 0 var(--space-2);
+}
+
+.diagnostic-title:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.diagnostic-intro {
+  margin: 0 0 var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-ink-subtle);
+  max-width: 46rem;
+}
+
+.diagnostic-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.diagnostic-q {
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  margin: 0;
+  min-width: 0;
+}
+
+.diagnostic-legend {
+  padding: 0;
+  display: block;
+}
+
+.diagnostic-dim {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-primary-hover);
+  margin-bottom: var(--space-1);
+}
+
+.diagnostic-question {
+  display: block;
+  font-size: 0.9375rem;
+  color: var(--color-ink);
+  margin-bottom: var(--space-3);
+}
+
+.diagnostic-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+  .diagnostic-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.diagnostic-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--color-ink-muted);
+}
+
+.diagnostic-option:hover {
+  color: var(--color-ink);
+  border-color: var(--color-primary-focus);
+}
+
+.diagnostic-option input[type='radio'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+  flex: none;
+  cursor: pointer;
+}
+
+.diagnostic-option input[type='radio']:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+/* Checked state = accent border + weight (never colour-alone: the radio dot +
+   the label text carry it too). :has() is well-supported; the radio dot is the
+   primary cue regardless. */
+.diagnostic-option:has(input:checked) {
+  border-color: var(--color-primary);
+  background: rgba(94, 106, 210, 0.12);
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.diagnostic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.diagnostic-result:not(:empty) {
+  margin: var(--space-3) 0 0;
+}

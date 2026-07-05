@@ -64,6 +64,12 @@
       </div>
     </section>
 
+    <!-- ============ onboarding diagnostic (P8; shown once after first result) ============ -->
+    <!-- Non-modal; ui/onboarding.js builds the 5-question form into this section
+         and unhides it after the first non-replay result. Skippable to the plain
+         slider below; never blocks landing (PREMORTEM A2). -->
+    <section id="diagnostic" class="panel diagnostic" hidden></section>
+
     <!-- ============ org controls ============ -->
     <section class="panel" aria-labelledby="controls-heading">
       <p class="eyebrow">Your org</p>
