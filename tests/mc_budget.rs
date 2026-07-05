@@ -8,9 +8,13 @@ use std::time::Instant;
 
 #[test]
 fn heaviest_output_stays_under_200kb() {
-    // The heaviest committed scenario is horizon 120 (coordinationCollapse /
-    // dunbarCliff). Payload is independent of iteration count (percentiles
-    // collapse iterations), so this bounds the share-URL/output budget (T5).
+    // Scope (MODEL.md §12.3): the < 200 KB budget covers the SHIPPED scenarios and
+    // presets (horizon <= 120 — the heaviest committed config is coordinationCollapse
+    // / dunbarCliff at 120). It is a product constraint on shipped content, not a
+    // schema bound: a schema-max horizon-600 config carries ~5x the per-step points
+    // (~0.6-1 MB) and is deliberately out of this budget's scope. Payload is
+    // independent of iteration count (percentiles collapse iterations), so the
+    // horizon-120 fixture bounds the share-URL/output budget for shipped content (T5).
     let out = run_json(&read_fixture(
         "fixtures/scenarios/coordinationCollapse__main.json",
     ))
