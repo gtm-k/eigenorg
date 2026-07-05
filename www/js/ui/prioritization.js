@@ -574,17 +574,35 @@ export function renderConfigurator(container, coordinator) {
   };
 
   // ---- toolbar wiring ----
+  // MED-2: a resize that hits a bound disables the button that was actioned
+  // (Add at the 5th layer; Remove at the 1st). If that button held keyboard
+  // focus, disabling it drops focus to <body> and keyboard nav breaks on the
+  // signature feature. Retarget focus to the new last row's active seat radio:
+  // the natural next step after resizing is choosing/adjusting that seat, it
+  // keeps focus on the stack the user is building, and it avoids parking focus
+  // on the opposite toolbar button (where a reflexive Enter would immediately
+  // undo the resize). Falls back to the opposite, still-enabled toolbar button
+  // if no row is somehow present (defensive; a resize always leaves >= 1 row).
+  const focusLastRowRadio = () => {
+    const row = rows[rows.length - 1];
+    const radio = row && (row.radios.find((r) => r.tabIndex === 0) ?? row.radios[0]);
+    if (radio) radio.focus();
+    else (addBtn.disabled ? removeBtn : addBtn).focus();
+  };
+
   addBtn.addEventListener('click', () => {
     const stack = currentStack();
     if (stack.length >= MAX_LAYERS) return;
-    commit(resizeStack(stack, stack.length + 1));
+    commit(resizeStack(stack, stack.length + 1)); // sync: refresh → syncRows sets addBtn.disabled + appends the row
     announce(`Added layer ${stack.length + 1}`);
+    if (addBtn.disabled) focusLastRowRadio(); // MED-2: don't let the disabled Add drop focus to <body>
   });
   removeBtn.addEventListener('click', () => {
     const stack = currentStack();
     if (stack.length <= MIN_LAYERS) return;
-    commit(resizeStack(stack, stack.length - 1));
+    commit(resizeStack(stack, stack.length - 1)); // sync: refresh → syncRows sets removeBtn.disabled + removes the row
     announce(`Removed layer ${stack.length}`);
+    if (removeBtn.disabled) focusLastRowRadio(); // MED-2: symmetric — remaining last row's radio, not <body>
   });
   compareBox.addEventListener('change', () => {
     compareOn = compareBox.checked;
