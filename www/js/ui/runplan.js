@@ -203,3 +203,32 @@ export function completionPolicy(planGeneration, currentGeneration) {
 export function autoRunsOnInteraction(interaction) {
   return interaction === 'preset';
 }
+
+/**
+ * Which interactions STAGE a change that must bump the monotonic generation
+ * counter (P5b-F1) so an in-flight plan — which captured the prior generation at
+ * plan start — completes STALE (completionPolicy) and never paints over the
+ * current view or arms share. P5b-F1 covered the config-authoring entries: a
+ * control/layer EDIT, a preset PICK, and a share-link BOOT.
+ *
+ * MED-1 adds the COMPARE TOGGLE. Toggling "compare to all-human" changes the
+ * NEXT run's SHAPE (it adds or drops the sequential all-human legibility twin),
+ * not the config; but an in-flight plan captured the OLD compare state (thus the
+ * old wantLayerTwin), so its completion must NOT paint the compare/legibility
+ * panel for that stale shape (which would show the no-twin note while the box is
+ * checked) nor let its success status overwrite the "comparison changed — run to
+ * update" prompt. It is the same class as the config-mutation entries P5b-F1
+ * already guards, so it routes through the same generation bump. A plain
+ * Run/Cancel toggle stages nothing.
+ *
+ * @param {'edit' | 'preset' | 'shareBoot' | 'compareToggle' | 'run'} interaction
+ * @returns {boolean} whether this interaction bumps the generation
+ */
+export function stagesGeneration(interaction) {
+  return (
+    interaction === 'edit' ||
+    interaction === 'preset' ||
+    interaction === 'shareBoot' ||
+    interaction === 'compareToggle'
+  );
+}

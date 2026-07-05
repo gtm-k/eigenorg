@@ -19,6 +19,7 @@ import {
   hasActiveAiInjection,
   completionPolicy,
   autoRunsOnInteraction,
+  stagesGeneration,
 } from './ui/runplan.js';
 import { renderControls } from './ui/org.js';
 import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
@@ -200,7 +201,7 @@ async function runAll() {
 
   const tPlan0 = performance.now();
   try {
-    setStatus(statusEl, `running… 0/${totalWork} iterations (${plan.runCount} runs)`, '');
+    setStatus(statusEl, `running… 0/${totalWork} iterations (${totalRuns} runs)`, '');
 
     const t0 = performance.now();
     const primary = await client.run({ config: plan.primary, onProgress: onProgress(0) });
@@ -404,12 +405,25 @@ function clearShareHash() {
 }
 
 /**
+ * Advance the monotonic generation for a staged interaction (P5b-F1 + MED-1).
+ * Every staged-change entry point routes its bump through the ONE `stagesGeneration`
+ * policy (runplan.js) so what invalidates an in-flight plan lives in a single,
+ * node-tested place. A no-op for interactions that stage nothing (a Run/Cancel
+ * toggle never reaches here).
+ * @param {'edit' | 'preset' | 'shareBoot' | 'compareToggle'} interaction
+ */
+function stageGeneration(interaction) {
+  if (stagesGeneration(interaction)) state.generation += 1;
+}
+
+/**
  * A staged config change (a control edit or a preset pick): bump the generation
  * so any in-flight plan's completion is treated as stale, leave replay mode,
  * disarm the now-stale share button, and drop a stale share fragment.
+ * @param {'edit' | 'preset'} interaction which config-authoring entry staged this
  */
-function stageConfigChange() {
-  state.generation += 1;
+function stageConfigChange(interaction) {
+  stageGeneration(interaction);
   state.replayPayload = null; // editing/picking = authoring (CONTRACTS §4)
   state.replayConfig = null;
   share.disarm(); // (e) no share until a matching fresh run completes
@@ -452,7 +466,7 @@ let picker = { setActive: () => {} }; // real picker mounts in boot(), after lab
  */
 function stageAndRefresh(next) {
   state.config = next;
-  stageConfigChange();
+  stageConfigChange('edit');
   state.pendingRerun = false; // an edit cancels a pending preset auto-run
   picker.setActive('');
   el('#preset-note').textContent = 'Custom configuration — changes apply on the next run.';
@@ -473,8 +487,19 @@ const configurator = renderConfigurator(el('#configurator'), {
   getConfig: () => state.config,
   onConfigChange: stageAndRefresh,
   onCompareToggle() {
-    // Toggling compare changes the NEXT run's shape (add/drop the all-human
-    // twin), not the config — prompt a re-run without a generation bump.
+    // Toggling compare changes the NEXT run's SHAPE (add/drop the sequential
+    // all-human twin). It is a staged RUN-SHAPE change — the same class as a
+    // config edit (P5b-F1) — because an in-flight plan captured the OLD compare
+    // state (thus the old wantLayerTwin). Bump the generation so that plan
+    // completes STALE: completionPolicy then keeps it from painting the compare/
+    // legibility panel for the old shape (the no-twin note under a checked box)
+    // or overwriting this prompt with a success status (MED-1). A compare toggle
+    // authors NO new config, so — unlike stageConfigChange — replay mode and the
+    // '#s=' hash are PRESERVED; only the run shape is staged. But the last run's
+    // charts no longer match the pending shape, so disarm share (staged-change
+    // convention). Never auto-run (decision 6).
+    stageGeneration('compareToggle');
+    share.disarm();
     setStatus(statusEl, 'comparison changed — run to update the all-human comparison', '');
   },
 });
@@ -509,7 +534,7 @@ async function boot() {
       if (!preset) return;
       state.presetId = ref.id;
       state.config = primaryRunConfig(preset, ref);
-      stageConfigChange();
+      stageConfigChange('preset');
       picker.setActive(ref.id);
       el('#preset-note').textContent = presetNote(preset);
       controls.refresh();
@@ -539,7 +564,7 @@ async function boot() {
     // Controls display the embedded config (without its override machinery).
     state.config = JSON.parse(JSON.stringify(replayBoot.payload.config));
     state.presetId = '';
-    state.generation += 1; // share-link boot is a staged config change (P5b-F1);
+    stageGeneration('shareBoot'); // share-link boot is a staged config change (P5b-F1);
     // NB: do NOT clear the '#s=' hash here — the shared link stays replayable.
     el('#preset-note').textContent = 'Shared run — replaying the exact embedded configuration and coefficients.';
     // A shared AI-seat stack shows its comparison by default.
