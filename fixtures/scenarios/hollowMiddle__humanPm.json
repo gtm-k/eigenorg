@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1", "modelVersion": "1.0.0", "sim": "team", "seed": 42,
+  "iterations": 500, "horizon": 60,
+  "team": {
+    "entities": [
+      { "id": "eng1", "kind": "human", "archetype": "engineer", "throughput": 7, "judgmentQuality": 6, "handoffFriction": 4, "reliability": 8, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 7 } },
+      { "id": "eng2", "kind": "human", "archetype": "engineer", "throughput": 7, "judgmentQuality": 6, "handoffFriction": 4, "reliability": 8, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 7 } },
+      { "id": "eng3", "kind": "human", "archetype": "engineer", "throughput": 7, "judgmentQuality": 6, "handoffFriction": 4, "reliability": 8, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 7 } },
+      { "id": "eng4", "kind": "human", "archetype": "engineer", "throughput": 7, "judgmentQuality": 6, "handoffFriction": 4, "reliability": 8, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 7 } },
+      { "id": "rev", "kind": "human", "archetype": "reviewer", "throughput": 4, "judgmentQuality": 8, "handoffFriction": 4, "reliability": 9, "rampTimeWeeks": 0, "availability": 1, "functions": ["review"], "capabilities": { "review": 8 } },
+      { "id": "dir", "kind": "human", "archetype": "director", "throughput": 4, "judgmentQuality": 8, "handoffFriction": 3, "reliability": 8, "rampTimeWeeks": 0, "availability": 0.25, "functions": ["ambiguityResolution", "review"], "capabilities": { "ambiguityResolution": 8, "review": 5 } },
+      { "id": "pm", "kind": "human", "archetype": "pm", "throughput": 5, "judgmentQuality": 7, "handoffFriction": 5, "reliability": 8, "rampTimeWeeks": 0, "availability": 1, "functions": ["prioritization", "coordination", "stakeholderCommunication"], "capabilities": { "prioritization": 7, "coordination": 6, "stakeholderCommunication": 8 } }
+    ],
+    "workStream": { "arrivalPerStep": 1.3, "mix": { "routine": 0.55, "complex": 0.25, "novel": 0.2 }, "highStakesShare": 0.3 },
+    "modality": "asyncFirst",
+    "structuralHealth": 6,
+    "recoveryOwner": "pm"
+  }
+}

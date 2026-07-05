@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "team", "seed": 42,
+  "iterations": 500, "horizon": 60,
+  "team": {
+    "entities": [
+      { "id": "a", "kind": "human", "archetype": "engineer", "throughput": 7, "judgmentQuality": 6, "handoffFriction": 4, "reliability": 8, "functions": ["execution"], "capabilities": { "flying": 7 } },
+      { "id": "b", "kind": "human", "archetype": "reviewer", "throughput": 4, "judgmentQuality": 8, "handoffFriction": 4, "reliability": 9, "functions": ["review"], "capabilities": { "review": 8 } }
+    ],
+    "workStream": { "arrivalPerStep": 1.0, "mix": { "routine": 0.6, "complex": 0.25, "novel": 0.15 }, "highStakesShare": 0.2 },
+    "structuralHealth": 6, "recoveryOwner": null
+  }
+}

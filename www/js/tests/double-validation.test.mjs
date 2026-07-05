@@ -41,6 +41,25 @@ test('every invalid fixture is rejected by the config schema (ajv)', () => {
   }
 });
 
+test('serde-only invalid fixtures are ACCEPTED by ajv (documented draft-07 asymmetry)', () => {
+  // These encode cross-field / params-membership constraints JSON Schema draft-07 cannot
+  // express: a fraction sum, an array length bound to ownershipLayers, the matrix-target
+  // seat rule, a recoveryOwner entity-id back-reference, and a paramOverrides key that
+  // must exist in params.json. The Rust authoring stack rejects them
+  // (tests/double_validation.rs); ajv passes them. If a future schema change makes ajv
+  // reject one, move its fixture into fixtures/invalid/ and drop it here — the asymmetry
+  // is intended and documented (CONTRACTS.md §1), not a drift bug.
+  const files = jsonFiles('fixtures/invalid_serde_only');
+  assert.ok(files.length > 0, 'expected serde-only invalid fixtures');
+  for (const file of files) {
+    const ok = validateConfig(JSON.parse(readFileSync(file, 'utf8')));
+    assert.ok(
+      ok,
+      `serde-only fixture unexpectedly rejected by ajv: ${file} — ${ajv.errorsText(validateConfig.errors)}`,
+    );
+  }
+});
+
 test('the output schema compiles (authored alongside config schema)', () => {
   const outputSchema = JSON.parse(readFileSync('docs/schema/output.v1.schema.json', 'utf8'));
   // A trivial well-formed output validates; a missing required field does not.

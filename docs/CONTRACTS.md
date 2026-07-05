@@ -21,7 +21,20 @@ any signature.
   `validate()` (Rust) AND ajv against the config schema (node). A fixture
   accepted by exactly one is a drift bug (PREMORTEM T3). `fixtures/scenarios/**`
   and `fixtures/hash/**` are valid; `fixtures/invalid/**` must be rejected by
-  both.
+  both. The config schema now requires the `org` block when `sim=org` (and forbids
+  `team`) and vice-versa, and pins `capabilities` keys to the seven functions, so
+  missing/mismatched blocks and an unknown capability key are caught by both.
+- **Serde-only rejections (documented asymmetry).** A few authoring constraints are
+  cross-field or params-membership checks that JSON Schema draft-07 cannot express:
+  the `team.workStream.mix` fraction sum, `layerOwnerCount.length ==
+  ownershipLayers`, the matrix-target seat's `layerOwnerCount == 1` rule, the
+  `recoveryOwner` entity-id back-reference, and `paramOverrides` keys existing in
+  `params.json`. Fixtures exercising these live in `fixtures/invalid_serde_only/`:
+  the Rust authoring stack (`validate()` + `Params::resolve`) rejects them
+  (`tests/double_validation.rs`), and ajv is asserted to ACCEPT them
+  (`www/js/tests/double-validation.test.mjs`) so the asymmetry is a pinned,
+  intentional invariant rather than a silent gap. If a schema change ever lets ajv
+  express one, its fixture moves to `fixtures/invalid/`.
 - All JSON is camelCase; config is `deny_unknown_fields`; output is
   additive-extensible (consumers ignore unknown fields). `schemaVersion` and
   `modelVersion` appear in both.

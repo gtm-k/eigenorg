@@ -32,6 +32,18 @@
     "org": { "$ref": "#/definitions/org" },
     "team": { "$ref": "#/definitions/team" }
   },
+  "allOf": [
+    {
+      "$comment": "sim=org requires the org block and forbids the team block (mirrors Config::validate); closes the ajv<->serde gap for missing/mismatched blocks.",
+      "if": { "properties": { "sim": { "const": "org" } }, "required": ["sim"] },
+      "then": { "required": ["org"], "not": { "required": ["team"] } }
+    },
+    {
+      "$comment": "sim=team requires the team block and forbids the org block.",
+      "if": { "properties": { "sim": { "const": "team" } }, "required": ["sim"] },
+      "then": { "required": ["team"], "not": { "required": ["org"] } }
+    }
+  ],
   "definitions": {
     "org": {
       "type": "object",
@@ -162,6 +174,17 @@
         },
         "capabilities": {
           "type": "object",
+          "propertyNames": {
+            "enum": [
+              "prioritization",
+              "review",
+              "coordination",
+              "execution",
+              "stakeholderCommunication",
+              "synthesis",
+              "ambiguityResolution"
+            ]
+          },
           "additionalProperties": { "type": "number", "minimum": 0, "maximum": 10 }
         }
       }
