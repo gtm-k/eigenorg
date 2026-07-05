@@ -587,3 +587,381 @@ progress {
     transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
   }
 }
+
+/* ==================================================================== */
+/* P6 — Prioritization Layer Configurator (signature feature)          */
+/* Mobile-first; DESIGN.md Linear tokens reused, none restated.        */
+/* Nothing signals by color alone: seat types carry a shape glyph +    */
+/* text label, the busiest seat + recovery state + comparison pills    */
+/* all carry words/patterns.                                           */
+/* ==================================================================== */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.configurator {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---- toolbar ---- */
+.cfg-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.cfg-count {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
+  margin-right: auto; /* pushes controls to the right; count stays fixed-left (E2) */
+}
+
+.cfg-btn {
+  background: transparent;
+  border-color: var(--color-hairline-strong);
+  color: var(--color-ink-muted);
+  font-weight: 500;
+}
+
+.cfg-btn:hover:not(:disabled) {
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+}
+
+.cfg-compare {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  font-size: 0.8125rem;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.cfg-compare input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.cfg-compare input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+/* ---- the stack ---- */
+.cfg-stack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cfg-layer {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline);
+  border-left: 3px solid var(--color-hairline-strong);
+  border-radius: 8px;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.cfg-layer-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.cfg-layer-num {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  color: var(--color-ink);
+}
+
+.cfg-layer-flow {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-primary-hover);
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  padding: 0.0625rem 0.5rem;
+}
+
+/* type radiogroup: 2-up on phones, 4-up from 640px */
+.cfg-types {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+  .cfg-types {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.cfg-type {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: 8px;
+  color: var(--color-ink-subtle);
+  font-weight: 400;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.cfg-type:hover:not(:disabled) {
+  color: var(--color-ink);
+  background: var(--color-surface-2);
+}
+
+.cfg-type.active {
+  border-color: var(--color-primary);
+  background: rgba(94, 106, 210, 0.16);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.cfg-type:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+.cfg-type-glyph {
+  font-size: 0.75rem;
+  color: var(--color-primary-hover);
+}
+
+.cfg-type-label {
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.cfg-layer-desc {
+  margin: var(--space-3) 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-ink-subtle);
+}
+
+/* ---- recovery indicator (read-only) ---- */
+.cfg-recovery {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  border: 1px solid var(--color-hairline-strong);
+  border-left: 3px solid var(--color-ink-tertiary);
+  border-radius: 8px;
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.8125rem;
+  color: var(--color-ink-muted);
+}
+
+.cfg-recovery.owned {
+  border-left-color: var(--color-success);
+}
+
+.cfg-recovery.unowned {
+  border-left-color: var(--color-primary);
+}
+
+.cfg-recovery-icon {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+/* ---- subheads for the flow + legibility blocks ---- */
+.cfg-subhead {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  color: var(--color-ink);
+  margin: 0 0 var(--space-2);
+}
+
+.cfg-pending {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-ink-subtle);
+}
+
+/* ---- flow diagram (semantic table) ---- */
+.cfg-flow-scroll {
+  overflow-x: auto; /* wide table scrolls itself, never the page body (E3) */
+  margin-top: var(--space-2);
+}
+
+.cfg-flow-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  min-width: 34rem; /* keeps 7 columns legible; the wrapper scrolls on phones */
+}
+
+.cfg-flow-caption {
+  caption-side: bottom;
+  text-align: left;
+  margin-top: var(--space-2);
+  font-size: 0.75rem;
+  color: var(--color-ink-tertiary);
+}
+
+.cfg-flow-table th,
+.cfg-flow-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--color-hairline);
+  font-variant-numeric: tabular-nums;
+}
+
+.cfg-flow-table thead th {
+  font-size: 0.6875rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-ink-tertiary);
+  font-weight: 500;
+}
+
+.cfg-flow-table td {
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono);
+}
+
+.cfg-flow-table tbody th[scope='row'] {
+  font-family: var(--font-mono);
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.cfg-flow-seat {
+  font-family: Inter, sans-serif;
+}
+
+.cfg-flow-busiest {
+  background: rgba(94, 106, 210, 0.08);
+}
+
+.cfg-flow-busiest th[scope='row'] {
+  box-shadow: inset 3px 0 0 0 var(--color-primary); /* pattern cue, not color-alone: paired with the text badge */
+}
+
+.cfg-busiest-badge {
+  display: inline-block;
+  margin-left: var(--space-2);
+  font-family: Inter, sans-serif;
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-primary-hover);
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  padding: 0.0625rem 0.4375rem;
+}
+
+.cfg-flow-util {
+  position: relative;
+  min-width: 5rem;
+}
+
+.cfg-util-num {
+  position: relative;
+  z-index: 1;
+}
+
+.cfg-util-bar {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: 4px;
+  height: 3px;
+  background: var(--color-primary);
+  border-radius: 2px;
+  max-width: calc(100% - var(--space-6));
+}
+
+/* ---- legibility comparison ---- */
+.cfg-leg-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.cfg-cmp-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.cfg-cmp-label {
+  flex: 1 1 12rem;
+  font-size: 0.8125rem;
+  color: var(--color-ink-muted);
+}
+
+.cfg-cmp-pill {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.0625rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline-strong);
+  min-width: 6.5rem;
+}
+
+/* Pattern distinction (not color-alone): AI = solid accent edge, all-human = dashed edge; each also carries its tag word. */
+.cfg-cmp-ai {
+  border-left: 3px solid var(--color-primary);
+}
+
+.cfg-cmp-human {
+  border-left: 3px dashed var(--color-ink-subtle);
+}
+
+.cfg-cmp-tag {
+  font-size: 0.625rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-ink-tertiary);
+}
+
+.cfg-cmp-val {
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.cfg-leg-sentence {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-ink-muted);
+  max-width: 46rem;
+}

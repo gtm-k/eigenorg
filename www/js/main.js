@@ -21,6 +21,7 @@ import {
   autoRunsOnInteraction,
 } from './ui/runplan.js';
 import { renderControls } from './ui/org.js';
+import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
@@ -50,6 +51,7 @@ const client = createEngineClient(createWorkerTransport(worker));
 const runButtons = [
   /** @type {HTMLButtonElement} */ (el('#run-button')),
   /** @type {HTMLButtonElement} */ (el('#run-button-2')),
+  /** @type {HTMLButtonElement} */ (el('#run-button-3')), // P6 configurator section run trigger
 ];
 const progressBar = /** @type {HTMLProgressElement} */ (el('#run-progress'));
 const statusEl = el('#run-status');
@@ -174,8 +176,15 @@ async function runAll() {
   const replayPayload = state.replayPayload;
   const baseConfig = replayPayload ? state.replayConfig : state.config;
   const plan = buildRunPlan(baseConfig);
+  // P6 legibility twin: when the configurator's compare toggle is on AND the
+  // stack has a non-humanPm seat (an all-human twin would otherwise be an
+  // identical, wasted run — D3), append one sequential all-human run through
+  // the SAME serialized client (CONTRACTS §2; the sequential-pair decision is
+  // BINDING). Off by default → the landing plan is byte-identical (test 14).
+  const wantLayerTwin = configurator.getCompareOn() && hasNonHumanLayer(baseConfig);
+  const totalRuns = plan.runCount + (wantLayerTwin ? 1 : 0);
   const iterations = Number(plan.primary.iterations);
-  const totalWork = iterations * plan.runCount;
+  const totalWork = iterations * totalRuns;
 
   state.planCancelled = false;
   setRunButtons(true);
@@ -186,7 +195,7 @@ async function runAll() {
   /** @param {number} runIndex @returns {(p: { completedCount: number, totalIterations: number }) => void} */
   const onProgress = (runIndex) => ({ completedCount }) => {
     progressBar.value = runIndex * iterations + completedCount;
-    setStatus(statusEl, `running… ${progressBar.value}/${totalWork} iterations (${plan.runCount} runs)`, '');
+    setStatus(statusEl, `running… ${progressBar.value}/${totalWork} iterations (${totalRuns} runs)`, '');
   };
 
   const tPlan0 = performance.now();
@@ -207,6 +216,16 @@ async function runAll() {
       aiOff = await client.run({ config: plan.aiOff, onProgress: onProgress(2) });
     }
 
+    /** @type {any} */
+    let layerTwin = null;
+    if (wantLayerTwin) {
+      if (state.planCancelled) throw Object.assign(new Error('run cancelled'), { cancelled: true });
+      // allHumanTwin preserves replay/paramOverrides, so a replayed pair runs
+      // on the same coefficients (twin philosophy — runplan.js). Its index is
+      // plan.runCount (after primary/contrast/[aiOff]).
+      layerTwin = await client.run({ config: allHumanTwin(baseConfig), onProgress: onProgress(plan.runCount) });
+    }
+
     const planElapsedMs = performance.now() - tPlan0;
     // Late-cancel race (P5b-F1(d)): a cancel that arrived while the final run
     // was already resolving must not paint a plan the user cancelled.
@@ -222,7 +241,7 @@ async function runAll() {
       // share armed for a config the controls no longer show.)
       setStatus(statusEl, 'configuration changed — run to update the charts', '');
     } else {
-      paintResults({ plan, primary, contrast, aiOff, primaryElapsedMs, planElapsedMs, replayPayload });
+      paintResults({ plan, primary, contrast, aiOff, layerTwin, totalRuns, primaryElapsedMs, planElapsedMs, replayPayload });
     }
   } catch (err) {
     if (/** @type {any} */ (err).cancelled) {
@@ -245,12 +264,12 @@ async function runAll() {
 
 /**
  * Paint every panel from a completed plan.
- * @param {{ plan: any, primary: any, contrast: any, aiOff: any,
- *           primaryElapsedMs: number, planElapsedMs: number,
+ * @param {{ plan: any, primary: any, contrast: any, aiOff: any, layerTwin: any,
+ *           totalRuns: number, primaryElapsedMs: number, planElapsedMs: number,
  *           replayPayload: any }} r
  */
 function paintResults(r) {
-  const { plan, primary, contrast, aiOff } = r;
+  const { plan, primary, contrast, aiOff, layerTwin } = r;
   const config = plan.primary;
   const output = primary.output;
 
@@ -331,14 +350,22 @@ function paintResults(r) {
   // --- readout + status + share ---
   el('#ro-model').textContent = `model v${output.modelVersion}`;
   el('#ro-seed').textContent = `seed ${config.seed}`;
-  el('#ro-iters').textContent = `${output.iterations} iterations × ${plan.runCount} runs`;
+  el('#ro-iters').textContent = `${output.iterations} iterations × ${r.totalRuns} runs`;
   el('#ro-elapsed').textContent = `${(r.primaryElapsedMs / 1000).toFixed(2)} s/run · ${(r.planElapsedMs / 1000).toFixed(2)} s total`;
   const replayNote = r.replayPayload ? 'replayed from the shared link — ' : '';
   setStatus(
     statusEl,
-    `${replayNote}${plan.runCount} runs × ${output.iterations} iterations in ${(r.planElapsedMs / 1000).toFixed(2)} s — entropy p50 ends at ${finalP50(output.series.entropy).toFixed(1)}`,
+    `${replayNote}${r.totalRuns} runs × ${output.iterations} iterations in ${(r.planElapsedMs / 1000).toFixed(2)} s — entropy p50 ends at ${finalP50(output.series.entropy).toFixed(1)}`,
     'ok',
   );
+
+  // --- P6 configurator: flow diagram + recovery indicator + all-human
+  //     comparison, all from THIS run's snapshot (never the edit buffer — B4).
+  configurator.renderRun(
+    { config: plan.primary, output },
+    layerTwin ? { output: layerTwin.output } : null,
+  );
+
   share.arm(plan.primary, output);
 
   // Replay banner: informational, computed against the version the engine
@@ -414,19 +441,41 @@ function requestRun(interaction) {
 /** @type {{ setActive: (id: string) => void }} */
 let picker = { setActive: () => {} }; // real picker mounts in boot(), after labels load
 
+/**
+ * Shared staged-config-change handler for BOTH the org controls and the P6
+ * configurator — they edit ONE canonical config through ONE surface (the
+ * single-state rule that closes B5). A control edit or a layer-stack edit
+ * stages config and prompts a re-run; it never auto-runs (decision 6). Any
+ * in-flight plan keeps running but is now stale and will re-assert this warning
+ * on completion instead of painting / arming share.
+ * @param {any} next
+ */
+function stageAndRefresh(next) {
+  state.config = next;
+  stageConfigChange();
+  state.pendingRerun = false; // an edit cancels a pending preset auto-run
+  picker.setActive('');
+  el('#preset-note').textContent = 'Custom configuration — changes apply on the next run.';
+  controls.refresh();
+  configurator.refresh();
+  setStatus(statusEl, 'configuration changed — run to update the charts', '');
+}
+
 const controls = renderControls(el('#org-controls'), {
   getConfig: () => state.config,
-  onConfigChange(next) {
-    state.config = next;
-    stageConfigChange();
-    state.pendingRerun = false; // an edit cancels a pending preset auto-run
-    picker.setActive('');
-    el('#preset-note').textContent = 'Custom configuration — changes apply on the next run.';
-    controls.refresh();
-    // A control edit never auto-runs (decision 6): it only stages config. Any
-    // in-flight plan keeps running but is now stale and will re-assert this
-    // warning on completion instead of painting/arming share.
-    setStatus(statusEl, 'configuration changed — run to update the charts', '');
+  onConfigChange: stageAndRefresh,
+});
+
+// P6 configurator — SUBSUMES P5's ownership-layers control (decision 4): the
+// single editing surface for layer structure, wired to the SAME config-change
+// handler as the org controls (so share/replay stay free — §2).
+const configurator = renderConfigurator(el('#configurator'), {
+  getConfig: () => state.config,
+  onConfigChange: stageAndRefresh,
+  onCompareToggle() {
+    // Toggling compare changes the NEXT run's shape (add/drop the all-human
+    // twin), not the config — prompt a re-run without a generation bump.
+    setStatus(statusEl, 'comparison changed — run to update the all-human comparison', '');
   },
 });
 
@@ -464,6 +513,10 @@ async function boot() {
       picker.setActive(ref.id);
       el('#preset-note').textContent = presetNote(preset);
       controls.refresh();
+      // Compare defaults ON for the layerConfigurator preset (mirrors the §10.6
+      // aiMiddle/allHuman pair), OFF for the others — decision 3.
+      configurator.setCompareDefault(ref.id === 'layerConfigurator');
+      configurator.refresh();
       // Picking a scenario is an explicit "show me" action → run now, or cancel
       // the in-flight plan and auto-run this preset when it unwinds (decision 6).
       requestRun('preset');
@@ -489,14 +542,20 @@ async function boot() {
     state.generation += 1; // share-link boot is a staged config change (P5b-F1);
     // NB: do NOT clear the '#s=' hash here — the shared link stays replayable.
     el('#preset-note').textContent = 'Shared run — replaying the exact embedded configuration and coefficients.';
+    // A shared AI-seat stack shows its comparison by default.
+    configurator.setCompareDefault(hasNonHumanLayer(state.config));
   } else {
     const preset = state.presets.get(DEFAULT_PRESET_ID);
     const ref = PRESET_REFS.find((p) => p.id === DEFAULT_PRESET_ID);
     state.config = primaryRunConfig(preset, /** @type {any} */ (ref));
     picker.setActive(DEFAULT_PRESET_ID);
     el('#preset-note').textContent = presetNote(preset);
+    // The landing default is fasterDysfunction (all-human) → single-run view;
+    // compare defaults on only for the layerConfigurator preset (decision 3).
+    configurator.setCompareDefault(false);
   }
   controls.refresh();
+  configurator.refresh();
   setRunButtons(false);
   probe.bootReadyMs = performance.now(); // navigation start → Run clickable
   setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
