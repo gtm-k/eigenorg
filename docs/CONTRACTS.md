@@ -35,6 +35,18 @@ any signature.
   (`www/js/tests/double-validation.test.mjs`) so the asymmetry is a pinned,
   intentional invariant rather than a silent gap. If a schema change ever lets ajv
   express one, its fixture moves to `fixtures/invalid/`.
+- **Residual serde-only bound (`seed`).** `org.aiInjection.atStep` now carries the
+  `u32` upper bound (`maximum: 4294967295`) in the schema, but `seed` (serde `u64`)
+  keeps no schema upper bound: a JSON schema `maximum` of `u64::MAX` cannot be
+  represented exactly in ajv's IEEE-754 evaluation, so an out-of-`u64`-range literal
+  (e.g. `1e999`) stays a serde-only rejection (ajv accepts the non-negative integer;
+  the serde `u64` parse overflows). This is an accepted residue on an intentionally-wide
+  field, not a fixture-backed invariant.
+- **Reverse asymmetry (ajv-stricter).** An explicit `null` on an optional field the
+  schema types as non-null (e.g. `org.misalignment: null`) is rejected by ajv — the
+  property's type is `number`, not `null` — while serde accepts it as an absent
+  `Option` (`None`). This is intended fail-closed at the browser, and the P5 share-URL
+  codec never emits `null`s, so no real payload trips it.
 - All JSON is camelCase; config is `deny_unknown_fields`; output is
   additive-extensible (consumers ignore unknown fields). `schemaVersion` and
   `modelVersion` appear in both.

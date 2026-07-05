@@ -94,7 +94,7 @@
           "required": ["enabled", "atStep"],
           "properties": {
             "enabled": { "type": "boolean" },
-            "atStep": { "type": "integer", "minimum": 0 }
+            "atStep": { "type": "integer", "minimum": 0, "maximum": 4294967295 }
           }
         }
       }
