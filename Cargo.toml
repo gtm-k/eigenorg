@@ -9,6 +9,22 @@ description = "Browser-native organizational-dynamics simulator engine (Rust -> 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+# Engine-core dependencies (native AND wasm). No getrandom: the RNG is seeded
+# only via SeedableRng::seed_from_u64 (§8.1 determinism contract), so rand_core
+# stays on its default no-getrandom feature set and nothing wall-clock/entropy
+# enters sim state. serde(_json) carry the schema; rand_chacha is the pinned
+# ChaCha8Rng; the exact versions are pinned by Cargo.lock for bit-stability.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand_core = { version = "0.6", default-features = false }
+rand_chacha = { version = "0.3", default-features = false }
+# Pure-Rust transcendentals so `exp`/`sqrt` are bit-identical on every target
+# (system libm differs across OS and from wasm's libm in the last ULP). This is
+# the cross-target output-hash guarantee (§8.1 / PREMORTEM T6): native (any OS)
+# and wasm run the SAME libm code, so the committed hash matches everywhere.
+libm = "0.2"
+
 # wasm-bindgen is target-gated so the engine core stays wasm-free and
 # `cargo test` runs native with zero wasm dependencies (PLAN P2).
 # Pinned exact: wasm-pack downloads the wasm-bindgen CLI matching this

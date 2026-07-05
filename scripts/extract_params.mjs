@@ -6,7 +6,6 @@
 // MODEL.md is the single source of truth; these files are generated - never edit them.
 // Usage: node scripts/extract_params.mjs   (exit 1 with a message on any validation error)
 
-/// <reference path="./node-types.d.ts" />
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

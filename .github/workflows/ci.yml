@@ -10,12 +10,16 @@ on:
   # pull_request:
   #   branches: [main]
 
+# Least privilege: CI only reads the repo (no writes to contents, packages, etc.).
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   rust:
-    name: Rust gates + wasm build
+    name: Rust gates + wasm build + cross-target hash
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,32 +39,34 @@ jobs:
       - name: Clippy (native)
         run: |
           set -o pipefail
-          cargo clippy -- -D warnings
+          cargo clippy --all-targets -- -D warnings
 
       - name: Clippy (wasm32 — lints the wasm-bindgen boundary in src/api.rs)
         run: |
           set -o pipefail
           cargo clippy --target wasm32-unknown-unknown -- -D warnings
 
-      - name: Test (native — engine core is wasm-free)
+      - name: Test (native — engine core is wasm-free; incl. golden harness, determinism, FSM, numeric-literal lint, double-validation)
         run: |
           set -o pipefail
           cargo test
 
-      - name: Install wasm-pack (locked; cached by rust-cache)
+      - name: Perf + size budgets (RELEASE — the <500 ms / <200 KB acceptance numbers are release metrics)
         run: |
           set -o pipefail
-          if ! command -v wasm-pack >/dev/null 2>&1; then
-            cargo install --locked wasm-pack
-          fi
-          wasm-pack --version
+          cargo test --release --test mc_budget
+
+      - name: Install wasm-pack (prebuilt binary; backlog B8 — no from-source compile)
+        uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack@0.15.0
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: npm ci (source for the vendored Chart.js bundle)
+      - name: npm ci (source for the vendored Chart.js bundle + ajv for the cross-target test)
         run: |
           set -o pipefail
           npm ci
@@ -77,6 +83,21 @@ jobs:
           test ! -f www/pkg/.gitignore
           test -f www/vendor/chart.umd.min.js
           test -f www/.nojekyll
+
+      - name: Vendor pin drift (backlog B2 — build.sh must not change the committed www/vendor/)
+        run: |
+          set -o pipefail
+          git diff --exit-code -- www/vendor/
+
+      - name: External-request grep against the BUILT www/ (backlog B1 — covers pkg/ + vendor/, protocol-relative + import()/Worker())
+        run: |
+          set -o pipefail
+          bash scripts/check_no_external_requests.sh www
+
+      - name: Cross-target output hash — wasm half (loads the built wasm; asserts == the committed native hash)
+        run: |
+          set -o pipefail
+          node --test www/js/tests/cross-target-hash.test.mjs
 
   js:
     name: JS gates
@@ -104,7 +125,12 @@ jobs:
           set -o pipefail
           npm run typecheck
 
-      - name: node --test (skips cleanly while no JS tests exist)
+      - name: modelVersion <-> extracted-artifact hash pairing (MODEL.md §12.6)
+        run: |
+          set -o pipefail
+          node scripts/check_version_pairing.mjs
+
+      - name: node --test (discovery matches *.test.{js,mjs}; backlog B5 — cross-target-hash skips here without a wasm build, runs for real in the rust job)
         run: |
           set -o pipefail
           if find . -path ./node_modules -prune -o -type f \( -name "*.test.js" -o -name "*.test.mjs" \) -print -quit | grep -q .; then
@@ -113,34 +139,18 @@ jobs:
             echo "no JS test files yet — skipping"
           fi
 
-      - name: Drift gate — extractor idempotence (inert until P1 lands)
+      - name: Drift gate — extractor idempotence + no untracked outputs (backlog B7)
         run: |
           set -o pipefail
           if [ -f scripts/extract_params.mjs ]; then
             node scripts/extract_params.mjs
             git diff --exit-code -- model/ www/assumptions.json
+            test -z "$(git status --porcelain model/ www/assumptions.json)" || { echo 'FAIL: extractor produced untracked outputs'; git status --porcelain model/ www/assumptions.json; exit 1; }
           else
             echo "scripts/extract_params.mjs not present yet — skipping drift gate"
           fi
 
-      - name: External-request grep — zero external requests from www/ (binding delta #2; allowlist nothing)
+      - name: External-request grep against the www/ source (binding delta #2; allowlist nothing)
         run: |
           set -o pipefail
-          status=0
-          if grep -rInE 'fetch\(.{0,3}https?://' www/; then
-            echo '^^ fetch() to an absolute http(s) URL'
-            status=1
-          fi
-          if grep -rInE '<script[^>]*src=.{0,2}https?://' www/; then
-            echo '^^ <script src> to an absolute http(s) URL'
-            status=1
-          fi
-          if grep -rIn 'sendBeacon' www/; then
-            echo '^^ sendBeacon usage'
-            status=1
-          fi
-          if [ "$status" -ne 0 ]; then
-            echo 'FAIL: external-request patterns found in www/ — the site must make zero external requests'
-            exit 1
-          fi
-          echo 'external-request grep clean'
+          bash scripts/check_no_external_requests.sh www

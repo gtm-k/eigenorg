@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "org", "seed": 1729,
+  "iterations": 200, "horizon": 50,
+  "org": { "headcountStart": 18, "headcountGrowthPerStep": 0.2,
+    "topology": "hierarchical", "hierarchyDepth": 3, "ownershipLayers": 3,
+    "layerTypes": ["humanPm", "committee", "humanDirector"],
+    "layerOwnerCount": [1, 3, 1],
+    "modality": "meetingHeavy", "structuralHealth": 5,
+    "aiInjection": { "enabled": false, "atStep": 0 } }
+}

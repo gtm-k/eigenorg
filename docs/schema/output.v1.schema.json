@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://eigenorg/schema/output.v1.json",
+  "title": "eigenorg output (schemaVersion 1)",
+  "description": "Hand-derived from MODEL.md §12.3/§7. Output is additive-extensible — consumers ignore unknown fields (§12.1) — so additionalProperties stays open, but the core fields are required and typed.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "modelVersion",
+    "sim",
+    "seed",
+    "iterations",
+    "horizon",
+    "series",
+    "resolvedParams"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "modelVersion": { "type": "string" },
+    "sim": { "enum": ["org", "team"] },
+    "seed": { "type": "integer", "minimum": 0 },
+    "iterations": { "type": "integer" },
+    "horizon": { "type": "integer" },
+    "series": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["t", "p10", "p50", "p90"],
+          "properties": {
+            "t": { "type": "integer", "minimum": 0 },
+            "p10": { "type": "number" },
+            "p50": { "type": "number" },
+            "p90": { "type": "number" }
+          }
+        }
+      }
+    },
+    "perLayer": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "layer",
+          "layerType",
+          "meanLatencyDays",
+          "meanQueue",
+          "utilization",
+          "overrideShare",
+          "distortion",
+          "ownerMultiplicity",
+          "diffusionFactor",
+          "bottleneck"
+        ],
+        "properties": {
+          "layer": { "type": "integer", "minimum": 1 },
+          "layerType": { "enum": ["humanPm", "humanDirector", "aiAgent", "committee"] },
+          "meanLatencyDays": { "type": "number" },
+          "meanQueue": { "type": "number" },
+          "utilization": { "type": "number" },
+          "overrideShare": { "type": "number" },
+          "distortion": { "type": "number" },
+          "ownerMultiplicity": { "type": "number" },
+          "diffusionFactor": { "type": "number" },
+          "bottleneck": { "type": "boolean" }
+        }
+      }
+    },
+    "bandMarkers": { "type": "array", "items": { "type": "number" } },
+    "qualityHistogram": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lo", "hi", "count"],
+        "properties": {
+          "lo": { "type": "number" },
+          "hi": { "type": "number" },
+          "count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "functionCoverage": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["score", "rating"],
+        "properties": {
+          "score": { "type": "number", "minimum": 0, "maximum": 1 },
+          "rating": { "enum": ["green", "amber", "red"] }
+        }
+      }
+    },
+    "resolvedParams": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "number" },
+          { "type": "array", "items": { "type": "number" }, "minItems": 3, "maxItems": 3 }
+        ]
+      }
+    }
+  }
+}

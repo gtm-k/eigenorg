@@ -1,0 +1,4 @@
+{
+  "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "team", "seed": 42,
+  "iterations": 500, "horizon": 60
+}

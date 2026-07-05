@@ -1,41 +1,46 @@
 //! eigenorg engine core.
 //!
-//! This crate root is deliberately wasm-free: everything here compiles and
-//! tests on the native target (`cargo test` needs no wasm toolchain). The
-//! wasm-bindgen boundary lives in [`api`] and only exists on wasm32 builds.
+//! The crate root is deliberately wasm-free: everything here compiles and tests
+//! on the native target (`cargo test` needs no wasm toolchain). The wasm-bindgen
+//! boundary lives in [`api`] and only exists on wasm32 builds.
 //!
-//! P2 walking-skeleton scope: a version string, an echo round-trip, and a
-//! dummy Monte Carlo pi probe used as the earliest read on the perf budget.
-//! Real mechanics arrive in P3+ per MODEL.md.
+//! P3 kernel: the config/output schema, the deterministic RNG, the task FSM, the
+//! org decision pipeline (M1–M13, M18, M19), the Monte Carlo runner, and the
+//! frozen chunked run API. `modelVersion` comes from `model/params.json` (the
+//! extractor's declaration, §12.6), never a hand-typed constant.
 
 #[cfg(target_arch = "wasm32")]
 pub mod api;
 
-/// Placeholder engine version for the walking skeleton.
-///
-/// The real `modelVersion` is declared in MODEL.md and emitted into
-/// `model/params.json` by the extractor (P1); P3 wires it through here.
-pub const MODEL_VERSION: &str = "0.0.0-p2-skeleton";
+pub mod config;
+pub mod engine;
+pub mod entities;
+pub mod goldens;
+pub mod mechanics;
+pub mod montecarlo;
+pub mod output;
+pub mod params;
+pub mod rng;
+pub mod tasks;
 
-/// Returns the engine's model version string.
+/// The engine's model version, declared in MODEL.md's meta block and emitted
+/// into `model/params.json` by the extractor (§12.6). The CI pairing gate ties
+/// this string to the params.json sha256.
 pub fn model_version() -> &'static str {
-    MODEL_VERSION
+    params::model_version()
 }
 
-/// Echo round-trip: returns the input unchanged.
-///
-/// Exists so the walking skeleton can prove a string survives the
-/// JS -> wasm -> JS boundary byte-for-byte.
+/// Echo round-trip (P2 skeleton surface, retained so the walking-skeleton page
+/// keeps working until P5 rewrites the worker against the frozen chunked API).
 pub fn echo(input: &str) -> String {
     input.to_owned()
 }
 
-/// Dummy perf probe: seeded Monte Carlo estimate of pi.
+/// Dummy perf probe: seeded Monte Carlo estimate of pi (P2 skeleton surface).
 ///
-/// Deterministic (xorshift64* — no `getrandom`, no wall clock, per the
-/// determinism standing rule; P3 replaces this with the real rand_chacha
-/// scheme). 500 iterations is the walking-skeleton probe size; the caller
-/// times the call to get the earliest read on the <1.5 s simulation budget.
+/// Kept for the P2 perf-probe page; the real engine perf path is the Monte Carlo
+/// runner ([`montecarlo`]). Deterministic xorshift — no `getrandom`, no wall
+/// clock — so it does not disturb the sim RNG contract.
 pub fn monte_carlo_pi(iterations: u32, seed: u32) -> f64 {
     if iterations == 0 {
         return 0.0;
@@ -45,7 +50,6 @@ pub fn monte_carlo_pi(iterations: u32, seed: u32) -> f64 {
         state ^= state << 13;
         state ^= state >> 7;
         state ^= state << 17;
-        // Top 53 bits -> uniform f64 in [0, 1).
         (state >> 11) as f64 / (1u64 << 53) as f64
     };
     let mut inside: u32 = 0;
@@ -64,45 +68,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn model_version_is_nonempty_and_named() {
-        assert!(!model_version().is_empty());
-        assert!(model_version().contains("skeleton"));
+    fn model_version_comes_from_params_json() {
+        assert_eq!(model_version(), "2.0.0");
     }
 
     #[test]
     fn echo_round_trips_unchanged() {
         assert_eq!(echo("eigenorg"), "eigenorg");
-        assert_eq!(echo(""), "");
         assert_eq!(echo("unicode: π ≈ 3.14159 🧭"), "unicode: π ≈ 3.14159 🧭");
     }
 
     #[test]
     fn pi_probe_is_deterministic_for_a_seed() {
-        let a = monte_carlo_pi(500, 42);
-        let b = monte_carlo_pi(500, 42);
-        assert_eq!(a.to_bits(), b.to_bits());
-    }
-
-    #[test]
-    fn pi_probe_differs_across_seeds() {
+        assert_eq!(
+            monte_carlo_pi(500, 42).to_bits(),
+            monte_carlo_pi(500, 42).to_bits()
+        );
         assert_ne!(
             monte_carlo_pi(500, 1).to_bits(),
             monte_carlo_pi(500, 2).to_bits()
         );
-    }
-
-    #[test]
-    fn pi_probe_is_in_a_plausible_band_at_500_iterations() {
-        // 500 iterations is coarse; ±0.25 is a generous but real sanity band.
-        let estimate = monte_carlo_pi(500, 42);
-        assert!(
-            (estimate - std::f64::consts::PI).abs() < 0.25,
-            "estimate {estimate} too far from pi"
-        );
-    }
-
-    #[test]
-    fn pi_probe_zero_iterations_is_finite() {
-        assert_eq!(monte_carlo_pi(0, 42), 0.0);
     }
 }

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1", "modelVersion": "2.0.0", "sim": "team", "seed": 42,
+  "iterations": 500, "horizon": 60,
+  "team": {
+    "entities": [
+      { "id": "aiEng1", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+      { "id": "aiEng2", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+      { "id": "aiEng3", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+      { "id": "aiEng4", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+      { "id": "aiEng5", "kind": "ai", "archetype": "aiExecution", "throughput": 8, "judgmentQuality": 3, "handoffFriction": 2, "reliability": 7, "rampTimeWeeks": 0, "availability": 1, "functions": ["execution"], "capabilities": { "execution": 8 } },
+      { "id": "rev", "kind": "human", "archetype": "reviewer", "throughput": 4, "judgmentQuality": 8, "handoffFriction": 4, "reliability": 9, "rampTimeWeeks": 0, "availability": 1, "functions": ["review"], "capabilities": { "review": 8 } },
+      { "id": "pm", "kind": "human", "archetype": "pm", "throughput": 5, "judgmentQuality": 7, "handoffFriction": 5, "reliability": 8, "rampTimeWeeks": 0, "availability": 1, "functions": ["prioritization", "coordination", "stakeholderCommunication"], "capabilities": { "prioritization": 7, "coordination": 6, "stakeholderCommunication": 8 } }
+    ],
+    "workStream": { "arrivalPerStep": 3.5, "mix": { "routine": 0.8, "complex": 0.15, "novel": 0.05 }, "highStakesShare": 0.1 },
+    "modality": "asyncFirst",
+    "structuralHealth": 6,
+    "recoveryOwner": "pm",
+    "reviewCapacityPerStep": 1
+  }
+}
