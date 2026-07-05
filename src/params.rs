@@ -195,11 +195,12 @@ mod tests {
 
     #[test]
     fn params_json_parses_and_declares_v2() {
-        assert_eq!(model_version(), "2.0.0");
+        assert_eq!(model_version(), "2.1.0");
         let d = Params::defaults();
         // A few spot values against MODEL.md §9.
         assert_eq!(d.p("channelCostFraction"), 0.036);
         assert_eq!(d.p("overrideDiffusionGain"), 0.4);
+        assert_eq!(d.p("brittlenessNormPerStep"), 0.35);
         assert_eq!(d.tri("decisionLatencyPerLayerDays"), [2.0, 2.5, 3.0]);
     }
 
