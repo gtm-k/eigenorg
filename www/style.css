@@ -572,6 +572,13 @@ progress {
   h1 {
     font-size: 1.625rem;
   }
+
+  /* The bottleneck badge is the one unguarded horizontal-scroll vector on the
+     smallest viewport: let it wrap instead of forcing the panel-header wider.
+     The full text also repeats in the "what this means" sentence below. */
+  .badge {
+    white-space: normal;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

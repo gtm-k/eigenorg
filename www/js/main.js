@@ -10,12 +10,21 @@
 import { createEngineClient, createWorkerTransport } from './engine-client.js';
 import { createPercentileChart, updatePercentileChart } from './charts/entropy.js';
 import { createDeltaChart, updateDeltaChart, createHealthChart, updateHealthChart } from './charts/lines.js';
-import { buildRunPlan, deltaSeries, finalP50, maxP90, computeBandCrossings, hasActiveAiInjection } from './ui/runplan.js';
+import {
+  buildRunPlan,
+  deltaSeries,
+  finalP50,
+  maxP90,
+  computeBandCrossings,
+  hasActiveAiInjection,
+  completionPolicy,
+  autoRunsOnInteraction,
+} from './ui/runplan.js';
 import { renderControls } from './ui/org.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
-import { meaningFor } from './ui/meaning.js';
+import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
-import { modelVersionBanner } from './url-codec.js';
+import { modelVersionBanner, extractShareFragment } from './url-codec.js';
 
 /** @param {string} sel @returns {HTMLElement} */
 function el(sel) {
@@ -92,6 +101,14 @@ const state = {
   /** @type {any} */ config: null,
   /** @type {any} */ replayPayload: null, // set while showing an un-edited share link
   planCancelled: false,
+  // Monotonic config generation (P5b-F1). Bumped by every staged config change
+  // (control edit, preset pick, share-link boot); runAll captures it at plan
+  // start so a completion whose generation no longer matches is treated as
+  // stale (never painted over the current view, never arms share).
+  generation: 0,
+  // A preset pick that lands mid-run sets this so the in-flight plan's unwind
+  // auto-runs the picked preset (decision 6). A control edit / Cancel clears it.
+  pendingRerun: false,
 };
 
 // Probe hook for the scripted acceptance measurements (Playwright): exposes
@@ -141,11 +158,19 @@ function renderStats(dl, run) {
  */
 async function runAll() {
   if (client.busy) {
+    // Run/Cancel toggle: an explicit click cancels the in-flight plan and
+    // drops any queued auto-rerun. (A preset pick uses requestRun('preset'),
+    // which sets pendingRerun BEFORE cancelling — decision 6.)
+    state.pendingRerun = false;
     state.planCancelled = true;
     client.cancel();
     return;
   }
 
+  // Capture the generation this plan runs at. If the config changes under it
+  // (an edit/preset/share-boot bumps state.generation), the completion is
+  // stale — see completionPolicy below (P5b-F1).
+  const planGeneration = state.generation;
   const replayPayload = state.replayPayload;
   const baseConfig = replayPayload ? state.replayConfig : state.config;
   const plan = buildRunPlan(baseConfig);
@@ -183,7 +208,22 @@ async function runAll() {
     }
 
     const planElapsedMs = performance.now() - tPlan0;
-    paintResults({ plan, primary, contrast, aiOff, primaryElapsedMs, planElapsedMs, replayPayload });
+    // Late-cancel race (P5b-F1(d)): a cancel that arrived while the final run
+    // was already resolving must not paint a plan the user cancelled.
+    if (state.planCancelled) throw Object.assign(new Error('run cancelled'), { cancelled: true });
+
+    const { stale } = completionPolicy(planGeneration, state.generation);
+    if (stale) {
+      // The config changed while this plan ran (an edit, preset pick or share
+      // boot bumped the generation): these charts describe a config the
+      // controls no longer show. Do NOT paint them over the current view and
+      // do NOT arm share; re-assert the "configuration changed" warning in case
+      // a progress tick overwrote it. (No silent chart/controls mismatch; no
+      // share armed for a config the controls no longer show.)
+      setStatus(statusEl, 'configuration changed — run to update the charts', '');
+    } else {
+      paintResults({ plan, primary, contrast, aiOff, primaryElapsedMs, planElapsedMs, replayPayload });
+    }
   } catch (err) {
     if (/** @type {any} */ (err).cancelled) {
       setStatus(statusEl, 'run cancelled', '');
@@ -193,6 +233,13 @@ async function runAll() {
   } finally {
     setRunButtons(false);
     progressBar.value = 0;
+    // A preset picked mid-run scheduled an auto-rerun (decision 6). Now that the
+    // cancelled plan has fully unwound and the client is idle, run the picked
+    // preset. queueMicrotask defers past this finally so runAll re-enters clean.
+    if (state.pendingRerun) {
+      state.pendingRerun = false;
+      window.queueMicrotask(() => void runAll());
+    }
   }
 }
 
@@ -217,6 +264,9 @@ function paintResults(r) {
   el('#pane-after-label').textContent = `Structural Health ${plan.afterSh}`;
   el('#pane-before-tag').hidden = !plan.primaryIsBefore;
   el('#pane-after-tag').hidden = plan.primaryIsBefore;
+  // Heading tracks whether AI is actually active in this pair (4/5 presets run
+  // the pane with AI off; the static default is the neutral copy).
+  el('#pane-heading').textContent = paneHeading(config);
   renderStats(el('#pane-before-stats'), beforeRun);
   renderStats(el('#pane-after-stats'), afterRun);
   setMeaning('pane', meaningFor('pane', {
@@ -231,7 +281,9 @@ function paintResults(r) {
   const aiOn = hasActiveAiInjection(config);
   const entropyMarkers = aiOn ? [{ t: Number(config.org.aiInjection.atStep), label: 'AI injected' }] : [];
   updatePercentileChart(charts.entropy, output.series.entropy, { markers: entropyMarkers });
-  setMeaning('entropy', meaningFor('entropy', { config }));
+  // Pass output so the fragile/absorbs boundary derives from the model's
+  // resolvedParams.shRiskThreshold (P5b-F1 fold; no hardcoded threshold).
+  setMeaning('entropy', meaningFor('entropy', { config, output }));
 
   // --- decision velocity + bottleneck badge ---
   updatePercentileChart(charts.velocity, output.series.decisionVelocity);
@@ -310,6 +362,53 @@ function paintResults(r) {
   };
 }
 
+// ---- config-change plumbing (P5b-F1) ----------------------------------------------
+
+/**
+ * Clear a stale '#s=' share fragment from the address bar once the user authors
+ * or picks a new config — otherwise a manual address-bar copy would share the
+ * pre-edit run (the same misattribution class the generation guard prevents).
+ * No-op when the hash holds no share fragment (preserves a live replay link).
+ */
+function clearShareHash() {
+  if (extractShareFragment(window.location.hash) === null) return;
+  const { pathname, search } = window.location;
+  window.history.replaceState(null, '', `${pathname}${search}`);
+}
+
+/**
+ * A staged config change (a control edit or a preset pick): bump the generation
+ * so any in-flight plan's completion is treated as stale, leave replay mode,
+ * disarm the now-stale share button, and drop a stale share fragment.
+ */
+function stageConfigChange() {
+  state.generation += 1;
+  state.replayPayload = null; // editing/picking = authoring (CONTRACTS §4)
+  state.replayConfig = null;
+  share.disarm(); // (e) no share until a matching fresh run completes
+  clearShareHash();
+}
+
+/**
+ * Run the current config now, or — when a plan is in flight and the interaction
+ * auto-runs (a preset pick; decision 6) — cancel the in-flight plan and auto-run
+ * once it unwinds (runAll's finally consumes pendingRerun). A non-auto-run
+ * interaction while busy does nothing here: the staged config waits for an
+ * explicit Run.
+ * @param {'preset' | 'run'} interaction
+ */
+function requestRun(interaction) {
+  if (client.busy) {
+    if (autoRunsOnInteraction(interaction)) {
+      state.pendingRerun = true;
+      state.planCancelled = true;
+      client.cancel();
+    }
+    return;
+  }
+  void runAll();
+}
+
 // ---- controls / presets -----------------------------------------------------------
 
 /** @type {{ setActive: (id: string) => void }} */
@@ -319,11 +418,14 @@ const controls = renderControls(el('#org-controls'), {
   getConfig: () => state.config,
   onConfigChange(next) {
     state.config = next;
-    state.replayPayload = null; // editing = authoring (CONTRACTS §4)
-    state.replayConfig = null;
+    stageConfigChange();
+    state.pendingRerun = false; // an edit cancels a pending preset auto-run
     picker.setActive('');
     el('#preset-note').textContent = 'Custom configuration — changes apply on the next run.';
     controls.refresh();
+    // A control edit never auto-runs (decision 6): it only stages config. Any
+    // in-flight plan keeps running but is now stale and will re-assert this
+    // warning on completion instead of painting/arming share.
     setStatus(statusEl, 'configuration changed — run to update the charts', '');
   },
 });
@@ -358,12 +460,13 @@ async function boot() {
       if (!preset) return;
       state.presetId = ref.id;
       state.config = primaryRunConfig(preset, ref);
-      state.replayPayload = null;
-      state.replayConfig = null;
+      stageConfigChange();
       picker.setActive(ref.id);
       el('#preset-note').textContent = presetNote(preset);
       controls.refresh();
-      void runAll(); // picking a scenario is an explicit "show me" action
+      // Picking a scenario is an explicit "show me" action → run now, or cancel
+      // the in-flight plan and auto-run this preset when it unwinds (decision 6).
+      requestRun('preset');
     },
   });
 
@@ -383,6 +486,8 @@ async function boot() {
     // Controls display the embedded config (without its override machinery).
     state.config = JSON.parse(JSON.stringify(replayBoot.payload.config));
     state.presetId = '';
+    state.generation += 1; // share-link boot is a staged config change (P5b-F1);
+    // NB: do NOT clear the '#s=' hash here — the shared link stays replayable.
     el('#preset-note').textContent = 'Shared run — replaying the exact embedded configuration and coefficients.';
   } else {
     const preset = state.presets.get(DEFAULT_PRESET_ID);

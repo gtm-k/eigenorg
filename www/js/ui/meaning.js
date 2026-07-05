@@ -22,6 +22,15 @@ const aiActive = (config) =>
   Boolean(config.org.aiInjection?.enabled) && Number(config.org.aiInjection?.atStep) < Number(config.horizon);
 
 /**
+ * The fragile/absorbs boundary is the model's `shRiskThreshold` — read live
+ * from `output.resolvedParams` at paint time. This constant is a fallback ONLY
+ * for pre-run copy, when no run output exists yet (e.g. a sentence rendered
+ * before the first run); the live value always comes from resolvedParams so the
+ * boundary can never silently drift from MODEL.md.
+ */
+const SH_RISK_THRESHOLD_FALLBACK = 4;
+
+/**
  * @typedef {{ config: any, output?: any,
  *             beforeSh?: number, afterSh?: number,
  *             beforeFinal?: number, afterFinal?: number,
@@ -51,7 +60,9 @@ const RULES = {
   entropy(ctx) {
     const { config } = ctx;
     const sh = Number(config.org.structuralHealth);
-    if (aiActive(config) && sh <= 4) {
+    const rawThreshold = Number(ctx.output?.resolvedParams?.shRiskThreshold);
+    const riskThreshold = Number.isFinite(rawThreshold) ? rawThreshold : SH_RISK_THRESHOLD_FALLBACK;
+    if (aiActive(config) && sh <= riskThreshold) {
       return `At Structural Health ${sh}, this org is fragile — watch entropy after the AI injection at step ${config.org.aiInjection.atStep}: AI accelerates the disorder it lands in.`;
     }
     if (aiActive(config)) {
@@ -140,3 +151,18 @@ export function meaningFor(panelId, ctx) {
 }
 
 export const PANEL_IDS = Object.keys(RULES);
+
+/**
+ * The before/after pane's H2 heading, driven by the SAME aiActive rule as the
+ * pane sentence: name AI only when this pair actually has an active injection.
+ * The static index.html default is the neutral (AI-inactive) copy; paint sets
+ * this once the config is known. Four of the five presets run the pane with AI
+ * off, so the old static "Same org, same AI …" heading was false for them.
+ * @param {any} config the pane's primary config
+ * @returns {string}
+ */
+export function paneHeading(config) {
+  return aiActive(config)
+    ? 'Same org, same AI — structure decides'
+    : 'Same org — structure decides';
+}

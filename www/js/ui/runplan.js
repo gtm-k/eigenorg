@@ -154,7 +154,9 @@ export function computeBandCrossings(config, bandMarkers) {
   const crossings = [];
   for (const center of bandMarkers) {
     if (headcountAt(config, 0) >= center) continue; // crossed before t=0
-    for (let t = 1; t <= horizon; t += 1) {
+    // The series spans t = 0..horizon-1; a crossing at t = horizon would
+    // annotate off the right edge, so scan only the valid indices.
+    for (let t = 1; t < horizon; t += 1) {
       if (headcountAt(config, t) >= center) {
         crossings.push({ t, center, label: `≈${center} people` });
         break;
@@ -162,4 +164,42 @@ export function computeBandCrossings(config, bandMarkers) {
     }
   }
   return crossings;
+}
+
+// ---- run-lifecycle decisions (P5b-F1, pure + node-tested) ---------------------
+
+/**
+ * Stale-generation completion policy. main.js keeps a monotonic `generation`
+ * counter that any staged config change bumps (a control edit, a preset pick,
+ * or a share-link boot); runAll captures it at plan start. When a plan
+ * finishes, compare the captured generation with the live one:
+ *   - EQUAL → the charts still describe the config the controls show: paint
+ *     and arm the share button.
+ *   - DIFFERENT → the config changed under the plan: its charts/controls no
+ *     longer agree. The completion is STALE — never arm share for it (it would
+ *     share a config the controls contradict) and never let its success status
+ *     overwrite the "configuration changed — run to update" warning.
+ *
+ * @param {number} planGeneration the generation captured when the plan started
+ * @param {number} currentGeneration the live generation counter at completion
+ * @returns {{ stale: boolean, armShare: boolean }}
+ */
+export function completionPolicy(planGeneration, currentGeneration) {
+  const stale = planGeneration !== currentGeneration;
+  return { stale, armShare: !stale };
+}
+
+/**
+ * Decision 6: which mid-run interaction auto-runs. A preset pick is an explicit
+ * "show me this scenario" action, so when it lands while a plan is in flight the
+ * in-flight plan is cancelled and the picked preset is auto-run once the
+ * cancelled plan unwinds. A plain control edit only stages config (it sets the
+ * "configuration changed — run to update" status and waits for an explicit Run),
+ * and a Run/Cancel click mid-run is just the cancel toggle — neither auto-runs.
+ *
+ * @param {'preset' | 'edit' | 'run'} interaction
+ * @returns {boolean} whether this interaction should auto-run after a cancel
+ */
+export function autoRunsOnInteraction(interaction) {
+  return interaction === 'preset';
 }

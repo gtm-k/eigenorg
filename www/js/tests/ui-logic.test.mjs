@@ -17,10 +17,12 @@ import {
   maxP90,
   headcountAt,
   computeBandCrossings,
+  completionPolicy,
+  autoRunsOnInteraction,
 } from '../ui/runplan.js';
 import { CONTROL_DEFS, readOrgValues, applyOrgValue, stripReplay, clampControlValue } from '../ui/org.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, primaryRunConfig } from '../ui/presets.js';
-import { meaningFor, PANEL_IDS } from '../ui/meaning.js';
+import { meaningFor, PANEL_IDS, paneHeading } from '../ui/meaning.js';
 import { buildShareConfig } from '../ui/share.js';
 import { encodeShare, decodeShare, buildReplayConfig } from '../url-codec.js';
 
@@ -289,4 +291,82 @@ test('buildShareConfig stamps the engine modelVersion so same-build shares never
   const replay = buildReplayConfig(payload);
   assert.equal(replay.replay, true);
   assert.deepEqual(replay.paramOverrides, output.resolvedParams);
+});
+
+// ---- P5 repair-2: band-crossing bound + meaning threshold + branches -----------------------
+
+test('band crossings never annotate beyond the last series index (t in 0..horizon-1)', () => {
+  // The series has `horizon` points at t = 0..horizon-1; a crossing reported at
+  // t = horizon would annotate off the right edge of the chart. (repair-2 fold)
+  const config = { horizon: 10, org: { headcountStart: 10, headcountGrowthPerStep: 1 } };
+  // center 19 first crosses at t=9 (= horizon-1, the LAST valid index) → kept.
+  // center 20 would first cross at t=10 (= horizon, off the chart) → dropped.
+  assert.deepEqual(
+    computeBandCrossings(config, [19, 20]).map((c) => [c.center, c.t]),
+    [[19, 9]],
+  );
+});
+
+test('entropy meaning derives the fragile/absorbs boundary from resolvedParams.shRiskThreshold (no hardcoded 4)', () => {
+  const config = landingConfig(); // SH 3, AI active
+  // With the model threshold (4), SH 3 sits at/below it → fragile.
+  assert.match(
+    meaningFor('entropy', { config, output: { resolvedParams: { shRiskThreshold: 4 } } }),
+    /fragile|accelerates/,
+  );
+  // Lower the threshold to 2: SH 3 is now ABOVE it → the structure absorbs.
+  assert.match(
+    meaningFor('entropy', { config, output: { resolvedParams: { shRiskThreshold: 2 } } }),
+    /absorbs/,
+  );
+});
+
+test('delta meaning: a negative peak reads "stays at or below" (structure converted AI to order)', () => {
+  const config = landingConfig();
+  assert.match(meaningFor('delta', { config, entropyDeltaPeak: -3.2 }), /stays at or below -3\.2/);
+});
+
+test('pane meaning drops the AI clause when the pair has no active injection', () => {
+  const noAi = landingConfig();
+  noAi.org.aiInjection.enabled = false;
+  assert.match(meaningFor('pane', { config: noAi, beforeSh: 3, afterSh: 7 }), /no AI in this scenario/);
+});
+
+test('velocity meaning omits bottleneck text when no layer is a bottleneck', () => {
+  const config = landingConfig();
+  const output = { perLayer: [{ layer: 1, layerType: 'humanPm', utilization: 0.4, bottleneck: false }] };
+  const text = meaningFor('velocity', { config, output });
+  assert.match(text, /speedometer/);
+  assert.doesNotMatch(text, /bottleneck is layer/);
+});
+
+// ---- P5b-F1: plan/config generation policy (pure decisions) --------------------------------
+
+test('completionPolicy: a matching generation is fresh (arms share); a bumped one is stale (never arms)', () => {
+  // A plan captures the generation at start. If it still matches when the plan
+  // finishes, the charts describe the config the controls still show → paint +
+  // arm share. If the generation advanced (an edit/preset/share-boot bumped it),
+  // the completion is STALE → never paint over the current view, never arm share.
+  assert.deepEqual(completionPolicy(5, 5), { stale: false, armShare: true });
+  const stale = completionPolicy(5, 6);
+  assert.equal(stale.stale, true);
+  assert.equal(stale.armShare, false);
+});
+
+test('decision 6: a preset pick auto-runs after a mid-run cancel; a plain edit / Run-toggle never auto-runs', () => {
+  // The busy-path bug the reconciliation documented: a preset chip clicked
+  // mid-run cancelled the in-flight plan and returned WITHOUT re-running, so the
+  // declared "preset chip auto-runs" decision was violated. Only a preset pick
+  // schedules an auto-rerun; a control edit stages config silently and a
+  // Run/Cancel click is a plain toggle.
+  assert.equal(autoRunsOnInteraction('preset'), true);
+  assert.equal(autoRunsOnInteraction('edit'), false);
+  assert.equal(autoRunsOnInteraction('run'), false);
+});
+
+test('pane heading names AI only when the pair actually has an active injection', () => {
+  const noAi = landingConfig();
+  noAi.org.aiInjection.enabled = false;
+  assert.equal(paneHeading(landingConfig()), 'Same org, same AI — structure decides');
+  assert.equal(paneHeading(noAi), 'Same org — structure decides');
 });

@@ -66,6 +66,9 @@ export function renderPresetPicker(root, opts) {
     chip.type = 'button';
     chip.className = 'chip';
     chip.textContent = opts.labels[ref.id] ?? ref.id;
+    // Initialize aria-pressed so the chips carry the toggle state even on the
+    // replay-boot path, where setActive is not called (P5b-F1 fold).
+    chip.setAttribute('aria-pressed', 'false');
     chip.addEventListener('click', () => opts.onPick(ref));
     chips.set(ref.id, chip);
     root.appendChild(chip);
