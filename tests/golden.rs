@@ -203,13 +203,27 @@ fn retuned_v2_org_goldens_green() {
 #[test]
 fn presets_are_plausible_and_drift_free() {
     let preset_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("www/presets");
-    let mut files: Vec<_> = std::fs::read_dir(&preset_dir)
-        .expect("www/presets must exist")
-        .map(|e| e.unwrap().path())
-        .filter(|p| p.extension().map(|e| e == "json").unwrap_or(false))
-        .collect();
-    files.sort();
-    assert_eq!(files.len(), 10, "expected 5 org + 5 team presets");
+    let team_dir = preset_dir.join("team");
+    // Org presets are browser-fetchable at www/presets/*.json — P5's org picker
+    // reads this flat directory and its share-URL budget covers exactly these.
+    // Team presets live in the team/ subdirectory (P7b's team-composer surface),
+    // invisible to the org picker's flat readdir; team share-URL budget is a
+    // P7b concern (team configs exceed the 2000-char org budget — see BACKLOG).
+    let json_files = |dir: &std::path::Path, what: &str| {
+        let mut v: Vec<_> = std::fs::read_dir(dir)
+            .unwrap_or_else(|_| panic!("{what} must exist"))
+            .map(|e| e.unwrap().path())
+            .filter(|p| p.extension().map(|e| e == "json").unwrap_or(false))
+            .collect();
+        v.sort();
+        v
+    };
+    let org_files = json_files(&preset_dir, "www/presets");
+    let team_files = json_files(&team_dir, "www/presets/team");
+    assert_eq!(org_files.len(), 5, "expected 5 org presets at www/presets/");
+    assert_eq!(team_files.len(), 5, "expected 5 team presets at www/presets/team/");
+    let mut files = org_files;
+    files.extend(team_files);
 
     let assertions = load_assertions();
     let mut org_ids = Vec::new();
