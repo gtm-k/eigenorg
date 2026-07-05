@@ -3,55 +3,154 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>eigenorg</title>
+  <title>eigenorg — org entropy simulator</title>
+  <meta name="description" content="Simulate how org structure, growth and AI injection shape coordination cost, decision speed and disorder. Runs entirely in your browser.">
   <!-- Relative asset paths ONLY: this page must work under the /eigenorg/
        Pages project subpath (PLAN P2 / PREMORTEM T2). -->
   <link rel="stylesheet" href="./style.css">
   <!-- Inline favicon: stops the browser's automatic /favicon.ico request,
        which would 404 at the origin root (outside the project subpath). -->
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%234c6ef5'/%3E%3Ctext x='8' y='12' font-size='11' font-family='monospace' fill='white' text-anchor='middle'%3Ee%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%235e6ad2'/%3E%3Ctext x='8' y='12' font-size='11' font-family='monospace' fill='white' text-anchor='middle'%3Ee%3C/text%3E%3C/svg%3E">
 </head>
 <body>
   <main>
-    <h1>eigenorg</h1>
-    <p class="tagline">
-      Walking skeleton — Rust/WebAssembly engine inside a module worker.
-      Nothing leaves your browser.
-    </p>
+    <header class="page-header">
+      <h1>eigenorg</h1>
+      <p class="framing">A thinking aid grounded in research — not a prediction engine. Every run is a seeded Monte Carlo simulation; nothing leaves your browser.</p>
+    </header>
 
-    <section class="panel" aria-labelledby="engine-heading">
-      <h2 id="engine-heading">Engine</h2>
-      <dl class="status">
-        <div class="row">
-          <dt>Status</dt>
-          <dd id="engine-status">starting worker…</dd>
-        </div>
-        <div class="row">
-          <dt>Model version</dt>
-          <dd id="model-version">—</dd>
-        </div>
-        <div class="row">
-          <dt>Echo round-trip</dt>
-          <dd id="echo-result">—</dd>
-        </div>
-        <div class="row">
-          <dt>π probe (500-iteration Monte Carlo)</dt>
-          <dd id="pi-result">—</dd>
-        </div>
-        <div class="row">
-          <dt>Probe timing</dt>
-          <dd id="pi-timing">—</dd>
-        </div>
-      </dl>
+    <div id="replay-banner" class="banner" role="status" hidden></div>
+
+    <!-- ============ scenario + run ============ -->
+    <section class="panel" aria-labelledby="run-heading">
+      <p class="eyebrow">Scenario</p>
+      <div class="panel-header">
+        <h2 id="run-heading">Org Entropy Simulator</h2>
+      </div>
+      <div id="preset-picker" class="chip-row" role="group" aria-label="scenario presets"></div>
+      <p id="preset-note" class="note"></p>
+      <div class="run-row">
+        <button id="run-button" type="button" disabled>Run simulation</button>
+        <progress id="run-progress" max="1500" value="0" aria-label="simulation progress"></progress>
+      </div>
+      <p id="run-status" class="status" role="status" aria-live="polite">starting engine…</p>
+      <p id="run-readout" class="readout" aria-label="run parameters">
+        <span id="ro-model">model —</span><span id="ro-seed"></span><span id="ro-iters"></span><span id="ro-elapsed"></span>
+      </p>
     </section>
 
-    <section class="panel" aria-labelledby="chart-heading">
-      <h2 id="chart-heading">Placeholder chart</h2>
-      <p class="note">Static placeholder data — proves the vendored Chart.js bundle renders under the subpath.</p>
-      <div class="chart-box">
-        <canvas id="placeholder-chart" role="img" aria-label="Placeholder line chart with static demo data"></canvas>
+    <!-- ============ before/after pane (the story) ============ -->
+    <section class="panel" aria-labelledby="pane-heading">
+      <p class="eyebrow">Before / after</p>
+      <!-- Neutral default; paint() sets "Same org, same AI — structure decides"
+           only when AI is actually active in the pane pair (P5b-F1 fold). -->
+      <h2 id="pane-heading">Same org — structure decides</h2>
+      <p id="meaning-pane" class="meaning"></p>
+      <div class="pane-grid">
+        <article class="pane-card" aria-labelledby="pane-before-title">
+          <h3 id="pane-before-title"><span id="pane-before-label">Structural Health 3</span> <span id="pane-before-tag" class="tag" hidden>your org</span></h3>
+          <div class="chart-box chart-box-sm">
+            <canvas id="pane-before-chart" role="img" aria-label="Entropy over time at the lower Structural Health: median line inside the 10th to 90th percentile band"></canvas>
+          </div>
+          <dl class="stat-row" id="pane-before-stats"></dl>
+        </article>
+        <article class="pane-card" aria-labelledby="pane-after-title">
+          <h3 id="pane-after-title"><span id="pane-after-label">Structural Health 7</span> <span id="pane-after-tag" class="tag" hidden>your org</span></h3>
+          <div class="chart-box chart-box-sm">
+            <canvas id="pane-after-chart" role="img" aria-label="Entropy over time at the higher Structural Health: median line inside the 10th to 90th percentile band"></canvas>
+          </div>
+          <dl class="stat-row" id="pane-after-stats"></dl>
+        </article>
       </div>
     </section>
+
+    <!-- ============ org controls ============ -->
+    <section class="panel" aria-labelledby="controls-heading">
+      <p class="eyebrow">Your org</p>
+      <div class="panel-header">
+        <h2 id="controls-heading">Structure controls</h2>
+        <button id="run-button-2" type="button" class="ghost" disabled>Run simulation</button>
+      </div>
+      <p class="note">Changes apply on the next run. Structural Health folds five observable diagnostics (ownership, WIP discipline, async norms, decision authority, recovery path) into one 1–10 scale.</p>
+      <div id="org-controls" class="controls-grid"></div>
+    </section>
+
+    <!-- ============ charts ============ -->
+    <div class="charts-grid">
+      <section class="panel" aria-labelledby="entropy-heading">
+        <p class="eyebrow">Disorder</p>
+        <h2 id="entropy-heading">Entropy</h2>
+        <p id="meaning-entropy" class="meaning">Composite disorder index (0–100), p50 line inside the p10–p90 Monte Carlo band.</p>
+        <div class="chart-box">
+          <canvas id="entropy-chart" role="img" aria-label="Entropy over time: median line with 10th to 90th percentile band; a labeled vertical line marks the AI injection step when active"></canvas>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="velocity-heading">
+        <p class="eyebrow">Decisions</p>
+        <div class="panel-header">
+          <h2 id="velocity-heading">Decision velocity</h2>
+          <span id="bottleneck-badge" class="badge" hidden></span>
+        </div>
+        <p id="meaning-velocity" class="meaning">A 0–100 speedometer for decisions: layers add friction, queues drag it lower.</p>
+        <div class="chart-box">
+          <canvas id="velocity-chart" role="img" aria-label="Decision velocity over time: median line with 10th to 90th percentile band; the bottleneck layer is named in the badge above"></canvas>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="comm-heading">
+        <p class="eyebrow">Coordination</p>
+        <h2 id="comm-heading">Communication load</h2>
+        <p id="meaning-communication" class="meaning">Open channels inside and between teams; labeled vertical lines mark cognitive band crossings.</p>
+        <div class="chart-box">
+          <canvas id="comm-chart" role="img" aria-label="Communication channels over time: median line with 10th to 90th percentile band; labeled vertical lines mark cognitive band crossings"></canvas>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="delta-heading">
+        <p class="eyebrow">Counterfactual</p>
+        <h2 id="delta-heading">AI injection delta</h2>
+        <p id="meaning-delta" class="meaning">Pointwise difference, AI minus no-AI, on this exact org.</p>
+        <div class="chart-box">
+          <canvas id="delta-chart" role="img" aria-label="AI injection delta: entropy difference (solid) and throughput difference (dashed) between the AI run and the no-AI counterfactual"></canvas>
+        </div>
+        <p id="delta-empty" class="empty-note" hidden></p>
+      </section>
+
+      <section class="panel" aria-labelledby="meetings-heading">
+        <p class="eyebrow">Coordination</p>
+        <h2 id="meetings-heading">Meeting overhead</h2>
+        <p id="meaning-meetings" class="meaning">Share of each step's capacity spent coordinating instead of working.</p>
+        <div class="chart-box">
+          <canvas id="meetings-chart" role="img" aria-label="Meeting overhead as a percentage of capacity over time: median line with 10th to 90th percentile band"></canvas>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="health-heading">
+        <p class="eyebrow">Multi-level health</p>
+        <h2 id="health-heading">Teams vs the org</h2>
+        <p id="meaning-health" class="meaning">Team cohesion vs org-level health: divergence means healthy teams inside a sick org.</p>
+        <div class="chart-box">
+          <canvas id="health-chart" role="img" aria-label="Org health (solid) versus mean team cohesion (dashed) over time"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <!-- ============ share ============ -->
+    <section class="panel" aria-labelledby="share-heading">
+      <p class="eyebrow">Reproduce</p>
+      <h2 id="share-heading">Share this run</h2>
+      <p class="note">The link embeds the seed, the config and the full resolved coefficient set — whoever opens it replays this exact run, byte for byte, in their own browser.</p>
+      <div class="run-row">
+        <button id="share-button" type="button" disabled>Copy share link</button>
+      </div>
+      <p id="share-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <footer class="page-footer">
+      <p class="framing">A thinking aid grounded in research — not a prediction engine.</p>
+      <p class="meta">Model coefficients carry evidence tiers and ranges in <span class="mono">MODEL.md</span>; adjustable via config (paramOverrides). Zero requests leave this page.</p>
+    </footer>
   </main>
 
   <script src="./vendor/chart.umd.min.js"></script>
