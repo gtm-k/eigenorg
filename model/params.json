@@ -1,5 +1,5 @@
 {
-  "modelVersion": "2.0.0",
+  "modelVersion": "2.1.0",
   "schemaVersion": "1",
   "parameters": [
     {
@@ -1161,7 +1161,7 @@
     },
     {
       "id": "brittlenessNormPerStep",
-      "value": 0.5,
+      "value": 0.35,
       "range": [
         0.2,
         1
@@ -1172,7 +1172,7 @@
       "tier": "editorial-heuristic",
       "limitation": "Normalization constant.",
       "formula": "xBrit = min(1, brittleEMA / brittlenessNormPerStep) (M13)",
-      "plainLanguage": "A failure every other day counts as maximal brittleness."
+      "plainLanguage": "A failure roughly every three working days counts as maximal brittleness."
     },
     {
       "id": "wipNormPerPerson",

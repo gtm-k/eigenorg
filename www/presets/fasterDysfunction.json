@@ -1,0 +1,95 @@
+{
+  "id": "fasterDysfunction",
+  "label": "Faster Dysfunction: AI on broken coordination",
+  "source": "MODEL.md §10.3 (normative scenario config, materialized verbatim)",
+  "runs": {
+    "sh3": {
+      "schemaVersion": "1",
+      "modelVersion": "2.0.0",
+      "sim": "org",
+      "seed": 42,
+      "iterations": 500,
+      "horizon": 60,
+      "org": {
+        "headcountStart": 40,
+        "headcountGrowthPerStep": 0,
+        "topology": "pods",
+        "hierarchyDepth": 3,
+        "ownershipLayers": 1,
+        "initialBacklog": 30,
+        "modality": "meetingHeavy",
+        "structuralHealth": 3,
+        "aiInjection": {
+          "enabled": true,
+          "atStep": 15
+        }
+      }
+    },
+    "sh7": {
+      "schemaVersion": "1",
+      "modelVersion": "2.0.0",
+      "sim": "org",
+      "seed": 42,
+      "iterations": 500,
+      "horizon": 60,
+      "org": {
+        "headcountStart": 40,
+        "headcountGrowthPerStep": 0,
+        "topology": "pods",
+        "hierarchyDepth": 3,
+        "ownershipLayers": 1,
+        "initialBacklog": 30,
+        "modality": "meetingHeavy",
+        "structuralHealth": 7,
+        "aiInjection": {
+          "enabled": true,
+          "atStep": 15
+        }
+      }
+    },
+    "sh3NoAi": {
+      "schemaVersion": "1",
+      "modelVersion": "2.0.0",
+      "sim": "org",
+      "seed": 42,
+      "iterations": 500,
+      "horizon": 60,
+      "org": {
+        "headcountStart": 40,
+        "headcountGrowthPerStep": 0,
+        "topology": "pods",
+        "hierarchyDepth": 3,
+        "ownershipLayers": 1,
+        "initialBacklog": 30,
+        "modality": "meetingHeavy",
+        "structuralHealth": 3,
+        "aiInjection": {
+          "enabled": false,
+          "atStep": 0
+        }
+      }
+    },
+    "sh7NoAi": {
+      "schemaVersion": "1",
+      "modelVersion": "2.0.0",
+      "sim": "org",
+      "seed": 42,
+      "iterations": 500,
+      "horizon": 60,
+      "org": {
+        "headcountStart": 40,
+        "headcountGrowthPerStep": 0,
+        "topology": "pods",
+        "hierarchyDepth": 3,
+        "ownershipLayers": 1,
+        "initialBacklog": 30,
+        "modality": "meetingHeavy",
+        "structuralHealth": 7,
+        "aiInjection": {
+          "enabled": false,
+          "atStep": 0
+        }
+      }
+    }
+  }
+}

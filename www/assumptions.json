@@ -1,5 +1,5 @@
 {
-  "modelVersion": "2.0.0",
+  "modelVersion": "2.1.0",
   "generatedBy": "scripts/extract_params.mjs from MODEL.md - do not edit by hand",
   "items": [
     {
@@ -1237,12 +1237,12 @@
     {
       "type": "parameter",
       "id": "brittlenessNormPerStep",
-      "plainLanguage": "A failure every other day counts as maximal brittleness.",
+      "plainLanguage": "A failure roughly every three working days counts as maximal brittleness.",
       "formula": "xBrit = min(1, brittleEMA / brittlenessNormPerStep) (M13)",
       "tier": "editorial-heuristic",
       "limitation": "Normalization constant.",
       "anchor": "Editorial",
-      "value": 0.5,
+      "value": 0.35,
       "range": [
         0.2,
         1

@@ -69,7 +69,7 @@ mod tests {
 
     #[test]
     fn model_version_comes_from_params_json() {
-        assert_eq!(model_version(), "2.0.0");
+        assert_eq!(model_version(), "2.1.0");
     }
 
     #[test]

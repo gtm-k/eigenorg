@@ -190,3 +190,136 @@ fn retuned_v2_org_goldens_green() {
     }
     assert_eq!(checked, 12, "expected 4+3+5 = 12 org-side v2 goldens");
 }
+
+/// P4: the 5 org presets (`www/presets/*.json`, browser-fetchable) materialize
+/// the §10 scenario configs. One definition, no drift: every preset run config
+/// must (a) pass full serde + `validate()`, (b) be VALUE-IDENTICAL to the
+/// committed `fixtures/scenarios/<id>__<run>.json` twin the golden harness and
+/// the double-validation gate consume, and (c) carry the §10-normative golden
+/// instrument settings (seed 42, 500 iterations). Every run label referenced by
+/// that scenario's golden assertions must exist in the preset.
+#[test]
+fn org_presets_are_plausible_and_drift_free() {
+    let preset_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("www/presets");
+    let mut files: Vec<_> = std::fs::read_dir(&preset_dir)
+        .expect("www/presets must exist")
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().map(|e| e == "json").unwrap_or(false))
+        .collect();
+    files.sort();
+    assert_eq!(files.len(), 5, "expected exactly 5 org presets");
+
+    let assertions = load_assertions();
+    let mut seen_ids = Vec::new();
+    for path in &files {
+        let text = std::fs::read_to_string(path).unwrap();
+        let preset: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let id = preset["id"].as_str().expect("preset id");
+        assert_eq!(
+            path.file_stem().unwrap().to_str().unwrap(),
+            id,
+            "preset filename must match its id"
+        );
+        assert!(
+            preset["label"]
+                .as_str()
+                .map(|l| !l.is_empty())
+                .unwrap_or(false),
+            "preset {id} needs a label"
+        );
+        let runs = preset["runs"].as_object().expect("preset runs map");
+
+        // (a)+(b)+(c): each run validates, runs on the engine's authoring
+        // path, matches its fixture twin, and pins seed 42 / 500 iterations.
+        for (run_label, cfg) in runs {
+            let cfg_text = serde_json::to_string(cfg).unwrap();
+            let parsed: eigenorg::config::Config = serde_json::from_str(&cfg_text)
+                .unwrap_or_else(|e| panic!("preset {id}@{run_label} must parse: {e}"));
+            parsed
+                .validate()
+                .unwrap_or_else(|e| panic!("preset {id}@{run_label} must validate: {e}"));
+            assert_eq!(cfg["seed"], 42, "preset {id}@{run_label} seed");
+            assert_eq!(cfg["iterations"], 500, "preset {id}@{run_label} iterations");
+            let fixture: serde_json::Value = serde_json::from_str(&common::read_fixture(&format!(
+                "fixtures/scenarios/{id}__{run_label}.json"
+            )))
+            .unwrap();
+            assert_eq!(
+                *cfg, fixture,
+                "preset {id}@{run_label} drifted from its fixture twin"
+            );
+        }
+
+        // Golden coverage: every @runLabel this scenario's assertions name
+        // exists in the preset.
+        for a in assertions.iter().filter(|a| a.scenario == id) {
+            for term in a.metric.split(' ') {
+                if let Some((_, run)) = term.split_once('@') {
+                    assert!(
+                        runs.contains_key(run),
+                        "preset {id} is missing run {run:?} required by golden {}",
+                        a.id
+                    );
+                }
+            }
+        }
+        seen_ids.push(id.to_string());
+    }
+    assert_eq!(
+        seen_ids,
+        vec![
+            "coordinationCollapse",
+            "dunbarCliff",
+            "fasterDysfunction",
+            "layerConfigurator",
+            "prioritizationTax"
+        ],
+        "the 5 org presets are the §10.1–10.4 + §10.6 scenarios"
+    );
+}
+
+/// P4 hard gate: the remaining org-side goldens — §11.3 prioritizationTax (6),
+/// §11.4 fasterDysfunction (6, including the monteCarlo visual-separability
+/// predicate `fdSeparability`), §11.5 dunbarCliff (5), §11.7 layerConfigurator
+/// (4) — GREEN via the generic evaluator, all with the ONE default coefficient
+/// set (seed 42, 500 iterations, per §10). With coordinationCollapse (P3) this
+/// completes 4/5 of the launch stress suite; hollowMiddle (team) is P7a's.
+#[test]
+fn remaining_org_goldens_green() {
+    let scenarios: &[(&str, &[&str], usize)] = &[
+        ("prioritizationTax", &["threeLayer", "oneLayer"], 6),
+        (
+            "fasterDysfunction",
+            &["sh3", "sh7", "sh3NoAi", "sh7NoAi"],
+            6,
+        ),
+        ("dunbarCliff", &["main"], 5),
+        ("layerConfigurator", &["aiMiddle", "allHuman"], 4),
+    ];
+    let assertions = load_assertions();
+    for (scenario, runs, expected) in scenarios {
+        let run_map = scenario_runs(scenario, runs);
+        let mut checked = 0;
+        for a in assertions.iter().filter(|a| &a.scenario == scenario) {
+            let o = evaluate(a, &run_map);
+            println!(
+                "[p4-golden] {:<26} {} measured={:.4} bound={} tol={}",
+                a.id,
+                if o.pass { "pass" } else { "FAIL" },
+                o.measured,
+                a.bound,
+                a.tolerance
+            );
+            assert!(
+                o.pass,
+                "org golden {} FAILED: measured {} ({})",
+                a.id, o.measured, o.detail
+            );
+            checked += 1;
+        }
+        assert_eq!(
+            checked, *expected,
+            "expected {expected} {scenario} assertions"
+        );
+    }
+}

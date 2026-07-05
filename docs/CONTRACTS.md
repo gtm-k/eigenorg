@@ -72,11 +72,16 @@ payload or an error envelope `{ "error": { "type", "message" } }` (`type ∈
 
 - `sim` is `"org"` or `"team"`; it must match `config.sim`. The **team** arm
   returns a typed `notImplemented` error until P7a (signature frozen; body later).
-- An org run with `org.aiInjection.enabled == true` also returns a typed
-  `notImplemented` error: the M9/M11 execution effects and the M12 cohesion-AI term
-  are P4 scope, so running injection now would emit a silent-wrong output. **P4
-  removes this guard when M9/M11/M12-AI land; signature-stable.** Every committed
-  config sets `enabled: false`, so the default path is unaffected.
+- The P3-era org `aiInjection` NotImplemented guard is **gone (removed at P4, as
+  planned here; signature-stable — no export changed)**: the M9/M11 execution
+  effects and the M12 cohesion-AI term are implemented, so an org run with
+  `org.aiInjection.enabled == true` runs normally. An inactive injection
+  (`enabled: false`, or `atStep` beyond the horizon) is an exact no-op — the
+  series payload is byte-identical to the same config with the injection block
+  absent or its `atStep` beyond the horizon (tested in `src/mechanics/org.rs`).
+  Configs with **no `aiAgent`-typed seats** additionally reproduce the P3 kernel
+  series byte-for-byte EXCEPT `brittlenessRate`, which P3 pinned to 0 and which
+  now reports real per-step brittleness events per MODEL.md §7.1.
 - **Lifecycle:** `begin_run` → repeated `run_chunk(n)` until
   `completedCount == totalIterations` → `finalize()`. `finalize()` is a pure read
   (idempotent). **Cancel = `cancel()` (or a new `begin_run`), then begin again;**
