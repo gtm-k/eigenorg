@@ -22,16 +22,24 @@
 /** Codec version this module writes and the only one it accepts. */
 export const CODEC_VERSION = 1;
 
+/**
+ * Hard budget for the full '#s=…' fragment. 2,000 chars keeps the whole URL
+ * inside the classic cross-browser/proxy URL-length floor. encodeShare throws
+ * a typed ShareUrlError('budget') beyond it — overflow is observable, never a
+ * silently-truncatable link.
+ */
+export const SHARE_FRAGMENT_BUDGET = 2000;
+
 /** The only major schemaVersion this UI understands (MODEL.md §12.5). */
 const SUPPORTED_SCHEMA_MAJOR = '1';
 
 /**
  * Typed decode/encode failure.
- * code ∈ 'malformed' | 'unsupportedCodecVersion' | 'unsupportedSchemaVersion'
+ * code ∈ 'malformed' | 'unsupportedCodecVersion' | 'unsupportedSchemaVersion' | 'budget'
  */
 export class ShareUrlError extends Error {
   /**
-   * @param {'malformed' | 'unsupportedCodecVersion' | 'unsupportedSchemaVersion'} code
+   * @param {'malformed' | 'unsupportedCodecVersion' | 'unsupportedSchemaVersion' | 'budget'} code
    * @param {string} message user-presentable explanation
    */
   constructor(code, message) {
@@ -126,12 +134,49 @@ async function inflateRaw(bytes) {
  */
 
 /**
+ * Whether a config's paramOverrides are exactly the resolvedParams being
+ * embedded — the replay case (buildReplayConfig injects the full set), where
+ * carrying both would double the ~108-param payload for nothing.
+ * Values are numbers or number arrays (CONTRACTS §4 / params.json).
+ *
+ * @param {Record<string, number | number[]> | undefined} overrides
+ * @param {Record<string, number | number[]>} resolved
+ * @returns {boolean}
+ */
+function overridesEqualResolved(overrides, resolved) {
+  if (!overrides || typeof overrides !== 'object') return false;
+  const keys = Object.keys(overrides);
+  if (keys.length !== Object.keys(resolved).length) return false;
+  for (const key of keys) {
+    const a = overrides[key];
+    const b = resolved[key];
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i += 1) {
+        if (a[i] !== b[i]) return false;
+      }
+    } else if (a !== b) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Encode a run into the share-fragment value (the part after '#s=').
  * `sim` / `seed` default from the config and, when given, must agree with it
  * (the frozen fragment shape carries them alongside the config).
  *
+ * Replay normalization: when config.paramOverrides is EXACTLY the
+ * resolvedParams being embedded (re-sharing an unedited replayed run), the
+ * embedded config drops `paramOverrides` and `replay` — decode +
+ * buildReplayConfig reconstructs both from the embedded resolvedParams, so
+ * replay semantics are unchanged while the fragment stops carrying the
+ * full 108-param set twice (measured overflow: 2005 > 2000 budget chars).
+ *
  * @param {{ config: any, resolvedParams: Record<string, number | number[]>, sim?: string, seed?: number }} parts
  * @returns {Promise<string>}
+ * @throws {ShareUrlError} 'budget' when the fragment would exceed SHARE_FRAGMENT_BUDGET
  */
 export async function encodeShare(parts) {
   const { config, resolvedParams } = parts;
@@ -149,10 +194,25 @@ export async function encodeShare(parts) {
   if (seed !== config.seed) {
     throw new ShareUrlError('malformed', `encodeShare: seed ${seed} disagrees with config.seed ${config.seed}`);
   }
+  let embeddedConfig = config;
+  if (overridesEqualResolved(config.paramOverrides, resolvedParams)) {
+    // Shallow copy preserves key order; the caller's config is not mutated.
+    embeddedConfig = { ...config };
+    delete embeddedConfig.paramOverrides;
+    delete embeddedConfig.replay;
+  }
   /** @type {SharePayload} */
-  const payload = { v: CODEC_VERSION, sim, seed, config, resolvedParams };
+  const payload = { v: CODEC_VERSION, sim, seed, config: embeddedConfig, resolvedParams };
   const json = new TextEncoder().encode(JSON.stringify(payload));
-  return bytesToBase64url(await deflateRaw(json));
+  const encoded = bytesToBase64url(await deflateRaw(json));
+  const fragmentLength = toShareFragment(encoded).length;
+  if (fragmentLength > SHARE_FRAGMENT_BUDGET) {
+    throw new ShareUrlError(
+      'budget',
+      `share URL fragment is ${fragmentLength} chars — over the ${SHARE_FRAGMENT_BUDGET}-char budget; this run cannot be shared as a link`,
+    );
+  }
+  return encoded;
 }
 
 /**
@@ -189,6 +249,21 @@ export async function decodeShare(encoded) {
   }
   if (!payload.resolvedParams || typeof payload.resolvedParams !== 'object') {
     throw new ShareUrlError('malformed', 'share URL payload has no resolvedParams');
+  }
+  // sim/seed ride alongside the config in the frozen fragment shape — they
+  // must be present, typed, and in agreement with the embedded config (a
+  // divergent pair means the payload was hand-edited or corrupted).
+  if (typeof payload.sim !== 'string') {
+    throw new ShareUrlError('malformed', 'share URL payload has no sim');
+  }
+  if (typeof payload.seed !== 'number' || !Number.isFinite(payload.seed)) {
+    throw new ShareUrlError('malformed', 'share URL payload has no numeric seed');
+  }
+  if (payload.sim !== payload.config.sim) {
+    throw new ShareUrlError('malformed', `share URL sim "${payload.sim}" disagrees with the embedded config.sim "${payload.config.sim}"`);
+  }
+  if (payload.seed !== payload.config.seed) {
+    throw new ShareUrlError('malformed', `share URL seed ${payload.seed} disagrees with the embedded config.seed ${payload.config.seed}`);
   }
   const schemaVersion = String(payload.config.schemaVersion ?? '');
   const major = schemaVersion.split('.')[0];

@@ -143,6 +143,12 @@ export function createEngineClient(transport) {
   const pending = new Map();
   /** @type {Promise<unknown>} serialization chain — next run waits for this */
   let tail = Promise.resolve();
+  /** Runs requested but not yet posted (they sit behind the chain). */
+  let queuedNotPosted = 0;
+  /** cancel() arrived while nothing was in flight but a run was queued —
+   *  honored before the next post (a same-tick run();cancel() must never be
+   *  silently lost). */
+  let cancelNextQueued = false;
 
   transport.onMessage((msg) => {
     const { id, type, payload } = msg;
@@ -186,9 +192,18 @@ export function createEngineClient(transport) {
       const sim = options.sim ?? config.sim;
       const seed = options.seed ?? config.seed;
       const configJson = JSON.stringify(config);
+      queuedNotPosted += 1;
       const result = tail.then(
         () =>
           new Promise((resolve, reject) => {
+            queuedNotPosted -= 1;
+            if (cancelNextQueued) {
+              // A cancel() raced ahead of this run's post — honor it here
+              // instead of posting a run nobody can cancel any more.
+              cancelNextQueued = false;
+              reject(new EngineError('cancelled', 'run cancelled'));
+              return;
+            }
             const id = nextId++;
             inFlightId = id;
             pending.set(id, { resolve, reject, onProgress: options.onProgress });
@@ -205,13 +220,18 @@ export function createEngineClient(transport) {
     },
 
     /**
-     * Cancel the in-flight run (no-op when idle). The cancelled run's promise
-     * rejects with an EngineError whose `.cancelled` is true. Runs already
-     * queued behind it still execute.
+     * Cancel the in-flight run, or — when nothing has been posted yet but a
+     * run is already queued (the same-tick run(); cancel() window) — the next
+     * run to post. No-op when fully idle. The cancelled run's promise rejects
+     * with an EngineError whose `.cancelled` is true. Runs already queued
+     * behind it still execute.
      */
     cancel() {
-      if (inFlightId === null) return;
-      transport.post({ id: inFlightId, type: 'cancel' });
+      if (inFlightId !== null) {
+        transport.post({ id: inFlightId, type: 'cancel' });
+        return;
+      }
+      if (queuedNotPosted > 0) cancelNextQueued = true;
     },
 
     /** @returns {boolean} whether a run is currently in flight */

@@ -119,6 +119,25 @@ test('cancel() when idle is a no-op', async () => {
   assert.equal(result.outputJson, outputJson);
 });
 
+test('same-tick run(); cancel() cancels the just-queued run (never silently lost)', async () => {
+  // run() posts on a microtask (behind the serialization chain), so a cancel()
+  // issued in the SAME tick used to find inFlightId === null and no-op — the
+  // run then completed as if never cancelled (P5 round-1 LOW, empirically
+  // confirmed). The cancel-requested flag must be honored before the post.
+  const client = createEngineClient(fixtureTransport());
+  const running = client.run({ config });
+  client.cancel(); // same tick — the run message has NOT been posted yet
+  await assert.rejects(running, (/** @type {any} */ err) => {
+    assert.ok(err instanceof EngineError);
+    assert.equal(err.cancelled, true);
+    assert.equal(err.type, 'cancelled');
+    return true;
+  });
+  // The client is not wedged: a fresh run still works.
+  const rerun = await client.run({ config });
+  assert.equal(rerun.outputJson, outputJson);
+});
+
 test('a missing fixture rejects with a typed EngineError and does not block later runs', async () => {
   const client = createEngineClient(fixtureTransport());
   const unknownConfig = { ...config, seed: config.seed + 1 };

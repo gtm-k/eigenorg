@@ -20,6 +20,7 @@ import { deflateRawSync } from 'node:zlib';
 
 import {
   CODEC_VERSION,
+  SHARE_FRAGMENT_BUDGET,
   ShareUrlError,
   encodeShare,
   decodeShare,
@@ -94,6 +95,89 @@ test('every encoded preset share fragment is < 2000 chars (URL budget)', async (
       `${presetId}.${runId}: encoded fragment is ${fragment.length} chars (budget 2000)`,
     );
   }
+});
+
+test('re-share loop (encode→decode→buildReplayConfig→re-encode) stays < 2000 for EVERY preset run', async () => {
+  // Re-sharing an UNEDITED replayed run used to double-carry the 108-param
+  // set (config.paramOverrides + resolvedParams) and measurably overflow the
+  // budget: layerConfigurator.aiMiddle re-share = 2005 > 2000 chars (P5
+  // round-1 F3). encodeShare now strips the replay machinery from the
+  // embedded config when it is exactly the resolvedParams being embedded.
+  for (const { presetId, runId, config } of allPresetRuns()) {
+    const label = `${presetId}.${runId}`;
+    const resolvedParams = fullResolvedParams(config);
+
+    // First share → replay boot (what a recipient's browser runs).
+    const encoded1 = await encodeShare({ config, resolvedParams });
+    const payload1 = await decodeShare(encoded1);
+    const replayConfig = buildReplayConfig(payload1);
+
+    // Re-share of the UNEDITED replayed run: the config as run IS the replay
+    // config, and the replay run's resolvedParams are the embedded set.
+    const encoded2 = await encodeShare({ config: replayConfig, resolvedParams: payload1.resolvedParams });
+    const fragment2 = toShareFragment(encoded2);
+    assert.ok(
+      fragment2.length < 2000,
+      `${label}: re-share fragment is ${fragment2.length} chars (budget 2000)`,
+    );
+
+    // Round-trip semantics preserved: the re-shared link reconstructs the
+    // exact same replay config (full-set paramOverrides + replay:true), and
+    // the embedded config carries no replay machinery.
+    const payload2 = await decodeShare(encoded2);
+    assert.equal(payload2.config.paramOverrides, undefined, `${label}: re-share must not embed the full-set paramOverrides`);
+    assert.equal(payload2.config.replay, undefined, `${label}: re-share must not embed the replay flag`);
+    assert.equal(
+      JSON.stringify(payload2.config),
+      JSON.stringify(payload1.config),
+      `${label}: re-shared embedded config drifted from the original share`,
+    );
+    assert.equal(
+      JSON.stringify(payload2.resolvedParams),
+      JSON.stringify(payload1.resolvedParams),
+      `${label}: re-shared resolvedParams drifted`,
+    );
+    assert.equal(
+      JSON.stringify(buildReplayConfig(payload2)),
+      JSON.stringify(replayConfig),
+      `${label}: re-shared link does not reconstruct the identical replay config`,
+    );
+  }
+});
+
+test('encodeShare preserves AUTHORED partial paramOverrides (strip fires only on the full replay set)', async () => {
+  const { config } = allPresetRuns()[0];
+  const resolvedParams = fullResolvedParams(config);
+  const someKey = Object.keys(resolvedParams)[0];
+  const authored = { ...config, paramOverrides: { [someKey]: resolvedParams[someKey] } };
+  const payload = await decodeShare(await encodeShare({ config: authored, resolvedParams }));
+  assert.deepEqual(payload.config.paramOverrides, authored.paramOverrides, 'partial overrides must survive the codec');
+});
+
+test('encodeShare does not mutate the caller config when stripping the replay set', async () => {
+  const { config } = allPresetRuns()[0];
+  const resolvedParams = fullResolvedParams(config);
+  const replayConfig = buildReplayConfig(await decodeShare(await encodeShare({ config, resolvedParams })));
+  const before = JSON.stringify(replayConfig);
+  await encodeShare({ config: replayConfig, resolvedParams });
+  assert.equal(JSON.stringify(replayConfig), before, 'caller config was mutated by encodeShare');
+});
+
+test('encodeShare over the 2000-char budget throws a typed ShareUrlError(budget), never a silent overlong link', async () => {
+  const { config } = allPresetRuns()[0];
+  const resolvedParams = fullResolvedParams(config);
+  // Deterministic low-compressibility ballast pushes the fragment over budget.
+  const ballast = Array.from({ length: 800 }, (_, i) => Math.sin(i + 1));
+  const oversized = { ...config, ballast };
+  await assert.rejects(
+    encodeShare({ config: oversized, resolvedParams }),
+    (/** @type {any} */ err) => {
+      assert.ok(err instanceof ShareUrlError);
+      assert.equal(err.code, 'budget');
+      assert.match(err.message, new RegExp(String(SHARE_FRAGMENT_BUDGET)));
+      return true;
+    },
+  );
 });
 
 test('encoding is deterministic (same payload → same fragment)', async () => {
@@ -182,6 +266,31 @@ test('malformed inputs are rejected with typed errors, never crashes', async () 
     await assert.rejects(decodeShare(bad), (/** @type {any} */ err) => {
       assert.ok(err instanceof ShareUrlError, `expected ShareUrlError for ${JSON.stringify(bad)}`);
       assert.equal(err.code, 'malformed');
+      return true;
+    });
+  }
+});
+
+test('decodeShare rejects payloads with missing, mistyped, or config-divergent sim/seed', async () => {
+  const { config } = allPresetRuns()[0];
+  const good = await decodeShare(await encodeShare({ config, resolvedParams: fullResolvedParams(config) }));
+
+  /** @param {any} forged */
+  const forge = (forged) => deflateRawSync(JSON.stringify(forged)).toString('base64url');
+
+  const cases = [
+    ['missing sim', (() => { const p = /** @type {any} */ ({ ...good }); delete p.sim; return p; })()],
+    ['non-string sim', { ...good, sim: 7 }],
+    ['missing seed', (() => { const p = /** @type {any} */ ({ ...good }); delete p.seed; return p; })()],
+    ['non-number seed', { ...good, seed: String(good.seed) }],
+    ['non-finite seed', { ...good, seed: null }],
+    ['sim disagreeing with config.sim', { ...good, sim: 'team' }],
+    ['seed disagreeing with config.seed', { ...good, seed: good.seed + 1 }],
+  ];
+  for (const [name, forged] of cases) {
+    await assert.rejects(decodeShare(forge(forged)), (/** @type {any} */ err) => {
+      assert.ok(err instanceof ShareUrlError, `${name}: expected ShareUrlError`);
+      assert.equal(err.code, 'malformed', `${name}: expected code 'malformed'`);
       return true;
     });
   }

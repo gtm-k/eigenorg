@@ -132,11 +132,12 @@ async function executeRun(id, payload) {
   }
 
   const outputJson = wasm.finalize();
-  // finalize() returns the output JSON or an error envelope; an envelope is a
-  // JSON object with a single `error` key — probe it cheaply before shipping.
-  if (outputJson.startsWith('{"error"')) {
-    if (parseEngineReply(id, outputJson) === null) return;
-  }
+  // finalize() returns the output JSON or an error envelope. Parse it
+  // UNCONDITIONALLY — probing the raw string for '{"error"' would couple the
+  // check to one exact serialization and ship any differently-formatted
+  // envelope as a false success. The RAW string still travels in the result
+  // message (byte-identity carrier for the share/replay contract).
+  if (parseEngineReply(id, outputJson) === null) return;
   post({ id, type: 'result', payload: outputJson });
 }
 
