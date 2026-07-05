@@ -6,9 +6,10 @@ policy are defined here and nowhere else. `model/params.json`, `model/goldens.js
 `www/assumptions.json` are machine-extracted from this file by `scripts/extract_params.mjs`;
 `docs/CONTRACTS.md` is a derived operational copy. On any conflict, this document wins.
 
-**Status:** v2.0.0 pending user lock (post-calibration lock gate). The G2 GO approved
-v2.0.0 to implement; the lock follows P3c calibration, exactly as v1.0.0 locked after
-P1's calibration.
+**Status:** v2.0.0 **USER-LOCKED 2026-07-05** (post-calibration lock gate; P3 phase gate).
+Post-lock changes only via the amendment protocol (§11.12 lock lifecycle): orchestrator
+single-writer, within-range coefficient changes flagged in review, range/parameter/
+tolerance/predicate changes require a mini-G2 user gate.
 **Extraction:** fenced blocks tagged `json eigenorg:parameter`, `json eigenorg:mechanic`,
 `json eigenorg:golden`, and `json eigenorg:meta` are machine-extracted. Untagged `json`
 fences are illustrative only.
