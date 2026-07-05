@@ -33,7 +33,7 @@ import {
   legibilitySummary,
   whatThisMeans,
 } from '../ui/prioritization.js';
-import { encodeShare, decodeShare, buildReplayConfig } from '../url-codec.js';
+import { encodeShare, decodeShare, buildReplayConfig, toShareFragment, SHARE_FRAGMENT_BUDGET } from '../url-codec.js';
 import { buildShareConfig } from '../ui/share.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -275,4 +275,24 @@ test('legibilitySummary reads settled latency + cumulative brittleness from both
   assert.deepEqual(s.twin, { latency: 6, brittleness: 0 });
   assert.equal(legibilitySummary(primary).twin, null);
   assert.equal(settledLatency({}), null);
+});
+
+// ---- 12. codec coverage + length for a maximal configurator config (G6) ----
+
+test('12. a maximal configurator config (5 mixed layers + µ + matrix) round-trips byte-equal and stays under the share budget', async () => {
+  // The share codec is P5-tested on presets; no shipped preset carries
+  // layerOwnerCount/matrix, so P6 re-checks the maximal reachable config to
+  // catch any field-aware encoding that could silently drop a P6 field.
+  const maximal = configWithStack(aiMiddle(), ['humanDirector', 'aiAgent', 'committee', 'humanPm', 'aiAgent']);
+  maximal.org.layerOwnerCount = [1, 2, 3, 2, 1]; // terminal seat µ=1 (matrix rule)
+  maximal.org.matrix = { enabled: true, tiebreaker: 0.5 };
+  const valid = validateConfig(maximal);
+  assert.ok(valid, `maximal config invalid: ${ajv.errorsText(/** @type {any} */ (validateConfig).errors)}`);
+
+  const resolvedParams = { recoveryOwnershipThreshold: 5, someArrayParam: [1, 2, 3] };
+  const shareConfig = buildShareConfig(maximal, { modelVersion: '2.1.0', resolvedParams });
+  const encoded = await encodeShare({ config: shareConfig, resolvedParams });
+  const payload = await decodeShare(encoded);
+  assert.deepEqual(payload.config, shareConfig, 'maximal config survives the codec byte-equal (no P6 field dropped)');
+  assert.ok(toShareFragment(encoded).length < SHARE_FRAGMENT_BUDGET, 'maximal configurator fragment is within the 2000-char budget');
 });
