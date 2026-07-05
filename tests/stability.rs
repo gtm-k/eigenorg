@@ -201,10 +201,38 @@ fn growing_config_bounded_and_entropy_trend_monotone_over_five_horizons() {
             w[1]
         );
     }
-    // Non-vacuity: growth must actually move entropy substantially.
+    // Non-vacuity: growth must actually move entropy substantially — and the
+    // floor must bind the GROWTH mechanic, not the initial settling transient
+    // every config shares (review R1-F6: the old `last - first > 10` floor was
+    // transient-dominated). Measured composition at seed 42 / 100 iterations:
+    // the trailing-60 mean climbs 35.14 -> 49.94 (~14.8 points total), but the
+    // static twin (long_run: the identical config with headcountGrowthPerStep
+    // = 0) itself settles at 44.69 — ~9.6 of those points are the shared
+    // transient. The floor therefore compares the growing run's FINAL
+    // trailing-60 mean against the static twin's and requires the
+    // growth-attributable excess to clear 4 entropy points: non-vacuous
+    // (measured 5.25) and impossible to satisfy from the shared transient
+    // alone, since the twin's transient is subtracted out.
+    let static_out = long_run();
+    let static_p50: Vec<f64> = static_out
+        .series
+        .get("entropy")
+        .unwrap()
+        .iter()
+        .map(|p| p.p50)
+        .collect();
+    let static_final = static_p50[static_p50.len() - 60..].iter().sum::<f64>() / 60.0;
+    let growing_final = *trailing.last().unwrap();
+    println!(
+        "[stability] growing final trailing-60 entropy mean = {growing_final:.4}, \
+         static twin final = {static_final:.4}, growth-attributable climb = {:.4}",
+        growing_final - static_final
+    );
     assert!(
-        trailing.last().unwrap() - trailing.first().unwrap() > 10.0,
-        "expected a substantial entropy climb while scaling 20 -> 90"
+        growing_final > static_final + 4.0,
+        "expected the growing config's settled entropy ({growing_final:.4}) to exceed \
+         its static twin's ({static_final:.4}) by > 4 — the climb floor must bind \
+         growth, not the shared transient"
     );
 }
 
@@ -245,10 +273,19 @@ fn injection_config_bounded_and_settles_after_l2_transient() {
         "expected sustained brittleness churn over 335 post-injection steps, got {final_cum}"
     );
     // WIP stays at most linear in t (overload guard): bounded by cumulative
-    // arrivals ~ 5.4/step * 350.
+    // arrivals — the per-step arrival rate DERIVED from Params::defaults()
+    // (taskArrivalPerPersonPerStep × the config's static headcount 40, M18)
+    // rather than a re-derived literal, so a future within-range amendment
+    // to the arrival coefficient cannot silently detune this bound.
+    let arrivals_per_step = Params::defaults().p("taskArrivalPerPersonPerStep") * 40.0;
+    assert!(
+        (arrivals_per_step - 5.4).abs() < 1e-12,
+        "derived arrival rate {arrivals_per_step} no longer matches the 5.4/step \
+         this bound was calibrated with — re-check the bound, don't just loosen it"
+    );
     for p in out.series.get("wip").unwrap() {
         assert!(
-            p.p90 <= 5.4 * 350.0,
+            p.p90 <= arrivals_per_step * 350.0,
             "wip exceeded the cumulative-arrivals linear bound at t={}",
             p.t
         );
