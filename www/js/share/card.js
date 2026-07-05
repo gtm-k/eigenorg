@@ -141,7 +141,7 @@ export function cardModel(snap) {
     : snap.scenarioLabel;
 
   const subhead = snap.aiActive
-    ? 'Layering AI on shaky structure moves work faster and makes it more disordered — faster dysfunction.'
+    ? 'Layering AI on low Structural Health moves work faster and makes it more disordered — faster dysfunction.'
     : 'Org performance is a property of structure, not headcount.';
 
   return {
