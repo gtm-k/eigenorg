@@ -117,6 +117,13 @@ pub fn resolve_team(team: &TeamConfig, params: &Params) -> TeamResolved {
 
     // M16 judgment coverage: weighted mean judgment over entities covering any
     // judgment function (weights = attention × availability), floor when none.
+    // Human judgment counts only with EFFECTIVE capacity (attention × availability
+    // > 0): M16 weights judgmentEff by exactly this product and §3.2 makes
+    // availability multiply the coverage contribution, so a zero-availability
+    // human applies no judgment and must not satisfy the hybrid-vs-autonomous
+    // gate (M16 hybridFactor / noveltyQualityPenalty) — a dead seat is not
+    // judgment. attention is always > 0 for an assigned human, so in practice
+    // this excludes exactly the availability-0 seat.
     let mut weight_sum = 0.0;
     let mut judgment_sum = 0.0;
     let mut human_judgment_covered = false;
@@ -125,7 +132,7 @@ pub fn resolve_team(team: &TeamConfig, params: &Params) -> TeamResolved {
             let w = attention(e, params) * e.availability;
             weight_sum += w;
             judgment_sum += e.judgment_quality * w;
-            if !is_ai(e) {
+            if !is_ai(e) && w > 0.0 {
                 human_judgment_covered = true;
             }
         }
@@ -706,6 +713,39 @@ mod tests {
         assert!((complex - (45.0 + 16.5 / 1.687 + 0.5)).abs() < 1e-12);
         // novel: complex − noveltyQualityPenalty (15).
         assert!((novel - (complex - 15.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn m16_zero_availability_human_is_not_judgment_coverage() {
+        // A human assigned to a judgment function but at availability 0 applies
+        // ZERO judgment: M16 weights judgmentEff by attention × availability and
+        // §3.2 makes availability multiply the coverage contribution, so a dead
+        // seat contributes nothing. It must NOT satisfy human judgment coverage —
+        // otherwise complex/novel work would dodge the autonomous-quality divisor
+        // (M16 hybridFactor) with no human judgment actually applied. RED on the
+        // pre-fix `!is_ai(e)` gate, which flipped the flag on assignment alone.
+        let p = Params::defaults();
+        let mut team = appendix_a_team();
+        // ana (human) is the only entity on a judgment function, but fully
+        // unavailable; exo (AI) executes only, covering no judgment function.
+        team.entities[0].functions = vec!["prioritization".to_string(), "review".to_string()];
+        team.entities[0].availability = 0.0;
+        team.entities[1].functions = vec!["execution".to_string()];
+        let r = resolve_team(&team, &p);
+        assert!(
+            !r.human_judgment_covered,
+            "a zero-availability human applies no judgment"
+        );
+        // No entity contributes effective judgment → judgmentEff is the floor.
+        assert!((r.judgment_eff - p.p("judgmentFloor")).abs() < 1e-12);
+        // Consequence (M16): complex work takes the autonomous divisor. exo is
+        // the only executor (reliability 7 → reliability term 0).
+        assert!((r.mean_rel_exec - 7.0).abs() < 1e-12);
+        let complex = quality_mu(TaskClass::Complex, &r, &p);
+        let expected = p.p("qualityBase")
+            + p.p("qualityJudgmentWeight") * p.p("judgmentFloor")
+                / p.p("hybridVsAutonomousAdvantage");
+        assert!((complex - expected).abs() < 1e-12);
     }
 
     #[test]
