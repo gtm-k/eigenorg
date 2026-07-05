@@ -176,10 +176,17 @@ pub fn resolve_team(team: &TeamConfig, params: &Params) -> TeamResolved {
         params.p("humanNovelFailureBase")
     };
 
-    // M11 prioritization service factors.
-    let (prio_routine_factor, prio_other_factor) = if ai_prio && !human_prio {
+    // M11 prioritization service factors. The routine latency factor applies
+    // when ANY AI covers prioritization ("if any AI covers prioritization,
+    // routine service time *= aiRoutineLatencyFactor") — including a mixed
+    // human+AI seat. This is deliberately broader than the brittleness gate
+    // (brittle_base above), whose clause carries the explicit "and no human is
+    // assigned" qualifier; the two gates differ by that qualifier's presence.
+    // Nobody on prioritization → the uncovered factor on every class; a
+    // human-only seat is neutral.
+    let (prio_routine_factor, prio_other_factor) = if ai_prio {
         (params.p("aiRoutineLatencyFactor"), 1.0)
-    } else if !ai_prio && !human_prio {
+    } else if !human_prio {
         let u = params.p("uncoveredPrioritizationFactor");
         (u, u)
     } else {
@@ -673,6 +680,22 @@ mod tests {
         let un = resolve_team(&uncovered, &p);
         assert_eq!(un.prio_routine_factor, p.p("uncoveredPrioritizationFactor"));
         assert_eq!(un.prio_other_factor, p.p("uncoveredPrioritizationFactor"));
+
+        // Mixed human+AI prioritization seat → routine still takes the AI
+        // routine-latency factor (M11: "if ANY AI covers prioritization, routine
+        // service time *= aiRoutineLatencyFactor" — no "and no human" qualifier,
+        // unlike the brittleness clause). RED on the pre-fix ai && !human gate,
+        // which neutralized a co-owned seat to factor 1. others stay 1.
+        let mut mixed = appendix_a_team();
+        // ana (human) keeps prioritization; exo (AI) also covers prioritization.
+        mixed.entities[0].functions = vec!["prioritization".to_string(), "review".to_string()];
+        mixed.entities[1].functions = vec!["execution".to_string(), "prioritization".to_string()];
+        let mx = resolve_team(&mixed, &p);
+        assert_eq!(mx.prio_routine_factor, p.p("aiRoutineLatencyFactor"));
+        assert_eq!(mx.prio_other_factor, 1.0);
+        // The brittleness gate keeps its explicit "no human" qualifier: a human
+        // co-owns prioritization → humanNovelFailureBase, NOT the AI base.
+        assert_eq!(mx.brittle_base, p.p("humanNovelFailureBase"));
     }
 
     #[test]
