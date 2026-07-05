@@ -2,12 +2,13 @@
 //!
 //! [`run_config`] is the native monolithic path (golden harness, cross-target
 //! hash, tests). [`Run`] is the chunked state machine the wasm `begin_run →
-//! run_chunk → finalize` surface drives (CONTRACTS.md). The team arm returns a
-//! typed [`EngineError::NotImplemented`] — the freeze binds the SIGNATURE; P7a
-//! fills in the body.
+//! run_chunk → finalize` surface drives (CONTRACTS.md). The P3 team
+//! NotImplemented stub was removed at P7a (signature-stable, the same pattern
+//! as P4's aiInjection-guard removal): both `sim` arms now dispatch to a real
+//! Monte Carlo run.
 
 use crate::config::{Config, Sim};
-use crate::montecarlo::OrgRun;
+use crate::montecarlo::{OrgRun, TeamRun};
 use crate::output::Output;
 
 /// Typed engine error, surfaced to JS as `{ "error": { "type", "message" } }`.
@@ -15,7 +16,9 @@ use crate::output::Output;
 pub enum EngineError {
     /// Config failed structural/schema validation (§12.1).
     Validation(String),
-    /// A frozen-but-unimplemented surface (team sim until P7a; `cost` block).
+    /// A frozen-but-unimplemented surface (the reserved `cost` block; the team
+    /// arm used this until P7a). The variant stays: the error envelope's
+    /// `notImplemented` type is part of the frozen worker contract.
     NotImplemented(String),
     /// The chunked API was driven out of order (§ state-machine contract).
     BadState(String),
@@ -69,12 +72,14 @@ pub fn parse_and_validate(
 /// runs in both modes.
 pub fn run_config(config: Config) -> Result<Output, EngineError> {
     config.validate().map_err(EngineError::Validation)?;
+    let replay = config.replay;
     match config.sim {
-        Sim::Team => Err(EngineError::NotImplemented(
-            "team simulator lands in P7a (the wasm export signature is frozen here)".to_string(),
-        )),
+        Sim::Team => {
+            let mut run = TeamRun::new(config, replay).map_err(EngineError::Validation)?;
+            run.run_chunk(run.total_iterations());
+            Ok(run.finalize())
+        }
         Sim::Org => {
-            let replay = config.replay;
             let mut run = OrgRun::new(config, replay).map_err(EngineError::Validation)?;
             run.run_chunk(run.total_iterations());
             Ok(run.finalize())
@@ -92,11 +97,12 @@ pub fn run_json(config_json: &str) -> Result<Output, EngineError> {
 /// cancel = drop the handle and `begin` again.
 pub enum Run {
     Org(OrgRun),
+    Team(TeamRun),
 }
 
 impl Run {
     /// `begin_run(sim, config_json, seed)` — parse, validate, and set up the run.
-    /// The `sim` argument must match the config's `sim`. Team → NotImplemented.
+    /// The `sim` argument must match the config's `sim`.
     pub fn begin(sim: Sim, config_json: &str, seed: u64) -> Result<Run, EngineError> {
         let config = parse_and_validate(config_json, Some(seed))?;
         if config.sim != sim {
@@ -105,13 +111,13 @@ impl Run {
                 sim, config.sim
             )));
         }
+        let replay = config.replay;
         match config.sim {
-            Sim::Team => Err(EngineError::NotImplemented(
-                "team simulator lands in P7a (the wasm export signature is frozen here)"
-                    .to_string(),
-            )),
+            Sim::Team => {
+                let run = TeamRun::new(config, replay).map_err(EngineError::Validation)?;
+                Ok(Run::Team(run))
+            }
             Sim::Org => {
-                let replay = config.replay;
                 let run = OrgRun::new(config, replay).map_err(EngineError::Validation)?;
                 Ok(Run::Org(run))
             }
@@ -122,37 +128,40 @@ impl Run {
     pub fn run_chunk(&mut self, n: u32) -> u32 {
         match self {
             Run::Org(run) => run.run_chunk(n),
+            Run::Team(run) => run.run_chunk(n),
         }
     }
 
     pub fn total_iterations(&self) -> u32 {
         match self {
             Run::Org(run) => run.total_iterations(),
+            Run::Team(run) => run.total_iterations(),
         }
     }
 
     pub fn completed_count(&self) -> u32 {
         match self {
             Run::Org(run) => run.completed_count(),
+            Run::Team(run) => run.completed_count(),
         }
     }
 
     /// `finalize()` — aggregate to the output JSON. Errors if the run has not
     /// completed every iteration (the state-machine contract).
     pub fn finalize(&self) -> Result<String, EngineError> {
-        match self {
-            Run::Org(run) => {
-                if run.completed_count() < run.total_iterations() {
-                    return Err(EngineError::BadState(format!(
-                        "finalize before completion: {}/{} iterations run",
-                        run.completed_count(),
-                        run.total_iterations()
-                    )));
-                }
-                serde_json::to_string(&run.finalize())
-                    .map_err(|e| EngineError::BadState(format!("serialize error: {e}")))
-            }
+        if self.completed_count() < self.total_iterations() {
+            return Err(EngineError::BadState(format!(
+                "finalize before completion: {}/{} iterations run",
+                self.completed_count(),
+                self.total_iterations()
+            )));
         }
+        let output = match self {
+            Run::Org(run) => run.finalize(),
+            Run::Team(run) => run.finalize(),
+        };
+        serde_json::to_string(&output)
+            .map_err(|e| EngineError::BadState(format!("serialize error: {e}")))
     }
 }
 
@@ -161,7 +170,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn team_run_is_typed_not_implemented() {
+    fn team_run_produces_real_output_after_p7a() {
+        // P7a removed the P3 typed-NotImplemented team stub (signature-stable —
+        // the same pattern as P4's aiInjection-guard removal; CONTRACTS §2).
+        // The frozen `sim: "team"` path must now return real output populating
+        // all 12 §7.2 team series plus the two team blocks.
         let cfg = r#"{"schemaVersion":"1","modelVersion":"2.0.0","sim":"team","seed":42,
             "iterations":50,"horizon":10,
             "team":{"entities":[
@@ -169,9 +182,18 @@ mod tests {
               {"id":"b","kind":"human","archetype":"reviewer","throughput":4,"judgmentQuality":8,"handoffFriction":4,"reliability":9,"functions":["review"],"capabilities":{"review":8}}],
             "workStream":{"arrivalPerStep":1.0,"mix":{"routine":0.6,"complex":0.25,"novel":0.15},"highStakesShare":0.2},
             "structuralHealth":6,"recoveryOwner":null}}"#;
-        let err = run_json(cfg).unwrap_err();
-        assert!(matches!(err, EngineError::NotImplemented(_)));
-        assert!(err.to_json().contains("notImplemented"));
+        let out = run_json(cfg).expect("the team arm must run after P7a");
+        assert_eq!(out.series.len(), 12, "all 12 team series (§7.2)");
+        for id in eigenorg_team_series() {
+            assert!(out.series.contains_key(id), "missing team series {id}");
+        }
+        assert!(out.quality_histogram.is_some());
+        assert_eq!(out.function_coverage.as_ref().unwrap().len(), 7);
+        assert!(out.per_layer.is_none());
+    }
+
+    fn eigenorg_team_series() -> [&'static str; 12] {
+        crate::mechanics::team::TEAM_METRICS
     }
 
     #[test]
