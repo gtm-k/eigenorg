@@ -961,4 +961,29 @@ mod tests {
             "post-injection throughput must beat the no-AI twin in the same window"
         );
     }
+
+    #[test]
+    fn m4_modality_coefficient_hand_ratios() {
+        // M4 hand check on the engine output: with identical structure below the
+        // maxCoordinationTax cap, tau(meetingHeavy)/tau(asyncFirst) equals
+        // meetingHeavyMultiplier (1.5) exactly, and the meeting-overhead share
+        // of tau is meetingShareMeetingHeavy (0.7) / meetingShareAsync (0.4).
+        let base = r#"{"schemaVersion":"1","modelVersion":"2.1.0","sim":"org","seed":42,
+            "iterations":50,"horizon":10,
+            "org":{"headcountStart":12,"headcountGrowthPerStep":0,"topology":"flat",
+            "hierarchyDepth":2,"ownershipLayers":1,"modality":"asyncFirst","structuralHealth":6,
+            "aiInjection":{"enabled":false,"atStep":0}}}"#;
+        let async_run = run_json(base).unwrap();
+        let meeting_run = run_json(&base.replace("\"asyncFirst\"", "\"meetingHeavy\"")).unwrap();
+        // tau is deterministic per step (structure only), so t=0 p50 is exact.
+        let tau_async = p50_at(&async_run, "coordinationTax", 0);
+        let tau_meeting = p50_at(&meeting_run, "coordinationTax", 0);
+        let p = Params::defaults();
+        assert!(tau_meeting < p.p("maxCoordinationTax"), "below the cap");
+        assert!((tau_meeting / tau_async - p.p("meetingHeavyMultiplier")).abs() < 1e-12);
+        let share_async = p50_at(&async_run, "meetingOverheadPct", 0) / tau_async;
+        let share_meeting = p50_at(&meeting_run, "meetingOverheadPct", 0) / tau_meeting;
+        assert!((share_async - p.p("meetingShareAsync")).abs() < 1e-12);
+        assert!((share_meeting - p.p("meetingShareMeetingHeavy")).abs() < 1e-12);
+    }
 }
