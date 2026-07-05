@@ -3,14 +3,95 @@
 //! `src/mechanics/` is the numeric-literal-lint scope: every model coefficient
 //! is read from [`crate::params`] by id, and the only bare float literals
 //! permitted here are the structural identities in the lint allowlist (0.0, 1.0,
-//! 2.0, 7.0, 9.0, 10.0, 100.0 — pairwise-channel /2, the sigmoid/clamp
-//! identities, the SH→misalignment scale, the /10 cohesion-coupling and ×100
-//! index scalings). A smuggled coefficient literal fails `mechanics_has_no_bare_coefficient_literals`.
+//! 2.0, 3.0, 5.0, 7.0, 9.0, 10.0, 100.0 — pairwise-channel /2, triangular-mean
+//! /3, the §3.2 1–10 property-scale midpoint /5 (M14's mean(handoffFriction)/5),
+//! the sigmoid/clamp identities, the SH→misalignment scale, the /10
+//! cohesion-coupling and ×100 index scalings). A smuggled coefficient literal
+//! fails `mechanics_has_no_bare_coefficient_literals`.
 
 pub mod org;
+pub mod team;
 
 use crate::config::{LayerType, OrgConfig};
 use crate::params::Params;
+use crate::rng::SimRng;
+use crate::tasks::TaskClass;
+
+/// Logistic σ(x) — via `libm::exp` (not `f64::exp`) so band/cohesion shapes are
+/// bit-identical native vs wasm (the cross-target hash gate, §8.1 / T6).
+pub(crate) fn sigma(x: f64) -> f64 {
+    1.0 / (1.0 + libm::exp(-x))
+}
+
+/// Cognitive-load band factor `B(n)` (M3): smooth ramps at the four contested
+/// band centers, never a cliff. Shared by the org tax (M4) and team tax (M14).
+pub(crate) fn cognitive_band(n: f64, params: &Params) -> f64 {
+    let bands = [
+        ("cognitiveBandInner", "bandPenaltyInner"),
+        ("cognitiveBandClose", "bandPenaltyClose"),
+        ("cognitiveBandWorking", "bandPenaltyWorking"),
+        ("cognitiveBandStable", "bandPenaltyStable"),
+    ];
+    let width = params.p("bandWidthFactor");
+    let mut b = 1.0;
+    for (center_id, penalty_id) in bands {
+        let center = params.p(center_id);
+        b += params.p(penalty_id) * sigma((n - center) / (width * center));
+    }
+    b
+}
+
+/// M9 `shBrittleFactor(SH)`: AI novel-failure amplification at low Structural
+/// Health, guardrail at high, linear between. Shared by the org injection path
+/// (M11) and the team AI-prioritization path (M9/M11).
+pub(crate) fn sh_brittle_factor(sh: f64, params: &Params) -> f64 {
+    let low = params.p("aiAmplificationLowSH");
+    let high = params.p("aiGuardrailedHighSH");
+    let risk = params.p("shRiskThreshold");
+    let safe = params.p("shSafeThreshold");
+    if sh <= risk {
+        low
+    } else if sh >= safe {
+        high
+    } else {
+        low + (high - low) * (sh - risk) / (safe - risk)
+    }
+}
+
+/// Effort draw by task class (M18) — one Triangular uniform.
+pub(crate) fn draw_effort(class: TaskClass, params: &Params, rng: &mut SimRng) -> f64 {
+    let id = match class {
+        TaskClass::Routine => "taskEffortRoutine",
+        TaskClass::Complex => "taskEffortComplex",
+        TaskClass::Novel => "taskEffortNovel",
+    };
+    let e = params.tri(id);
+    rng.triangular(e[0], e[1], e[2])
+}
+
+/// A brittleness recovery window `(duration steps, latency multiplier)` (M10).
+/// Owned recovery draws duration only (the multiplier is a point value);
+/// unowned draws duration then multiplier — the §5 draw order both sims share.
+/// Ownership is the caller's rule: org SH < recoveryOwnershipThreshold; team
+/// `recoveryOwner == null`.
+pub(crate) fn draw_recovery_window(unowned: bool, params: &Params, rng: &mut SimRng) -> (u32, f64) {
+    let dur_tri = if unowned {
+        params.tri("recoveryDurationUnownedSteps")
+    } else {
+        params.tri("recoveryDurationOwnedSteps")
+    };
+    let duration = rng
+        .triangular(dur_tri[0], dur_tri[1], dur_tri[2])
+        .round()
+        .max(1.0) as u32;
+    let mult = if unowned {
+        let mt = params.tri("recoveryLatencyMultiplierUnowned");
+        rng.triangular(mt[0], mt[1], mt[2])
+    } else {
+        params.p("recoveryLatencyMultiplierOwned")
+    };
+    (duration, mult)
+}
 
 /// The resolved model factors for one ownership seat (§9.9 type + §4 M19
 /// multiplicity), precomputed once per iteration.

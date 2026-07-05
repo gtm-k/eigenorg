@@ -138,3 +138,108 @@ fn sim_argument_must_match_config() {
         Err(EngineError::Validation(_))
     ));
 }
+
+// ---------------------------------------------------------------------------
+// P7a — the same contracts hold on the team arm.
+// ---------------------------------------------------------------------------
+
+/// A small team config for the chunked-API contracts (kept light: the chunk
+/// tests below run it several times).
+fn team_cfg() -> String {
+    let mut cfg: serde_json::Value = serde_json::from_str(&read_fixture(
+        "fixtures/scenarios/hollowMiddle__hollow.json",
+    ))
+    .unwrap();
+    cfg["iterations"] = serde_json::json!(60);
+    cfg["horizon"] = serde_json::json!(30);
+    cfg.to_string()
+}
+
+#[test]
+fn team_identical_config_and_seed_is_byte_identical() {
+    let cfg = team_cfg();
+    let a = run_json(&cfg).unwrap();
+    let b = run_json(&cfg).unwrap();
+    assert_eq!(
+        to_json(&a),
+        to_json(&b),
+        "team: same (config, seed) -> byte-identical"
+    );
+    let c = run_json(&cfg.replace("\"seed\":42", "\"seed\":43")).unwrap();
+    assert_ne!(
+        to_json(&a),
+        to_json(&c),
+        "team: different seed -> different output"
+    );
+}
+
+#[test]
+fn team_chunk_partition_is_invariant() {
+    let cfg = team_cfg();
+    let seed = 1729u64;
+
+    let mut single_steps = Run::begin(Sim::Team, &cfg, seed).unwrap();
+    let total = single_steps.total_iterations();
+    for _ in 0..total {
+        single_steps.run_chunk(1);
+    }
+    let by_ones = single_steps.finalize().unwrap();
+
+    let mut odd = Run::begin(Sim::Team, &cfg, seed).unwrap();
+    while odd.completed_count() < total {
+        odd.run_chunk(7); // a non-default chunk size
+    }
+    let by_odd = odd.finalize().unwrap();
+
+    let mut cfg_json: serde_json::Value = serde_json::from_str(&cfg).unwrap();
+    cfg_json["seed"] = serde_json::json!(seed);
+    let monolithic = to_json(&run_json(&cfg_json.to_string()).unwrap());
+
+    assert_eq!(by_ones, by_odd, "team: chunk size 7 == run_chunk(1)xN");
+    assert_eq!(by_ones, monolithic, "team: chunked == monolithic native");
+}
+
+#[test]
+fn team_finalize_before_completion_is_bad_state() {
+    let mut run = Run::begin(Sim::Team, &team_cfg(), 1729).unwrap();
+    run.run_chunk(10);
+    match run.finalize() {
+        Err(EngineError::BadState(_)) => {}
+        other => panic!("expected BadState, got {other:?}"),
+    }
+}
+
+#[test]
+fn team_extreme_config_stays_finite() {
+    // Structural corners: max entities (12), max arrival rate, all-novel mix,
+    // SH 1, unowned recovery, fractional review capacity, meetingHeavy.
+    let entities: Vec<String> = (0..12)
+        .map(|i| {
+            format!(
+                r#"{{"id":"e{i}","kind":"{}","archetype":"x","throughput":10,"judgmentQuality":1,"handoffFriction":10,"reliability":1,"rampTimeWeeks":6,"availability":1,"functions":["execution","prioritization","review"],"capabilities":{{"execution":10}}}}"#,
+                if i % 2 == 0 { "human" } else { "ai" }
+            )
+        })
+        .collect();
+    let cfg = format!(
+        r#"{{"schemaVersion":"1","modelVersion":"2.1.0","sim":"team","seed":7,
+        "iterations":60,"horizon":80,
+        "team":{{"entities":[{}],
+        "workStream":{{"arrivalPerStep":5.0,"mix":{{"routine":0,"complex":0,"novel":1}},"highStakesShare":1}},
+        "modality":"meetingHeavy","structuralHealth":1,"recoveryOwner":null,
+        "reviewCapacityPerStep":0.5}}}}"#,
+        entities.join(",")
+    );
+    let out = run_json(&cfg).unwrap();
+    for (id, series) in &out.series {
+        for p in series {
+            for v in [p.p10, p.p50, p.p90] {
+                assert!(
+                    v.is_finite(),
+                    "team series {id} produced non-finite {v} at t={}",
+                    p.t
+                );
+            }
+        }
+    }
+}

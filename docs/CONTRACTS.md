@@ -7,8 +7,9 @@ against.
 
 **Frozen at P3 (this file + `src/api.rs`).** Changing a signature below, the
 config/output schema (`docs/schema/*.json`), or the URL-hash codec after P3 is a
-review-blocking change. P7a fills in the team simulator body **without** changing
-any signature.
+review-blocking change. P7a filled in the team simulator body **without**
+changing any signature (dispatch-arm change in `src/engine.rs` only; `src/api.rs`
+is byte-identical to P3).
 
 ---
 
@@ -70,8 +71,14 @@ payload or an error envelope `{ "error": { "type", "message" } }` (`type ∈
 | `finalize()` | `() -> String` | the output JSON, or an error envelope (BadState if not every iteration has run) |
 | `cancel()` | `() -> ()` | drops the in-flight run |
 
-- `sim` is `"org"` or `"team"`; it must match `config.sim`. The **team** arm
-  returns a typed `notImplemented` error until P7a (signature frozen; body later).
+- `sim` is `"org"` or `"team"`; it must match `config.sim`. The P3-era **team**
+  NotImplemented stub is **gone (removed at P7a, as planned here;
+  signature-stable — no export changed, `src/api.rs` byte-identical)**: a
+  `sim: "team"` run returns real output populating all 12 §7.2 team series plus
+  the `qualityHistogram` and `functionCoverage` blocks. The typed
+  `notImplemented` envelope type remains part of the error contract (the
+  reserved `cost` block still uses the validation path; nothing emits
+  `notImplemented` today, but workers must keep handling it).
 - The P3-era org `aiInjection` NotImplemented guard is **gone (removed at P4, as
   planned here; signature-stable — no export changed)**: the M9/M11 execution
   effects and the M12 cohesion-AI term are implemented, so an org run with

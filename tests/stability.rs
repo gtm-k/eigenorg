@@ -1,9 +1,14 @@
-//! Long-horizon stability property tests (MODEL.md §6 / PLAN P3b + P4): >= 5x
-//! the default horizon (>= 300 steps), bounded, no NaN, settling. P4 extends
-//! the P3 static-benign suite to org mechanics under stress: a GROWING config
-//! (headcountGrowthPerStep > 0 — the L3 cohesion/entropy loop under monotone
-//! structural pressure) and an AI-INJECTION config at low SH (the L2
-//! brittleness/recovery loop churning recovery windows for ~335 steps).
+//! Long-horizon stability property tests (MODEL.md §6 / PLAN P3b + P4 + P7a),
+//! at 5x the default horizon or more (>= 300 steps): bounded, no NaN, settling.
+//! P4 extends the P3 static-benign suite to org mechanics under stress: a GROWING
+//! config (headcountGrowthPerStep > 0 — the L3 cohesion/entropy loop under
+//! monotone structural pressure) and an AI-INJECTION config at low SH (the L2
+//! brittleness/recovery loop churning recovery windows for ~335 steps). P7a
+//! extends it to team mechanics: a static team (the §10.5 humanPm composition)
+//! held to the same composite settling contract, and the §10.10 review
+//! bottleneck run 5x — the deliberately UNSTABLE rho >= 1 regime, whose queue
+//! must grow at most linearly (bounded by cumulative completions) while every
+//! composite stays bounded.
 
 mod common;
 
@@ -290,4 +295,150 @@ fn injection_config_bounded_and_settles_after_l2_transient() {
             p.t
         );
     }
+}
+
+// ---------------------------------------------------------------------------
+// P7a — team-sim long-horizon stability (§6 contract on the team composites).
+// ---------------------------------------------------------------------------
+
+/// Shared team boundedness contract: composites in range, τ within its cap,
+/// event/queue series finite and non-negative, no NaN anywhere.
+fn assert_team_bounded(out: &Output) {
+    let max_tax = Params::defaults().p("maxCoordinationTax");
+    let bound = |id: &str, lo: f64, hi: f64| {
+        for p in out.series.get(id).unwrap() {
+            for v in [p.p10, p.p50, p.p90] {
+                assert!(v.is_finite(), "{id} non-finite at t={}", p.t);
+                assert!(
+                    v >= lo && v <= hi,
+                    "{id}={v} out of [{lo},{hi}] at t={}",
+                    p.t
+                );
+            }
+        }
+    };
+    bound("entropyProxy", 0.0, 100.0);
+    bound("orgHealthProxy", 0.0, 100.0);
+    bound("cohesion", 0.0, 100.0);
+    bound("coordinationTax", 0.0, max_tax);
+    for id in [
+        "throughput",
+        "cumThroughput",
+        "decisionLatencyRoutine",
+        "brittlenessRate",
+        "cumulativeBrittleness",
+        "reviewQueueDepth",
+        "reviewWaitDays",
+    ] {
+        for p in out.series.get(id).unwrap() {
+            for v in [p.p10, p.p50, p.p90] {
+                assert!(v.is_finite(), "{id} non-finite at t={}", p.t);
+                assert!(v >= 0.0, "{id}={v} negative at t={}", p.t);
+            }
+        }
+    }
+    for p in out.series.get("healthGap").unwrap() {
+        for v in [p.p10, p.p50, p.p90] {
+            assert!(v.is_finite(), "healthGap non-finite at t={}", p.t);
+        }
+        assert!(p.p50 >= -100.0 && p.p50 <= 100.0, "healthGap implausible");
+    }
+}
+
+/// The §10.5 humanPm team composition (static, benign) run for 350 steps.
+fn team_long_run() -> Output {
+    let mut cfg: serde_json::Value = serde_json::from_str(&common::read_fixture(
+        "fixtures/scenarios/hollowMiddle__humanPm.json",
+    ))
+    .unwrap();
+    cfg["horizon"] = serde_json::json!(350);
+    cfg["iterations"] = serde_json::json!(100);
+    run_json(&cfg.to_string()).unwrap()
+}
+
+#[test]
+fn team_static_config_bounded_and_settles_over_five_horizons() {
+    let out = team_long_run();
+    assert_team_bounded(&out);
+
+    // §6 settling contract, team composites: `entropyProxy`, `cohesion`, and
+    // `orgHealthProxy = 100 − entropyProxy` reach a steady band (trailing-30
+    // p50 range < 10% of the trailing mean) by step 100 and STAY through 5×
+    // horizon — every trailing-30 window inside [100, last], as the org suite.
+    for id in ["entropyProxy", "cohesion", "orgHealthProxy"] {
+        let series = out.series.get(id).unwrap();
+        let p50: Vec<f64> = series.iter().map(|p| p.p50).collect();
+        let last = series.len() - 1;
+        assert!(last >= 300, "settling needs >= 300 steps, got {}", last + 1);
+        for start in 100..=(last - 29) {
+            let window = &p50[start..=start + 29];
+            let mean = window.iter().sum::<f64>() / window.len() as f64;
+            let range = window.iter().cloned().fold(f64::MIN, f64::max)
+                - window.iter().cloned().fold(f64::MAX, f64::min);
+            assert!(
+                mean > 0.0 && range <= 0.10 * mean,
+                "{id} not settled at trailing-30 window t=[{}, {}]: range {range} vs 10% of mean {mean}",
+                series[start].t,
+                series[start + 29].t
+            );
+        }
+    }
+    // The M20 neutral identity holds at any horizon: review capacity is
+    // unbounded here, so reviewWaitDays is exactly reviewDwellDays throughout.
+    for p in out.series.get("reviewWaitDays").unwrap() {
+        assert_eq!(p.p50, 1.0, "unbounded review wait must stay at the dwell");
+    }
+}
+
+/// The §10.10 bottleneck config run 5× — the deliberately UNSTABLE ToC regime.
+fn team_bottleneck_long_run() -> Output {
+    let mut cfg: serde_json::Value = serde_json::from_str(&common::read_fixture(
+        "fixtures/scenarios/reviewBottleneck__bottleneck.json",
+    ))
+    .unwrap();
+    cfg["horizon"] = serde_json::json!(350);
+    cfg["iterations"] = serde_json::json!(100);
+    run_json(&cfg.to_string()).unwrap()
+}
+
+#[test]
+fn team_bottleneck_config_bounded_with_linear_queue_growth() {
+    let out = team_bottleneck_long_run();
+    assert_team_bounded(&out);
+
+    // rho >= 1: the review queue may grow, but at most linearly — bounded by
+    // cumulative completions, which are bounded by cumulative arrivals
+    // (arrivalPerStep × t, M18). Derive the rate from the config, not a
+    // literal, so a fixture change cannot silently detune the bound.
+    let cfg: serde_json::Value = serde_json::from_str(&common::read_fixture(
+        "fixtures/scenarios/reviewBottleneck__bottleneck.json",
+    ))
+    .unwrap();
+    let arrivals_per_step = cfg["team"]["workStream"]["arrivalPerStep"]
+        .as_f64()
+        .unwrap();
+    for p in out.series.get("reviewQueueDepth").unwrap() {
+        assert!(
+            p.p90 <= arrivals_per_step * f64::from(p.t + 1),
+            "review queue exceeded the cumulative-arrivals linear bound at t={}",
+            p.t
+        );
+    }
+    // The gate stays binding at long horizon: done-throughput tracks the review
+    // capacity (1/step), so the 5x-horizon cumulative total sits near 350 —
+    // assert it cannot exceed capacity x steps + the single banked clearance.
+    let cap = cfg["team"]["reviewCapacityPerStep"].as_f64().unwrap();
+    let cum_final = out.series.get("cumThroughput").unwrap().last().unwrap().p90;
+    assert!(
+        cum_final <= cap * 350.0 + 1.0,
+        "done-throughput broke the ToC ceiling: {cum_final} > cap*350+1"
+    );
+    // And the queue really does keep growing (non-vacuity of the rho >= 1 claim).
+    let q = out.series.get("reviewQueueDepth").unwrap();
+    let q100 = q.iter().find(|p| p.t == 100).unwrap().p50;
+    let q349 = q.last().unwrap().p50;
+    assert!(
+        q349 > q100 + 50.0,
+        "expected sustained queue growth over [100, 349]: {q100} -> {q349}"
+    );
 }

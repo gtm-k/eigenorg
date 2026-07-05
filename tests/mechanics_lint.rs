@@ -9,9 +9,14 @@ use std::path::Path;
 
 /// Structural float identities the mechanics may spell out directly:
 /// clamp/identity bounds, the pairwise-channel /2 and triangular-mean /3, the
-/// SH→misalignment (7−SH)/9 scale, the /10 cohesion-coupling normalizer, and the
-/// ×100 index scaling. NOT model coefficients (those all come from params.json).
-const ALLOWED: &[&str] = &["0.0", "1.0", "2.0", "3.0", "7.0", "9.0", "10.0", "100.0"];
+/// 1–10 property-scale midpoint /5 (M14's `mean(handoffFriction)/5` — §3.2 rates
+/// are anchored at 5), the SH→misalignment (7−SH)/9 scale (7 also centers the
+/// M16 reliability term), the /10 cohesion-coupling and quality-bin normalizers,
+/// and the ×100 index scaling. NOT model coefficients (those all come from
+/// params.json).
+const ALLOWED: &[&str] = &[
+    "0.0", "1.0", "2.0", "3.0", "5.0", "7.0", "9.0", "10.0", "100.0",
+];
 
 /// Scan a line for float numeric literals in every Rust surface form: an integer
 /// part with optional `_` grouping, an optional `.fraction` (the fraction digits
@@ -114,7 +119,10 @@ fn mechanics_has_no_bare_coefficient_literals() {
             linted += 1;
         }
     }
-    assert!(linted >= 2, "expected to lint mechanics/mod.rs and org.rs");
+    assert!(
+        linted >= 3,
+        "expected to lint mechanics/mod.rs, org.rs, and team.rs"
+    );
 }
 
 #[test]

@@ -7,12 +7,16 @@
 //! `SimRng::for_iteration(seed, i)` regardless of chunk boundaries, so the
 //! output is invariant to chunking (`run_chunk(1)×N == run_chunk(N)×1`).
 
-use crate::config::{Config, OrgConfig, Sim};
+use crate::config::{Config, OrgConfig, Sim, TeamConfig};
+use crate::entities::function_coverage;
 use crate::mechanics::org::{
     layer_means, make_per_layer, run_iteration, LayerIterStats, OrgIterResult, ORG_METRICS,
 };
+use crate::mechanics::team::{
+    resolve_team, run_team_iteration, TeamIterResult, TeamResolved, TEAM_METRICS,
+};
 use crate::mechanics::{resolve_layers, LayerResolved};
-use crate::output::{Output, Percentile};
+use crate::output::{Output, Percentile, QualityBin};
 use crate::params::Params;
 use crate::rng::SimRng;
 use std::collections::BTreeMap;
@@ -175,6 +179,114 @@ impl OrgRun {
                 )
             })
             .collect()
+    }
+}
+
+/// Stateful team Monte Carlo run (P7a) — validated config + resolved params and
+/// static team factors plus the completed iterations. Chunk-invariant by
+/// construction, exactly like [`OrgRun`]: iteration `i` always uses
+/// `SimRng::for_iteration(seed, i)` regardless of chunk boundaries.
+pub struct TeamRun {
+    config: Config,
+    team: TeamConfig,
+    params: Params,
+    resolved: TeamResolved,
+    completed: Vec<TeamIterResult>,
+}
+
+impl TeamRun {
+    /// Build a run from an already-`validate()`d team config. `replay` controls
+    /// `paramOverrides` range checking (§12.1).
+    pub fn new(config: Config, replay: bool) -> Result<Self, String> {
+        let team = config
+            .team
+            .clone()
+            .ok_or_else(|| "team run requires a team block".to_string())?;
+        let params = Params::resolve(&config.param_overrides, replay)?;
+        let resolved = resolve_team(&team, &params);
+        Ok(TeamRun {
+            config,
+            team,
+            params,
+            resolved,
+            completed: Vec::new(),
+        })
+    }
+
+    pub fn total_iterations(&self) -> u32 {
+        self.config.iterations
+    }
+
+    pub fn completed_count(&self) -> u32 {
+        self.completed.len() as u32
+    }
+
+    /// Run up to `n` more iterations; returns the new completed count.
+    pub fn run_chunk(&mut self, n: u32) -> u32 {
+        let start = self.completed.len() as u32;
+        let end = (start + n).min(self.config.iterations);
+        for i in start..end {
+            let mut rng = SimRng::for_iteration(self.config.seed, i);
+            self.completed.push(run_team_iteration(
+                &self.team,
+                &self.params,
+                &self.resolved,
+                self.config.horizon,
+                &mut rng,
+            ));
+        }
+        self.completed.len() as u32
+    }
+
+    /// Aggregate the completed iterations into the output (§7.2, §12.3):
+    /// percentile series, the pooled quality histogram (counts summed across
+    /// iterations and steps), and the deterministic function-coverage map (M17,
+    /// computed once — static per run).
+    pub fn finalize(&self) -> Output {
+        let horizon = self.config.horizon as usize;
+        let mut series: BTreeMap<String, Vec<Percentile>> = BTreeMap::new();
+        for (mi, name) in TEAM_METRICS.iter().enumerate() {
+            let mut points = Vec::with_capacity(horizon);
+            for step in 0..horizon {
+                let mut vals: Vec<f64> = self
+                    .completed
+                    .iter()
+                    .map(|it| it.series[step][mi])
+                    .collect();
+                vals.sort_by(|a, b| a.total_cmp(b));
+                points.push(Percentile {
+                    t: step as u32,
+                    p10: percentile(&vals, 0.1),
+                    p50: percentile(&vals, 0.5),
+                    p90: percentile(&vals, 0.9),
+                });
+            }
+            series.insert((*name).to_string(), points);
+        }
+
+        // §7.2 qualityHistogram: 10 width-10 bins, pooled across all iterations.
+        let quality_histogram: Vec<QualityBin> = (0..10)
+            .map(|b| QualityBin {
+                lo: b as f64 * 10.0,
+                hi: b as f64 * 10.0 + 10.0,
+                count: self.completed.iter().map(|it| it.quality_bins[b]).sum(),
+            })
+            .collect();
+
+        Output {
+            schema_version: "1".to_string(),
+            model_version: crate::model_version().to_string(),
+            sim: Sim::Team,
+            seed: self.config.seed,
+            iterations: self.config.iterations,
+            horizon: self.config.horizon,
+            series,
+            per_layer: None,
+            band_markers: None,
+            quality_histogram: Some(quality_histogram),
+            function_coverage: Some(function_coverage(&self.team.entities, &self.params)),
+            resolved_params: self.params.resolved_map().clone(),
+        }
     }
 }
 

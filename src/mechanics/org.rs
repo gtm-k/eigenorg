@@ -12,7 +12,10 @@
 //! to the P3 kernel (cross-target hash + §11.12 neutral identity).
 
 use crate::config::{Modality, OrgConfig, Topology};
-use crate::mechanics::{layer_type_name, mean_over_upper, LayerResolved};
+use crate::mechanics::{
+    cognitive_band, draw_effort, draw_recovery_window, layer_type_name, mean_over_upper,
+    sh_brittle_factor, sigma, LayerResolved,
+};
 use crate::output::PerLayer;
 use crate::params::Params;
 use crate::rng::SimRng;
@@ -79,12 +82,6 @@ pub struct OrgIterResult {
     pub layers: Vec<LayerIterStats>,
 }
 
-fn sigma(x: f64) -> f64 {
-    // libm::exp (not f64::exp) so the logistic band shape is bit-identical
-    // native vs wasm (the cross-target hash gate, §8.1 / T6).
-    1.0 / (1.0 + libm::exp(-x))
-}
-
 fn team_count(n: u32, topology: Topology, params: &Params) -> u32 {
     match topology {
         Topology::Flat => 1,
@@ -107,22 +104,6 @@ fn intra_channels(n: u32, t: u32) -> f64 {
     let big_teams = f64::from(rem);
     let small_teams = f64::from(t - rem);
     big_teams * (big * (big - 1.0) / 2.0) + small_teams * (small * (small - 1.0) / 2.0)
-}
-
-fn cognitive_band(n: f64, params: &Params) -> f64 {
-    let bands = [
-        ("cognitiveBandInner", "bandPenaltyInner"),
-        ("cognitiveBandClose", "bandPenaltyClose"),
-        ("cognitiveBandWorking", "bandPenaltyWorking"),
-        ("cognitiveBandStable", "bandPenaltyStable"),
-    ];
-    let width = params.p("bandWidthFactor");
-    let mut b = 1.0;
-    for (center_id, penalty_id) in bands {
-        let center = params.p(center_id);
-        b += params.p(penalty_id) * sigma((n - center) / (width * center));
-    }
-    b
 }
 
 /// Pick an overriding seat in `{2..=L}` weighted by `w_l = 1 + gradient·(l−1)`
@@ -612,30 +593,6 @@ fn draw_class(params: &Params, rng: &mut SimRng) -> TaskClass {
     }
 }
 
-fn draw_effort(class: TaskClass, params: &Params, rng: &mut SimRng) -> f64 {
-    let id = match class {
-        TaskClass::Routine => "taskEffortRoutine",
-        TaskClass::Complex => "taskEffortComplex",
-        TaskClass::Novel => "taskEffortNovel",
-    };
-    let e = params.tri(id);
-    rng.triangular(e[0], e[1], e[2])
-}
-
-fn sh_brittle_factor(sh: f64, params: &Params) -> f64 {
-    let low = params.p("aiAmplificationLowSH");
-    let high = params.p("aiGuardrailedHighSH");
-    let risk = params.p("shRiskThreshold");
-    let safe = params.p("shSafeThreshold");
-    if sh <= risk {
-        low
-    } else if sh >= safe {
-        high
-    } else {
-        low + (high - low) * (sh - risk) / (safe - risk)
-    }
-}
-
 /// M9 relief ramp: `clamp((SH − shRiskThreshold)/(shSafeThreshold −
 /// shRiskThreshold), 0, 1)` — 0 at/below the risk threshold, 1 at/above the
 /// safe threshold. Shared by the coordination relief (M9) and the routine
@@ -671,25 +628,11 @@ fn ai_routing_factor(sh: f64, params: &Params) -> f64 {
     1.0 - (1.0 - params.p("aiRoutineLatencyFactor")) * relief_ramp(sh, params)
 }
 
-/// A brittleness recovery window `(duration steps, latency multiplier)` (M10).
+/// A brittleness recovery window (M10), org ownership rule:
+/// unowned iff `SH < recoveryOwnershipThreshold`.
 fn draw_recovery(org: &OrgConfig, params: &Params, rng: &mut SimRng) -> (u32, f64) {
     let unowned = f64::from(org.structural_health) < params.p("recoveryOwnershipThreshold");
-    let dur_tri = if unowned {
-        params.tri("recoveryDurationUnownedSteps")
-    } else {
-        params.tri("recoveryDurationOwnedSteps")
-    };
-    let duration = rng
-        .triangular(dur_tri[0], dur_tri[1], dur_tri[2])
-        .round()
-        .max(1.0) as u32;
-    let mult = if unowned {
-        let mt = params.tri("recoveryLatencyMultiplierUnowned");
-        rng.triangular(mt[0], mt[1], mt[2])
-    } else {
-        params.p("recoveryLatencyMultiplierOwned")
-    };
-    (duration, mult)
+    draw_recovery_window(unowned, params, rng)
 }
 
 fn record_entry(

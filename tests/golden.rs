@@ -1,17 +1,19 @@
-//! Golden-harness gate (MODEL.md §11 / PLAN P3b + P3c).
+//! Golden-harness gate (MODEL.md §11 / PLAN P3b + P3c + P4 + P7a).
 //!
-//! Hard gates: the five `coordinationCollapse` assertions AND the 12 org-side v2
+//! Hard gates: the five `coordinationCollapse` assertions, the 12 org-side v2
 //! assertions (§11.8 accountabilityDiffusion, §11.9 committeeInversion, §11.10
-//! matrix) are GREEN via the generic evaluator. `coordinationCollapse` is the
-//! harness-fidelity canary (if it forced any coefficient change the orchestrator
-//! would be surfaced, per PLAN); the §11.8–§11.10 bounds are no longer provisional
-//! — P3c retuned them against the engine harness (seed 42, 500 iters) and they are
-//! hard-asserted here. The normative exact identities hold (neutral-identity
-//! byte-parity + the `mxTiebreakerRecovers` exact 1.0). The team-side §11.11
-//! reviewBottleneck goldens and the §11.6 `hmReviewWaitNeutral` identity are
-//! calibrator-proven only — the engine's team arm is NotImplemented until P7a, so
-//! P7a owns their engine assertion. All v2 golden bounds are FINAL per the two
-//! mini-G2 decisions (2026-07-04); MODEL.md is not edited here.
+//! matrix), the 21 remaining org assertions (P4), AND — since P7a — the team-side
+//! assertions: §11.6 hollowMiddle (9, incl. `hmReviewWaitNeutral`) and §11.11
+//! reviewBottleneck (5), all GREEN via the generic evaluator.
+//! `coordinationCollapse` is the harness-fidelity canary (if it forced any
+//! coefficient change the orchestrator would be surfaced, per PLAN); the
+//! §11.8–§11.10 bounds were retuned against the engine harness at P3c (seed 42,
+//! 500 iters) and the §11.6/§11.11 team bounds — calibrator-proven until P7a —
+//! are now RE-PROVEN on the real engine (P7a acceptance; a misfit is a
+//! stop-and-surface, never a local retune). The normative exact identities hold
+//! (neutral-identity byte-parity + `mxTiebreakerRecovers` exact 1.0 +
+//! `hmReviewWaitNeutral` exact [1,1]). All v2 golden bounds are FINAL per the
+//! two mini-G2 decisions (2026-07-04); MODEL.md is not edited here.
 
 mod common;
 
@@ -150,10 +152,8 @@ fn matrix_tiebreaker_recovers_is_exact_identity() {
 /// committeeInversion, §11.10 matrix): after P3c calibration these bounds are FINAL
 /// (the two mini-G2 decisions, 2026-07-04) — every predicate must PASS via the
 /// engine golden harness (seed 42, 500 iters). The team-side §11.11 reviewBottleneck
-/// goldens and the §11.6 `hmReviewWaitNeutral` identity are NOT here: the engine's
-/// team arm is NotImplemented until P7a, so they are calibrator-proven only and their
-/// engine assertion is owned by P7a (per PLAN). Their bounds are FINAL, not
-/// provisional.
+/// goldens and the §11.6 `hmReviewWaitNeutral` identity are asserted by the P7a
+/// tests below (engine-re-proven since P7a; calibrator-proven before it).
 #[test]
 fn retuned_v2_org_goldens_green() {
     let scenarios: &[(&str, &[&str])] = &[
@@ -191,15 +191,17 @@ fn retuned_v2_org_goldens_green() {
     assert_eq!(checked, 12, "expected 4+3+5 = 12 org-side v2 goldens");
 }
 
-/// P4: the 5 org presets (`www/presets/*.json`, browser-fetchable) materialize
-/// the §10 scenario configs. One definition, no drift: every preset run config
-/// must (a) pass full serde + `validate()`, (b) be VALUE-IDENTICAL to the
-/// committed `fixtures/scenarios/<id>__<run>.json` twin the golden harness and
-/// the double-validation gate consume, and (c) carry the §10-normative golden
-/// instrument settings (seed 42, 500 iterations). Every run label referenced by
-/// that scenario's golden assertions must exist in the preset.
+/// P4 + P7a: the 10 presets (`www/presets/*.json`, browser-fetchable) — 5 org
+/// (P4: the §10.1–10.4 + §10.6 scenarios) and 5 team (P7a: the §10.5 + §10.10
+/// scenarios plus three archetype-table compositions). One definition, no
+/// drift: every preset run config must (a) pass full serde + `validate()`,
+/// (b) be VALUE-IDENTICAL to the committed
+/// `fixtures/scenarios/<id>__<run>.json` twin the golden harness and the
+/// double-validation gate consume, and (c) carry the golden instrument settings
+/// (seed 42, 500 iterations). Every run label referenced by that scenario's
+/// golden assertions must exist in the preset.
 #[test]
-fn org_presets_are_plausible_and_drift_free() {
+fn presets_are_plausible_and_drift_free() {
     let preset_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("www/presets");
     let mut files: Vec<_> = std::fs::read_dir(&preset_dir)
         .expect("www/presets must exist")
@@ -207,10 +209,11 @@ fn org_presets_are_plausible_and_drift_free() {
         .filter(|p| p.extension().map(|e| e == "json").unwrap_or(false))
         .collect();
     files.sort();
-    assert_eq!(files.len(), 5, "expected exactly 5 org presets");
+    assert_eq!(files.len(), 10, "expected 5 org + 5 team presets");
 
     let assertions = load_assertions();
-    let mut seen_ids = Vec::new();
+    let mut org_ids = Vec::new();
+    let mut team_ids = Vec::new();
     for path in &files {
         let text = std::fs::read_to_string(path).unwrap();
         let preset: serde_json::Value = serde_json::from_str(&text).unwrap();
@@ -231,6 +234,7 @@ fn org_presets_are_plausible_and_drift_free() {
 
         // (a)+(b)+(c): each run validates, runs on the engine's authoring
         // path, matches its fixture twin, and pins seed 42 / 500 iterations.
+        let mut sims = Vec::new();
         for (run_label, cfg) in runs {
             let cfg_text = serde_json::to_string(cfg).unwrap();
             let parsed: eigenorg::config::Config = serde_json::from_str(&cfg_text)
@@ -248,7 +252,12 @@ fn org_presets_are_plausible_and_drift_free() {
                 *cfg, fixture,
                 "preset {id}@{run_label} drifted from its fixture twin"
             );
+            sims.push(cfg["sim"].as_str().unwrap().to_string());
         }
+        assert!(
+            sims.windows(2).all(|w| w[0] == w[1]),
+            "preset {id} mixes sims"
+        );
 
         // Golden coverage: every @runLabel this scenario's assertions name
         // exists in the preset.
@@ -263,10 +272,14 @@ fn org_presets_are_plausible_and_drift_free() {
                 }
             }
         }
-        seen_ids.push(id.to_string());
+        if sims[0] == "org" {
+            org_ids.push(id.to_string());
+        } else {
+            team_ids.push(id.to_string());
+        }
     }
     assert_eq!(
-        seen_ids,
+        org_ids,
         vec![
             "coordinationCollapse",
             "dunbarCliff",
@@ -276,6 +289,227 @@ fn org_presets_are_plausible_and_drift_free() {
         ],
         "the 5 org presets are the §10.1–10.4 + §10.6 scenarios"
     );
+    assert_eq!(
+        team_ids,
+        vec![
+            "allHumanBaseline",
+            "autonomousSquad",
+            "balancedHybrid",
+            "hollowMiddle",
+            "reviewBottleneck"
+        ],
+        "the 5 team presets are §10.5 + §10.10 plus the three archetype compositions"
+    );
+}
+
+/// P7a: the three non-golden team presets (archetype-table compositions) run
+/// end-to-end on the engine — a plausibility smoke, not a golden: every series
+/// is finite and bounded where §6 binds it, all 12 §7.2 series and both team
+/// blocks are present, and the compositions differ in the direction the model
+/// claims (an all-AI squad erodes cohesion below the all-human baseline's and
+/// draws lower-quality output than the hybrid team).
+#[test]
+fn team_composition_presets_run_plausibly() {
+    let runs = ["allHumanBaseline", "autonomousSquad", "balancedHybrid"];
+    let mut finals: std::collections::BTreeMap<&str, Output> = std::collections::BTreeMap::new();
+    for id in runs {
+        let out = run_scenario(id, "main");
+        assert_eq!(out.series.len(), 12, "{id}: all 12 team series");
+        for (sid, series) in &out.series {
+            for p in series {
+                for v in [p.p10, p.p50, p.p90] {
+                    assert!(v.is_finite(), "{id}/{sid} non-finite at t={}", p.t);
+                }
+            }
+        }
+        for sid in ["cohesion", "entropyProxy", "orgHealthProxy"] {
+            for p in out.series.get(sid).unwrap() {
+                assert!(
+                    (0.0..=100.0).contains(&p.p50),
+                    "{id}/{sid} out of [0,100] at t={}",
+                    p.t
+                );
+            }
+        }
+        let cov = out.function_coverage.as_ref().unwrap();
+        assert_eq!(cov.len(), 7, "{id}: coverage for all seven functions");
+        let hist_total: u64 = out
+            .quality_histogram
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|b| b.count)
+            .sum();
+        assert!(hist_total > 0, "{id}: completions must draw quality");
+        finals.insert(id, out);
+    }
+    // Directional plausibility (M12/M16): the all-AI squad's settled cohesion
+    // sits below the all-human baseline's, and its pooled quality mass sits
+    // lower than the hybrid team's (autonomous complex/novel judgment loss).
+    let last = |o: &Output, s: &str| {
+        let v = o.series.get(s).unwrap();
+        v.last().unwrap().p50
+    };
+    assert!(
+        last(&finals["autonomousSquad"], "cohesion")
+            < last(&finals["allHumanBaseline"], "cohesion"),
+        "an all-AI squad must erode cohesion below the all-human baseline"
+    );
+    let mean_quality = |o: &Output| {
+        let bins = o.quality_histogram.as_ref().unwrap();
+        let (mut num, mut den) = (0.0, 0.0);
+        for b in bins {
+            num += (b.lo + b.hi) / 2.0 * b.count as f64;
+            den += b.count as f64;
+        }
+        num / den
+    };
+    assert!(
+        mean_quality(&finals["autonomousSquad"]) < mean_quality(&finals["balancedHybrid"]),
+        "autonomous output quality must sit below the hybrid team's"
+    );
+}
+
+/// P7a hard gate — hollowMiddle on the real engine (seed 42, 500 iterations,
+/// ONE default coefficient set): 8 of the 9 §11.6 assertions (including the
+/// `hmReviewWaitNeutral` M20 neutral identity) GREEN via the generic evaluator.
+///
+/// **`hmBrittlenessSpike` is excluded pending a mini-G2 decision
+/// (STOP-AND-SURFACE, P7a 2026-07-05):** the locked golden's own rationale
+/// documents that `cumulativeBrittleness@humanPm` can be 0 ("giving ratio =
+/// +infinity, which satisfies ratioAbove" — the v1 evaluator convention), but
+/// the P3 pre-lock addendum hardened ALL ratio-family comparators to FAIL
+/// loudly on a non-finite ratio (§11.1), and on the engine the humanPm median
+/// IS 0 at every probed seed ({42, 7, 123, 999, 2024}: hollow p50 = 2,
+/// humanPm p50 = 0). Two locked clauses of MODEL.md contradict on this input;
+/// resolving it (e.g. re-anchoring the metric to the pointwise difference, as
+/// was done for hmEarlyThroughputBoost and rbThroughputPlateau) is a predicate
+/// change = mini-G2 user gate, never a phase-local edit. The companion test
+/// below pins the CURRENT reality so the eventual amendment self-announces.
+#[test]
+fn hollow_middle_goldens_green_except_surfaced_spike() {
+    let runs = scenario_runs("hollowMiddle", &["hollow", "humanPm"]);
+    let assertions = load_assertions();
+    let mut checked = 0;
+    for a in assertions.iter().filter(|a| a.scenario == "hollowMiddle") {
+        let o = evaluate(a, &runs);
+        println!(
+            "[p7a-golden] {:<24} {} measured={:.4} bound={} tol={}",
+            a.id,
+            if o.pass { "pass" } else { "FAIL" },
+            o.measured,
+            a.bound,
+            a.tolerance
+        );
+        if a.id == "hmBrittlenessSpike" {
+            continue; // asserted by the surfaced-state companion test below
+        }
+        assert!(
+            o.pass,
+            "hollowMiddle golden {} FAILED: measured {} ({})",
+            a.id, o.measured, o.detail
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 8, "expected 8 asserted hollowMiddle assertions");
+
+    // hmReviewWaitNeutral is an EXACT identity, not a tolerance pass: with
+    // review capacity unbounded every realized sojourn equals reviewDwellDays,
+    // so reviewWaitDays is exactly 1.0 at every step and quantile (M20).
+    let hollow = &runs["hollow"];
+    for p in hollow.series.get("reviewWaitDays").unwrap() {
+        assert_eq!(
+            p.p10, 1.0,
+            "reviewWaitDays p10 must be exactly 1 at t={}",
+            p.t
+        );
+        assert_eq!(
+            p.p50, 1.0,
+            "reviewWaitDays p50 must be exactly 1 at t={}",
+            p.t
+        );
+        assert_eq!(
+            p.p90, 1.0,
+            "reviewWaitDays p90 must be exactly 1 at t={}",
+            p.t
+        );
+    }
+}
+
+/// Companion to the surfaced `hmBrittlenessSpike` mini-G2 (see the test above):
+/// pins today's state so the decision cannot be forgotten. The model DIRECTION
+/// holds — the hollow team's median brittleness (2 events) exceeds twice the
+/// human-PM team's (0) — but the §11.1 finite-ratio rule rejects the +inf
+/// ratio the golden's rationale relies on. When the amendment lands (any
+/// change to the hmBrittlenessSpike predicate/metric), this test FAILS and
+/// must be replaced by the plain green assertion in the suite above.
+#[test]
+fn hm_brittleness_spike_surfaced_state_pending_mini_g2() {
+    let runs = scenario_runs("hollowMiddle", &["hollow", "humanPm"]);
+    let a = load_assertions()
+        .into_iter()
+        .find(|a| a.id == "hmBrittlenessSpike")
+        .expect("hmBrittlenessSpike exists");
+    assert_eq!(
+        a.comparator, "ratioAbove",
+        "predicate changed — the mini-G2 amendment landed; fold this test back \
+         into the green suite"
+    );
+    let o = evaluate(&a, &runs);
+    assert!(
+        !o.pass && o.detail.contains("non-finite"),
+        "expected the documented non-finite failure, got pass={} detail={}",
+        o.pass,
+        o.detail
+    );
+    // The substance behind the predicate holds: hollow ≥ bound × humanPm, with
+    // a strictly positive hollow numerator (hmBrittlenessFloorMc pins ≥ 1.5).
+    let last = |run: &str, s: &str| {
+        runs[run]
+            .series_value(s, Quantile::P50, runs[run].horizon - 1)
+            .unwrap()
+    };
+    let hollow = last("hollow", "cumulativeBrittleness");
+    let human = last("humanPm", "cumulativeBrittleness");
+    assert!(hollow >= 2.0 * human && hollow > 0.0);
+    assert_eq!(
+        human, 0.0,
+        "humanPm median brittleness became nonzero — re-evaluate the ratio \
+         (the +inf collision may have dissolved); surface to the orchestrator"
+    );
+}
+
+/// P7a hard gate — the v2.0.0 team goldens re-proven on the REAL engine (they
+/// were calibrator-proven only until this phase): the 5 §11.11 reviewBottleneck
+/// assertions GREEN via the generic evaluator, seed 42, 500 iterations. A bound
+/// misfit here is calibrator-vs-engine divergence — a stop-and-surface via the
+/// amendment protocol, never a local retune.
+#[test]
+fn review_bottleneck_goldens_reproven_on_engine() {
+    let runs = scenario_runs("reviewBottleneck", &["bottleneck", "unbounded"]);
+    let assertions = load_assertions();
+    let mut checked = 0;
+    for a in assertions
+        .iter()
+        .filter(|a| a.scenario == "reviewBottleneck")
+    {
+        let o = evaluate(a, &runs);
+        println!(
+            "[p7a-golden] {:<24} {} measured={:.4} bound={} tol={}",
+            a.id,
+            if o.pass { "pass" } else { "FAIL" },
+            o.measured,
+            a.bound,
+            a.tolerance
+        );
+        assert!(
+            o.pass,
+            "reviewBottleneck golden {} FAILED: measured {} ({})",
+            a.id, o.measured, o.detail
+        );
+        checked += 1;
+    }
+    assert_eq!(checked, 5, "expected all 5 reviewBottleneck assertions");
 }
 
 /// P4 hard gate: the remaining org-side goldens — §11.3 prioritizationTax (6),

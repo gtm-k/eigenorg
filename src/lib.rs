@@ -6,8 +6,10 @@
 //!
 //! P3 kernel: the config/output schema, the deterministic RNG, the task FSM, the
 //! org decision pipeline (M1–M13, M18, M19), the Monte Carlo runner, and the
-//! frozen chunked run API. `modelVersion` comes from `model/params.json` (the
-//! extractor's declaration, §12.6), never a hand-typed constant.
+//! frozen chunked run API. P4 landed the org AI-injection mechanics; P7a landed
+//! the team simulator (`mechanics::team` — M9/M11/M12/M14–M18/M20 team-side)
+//! behind the same frozen API. `modelVersion` comes from `model/params.json`
+//! (the extractor's declaration, §12.6), never a hand-typed constant.
 
 #[cfg(target_arch = "wasm32")]
 pub mod api;

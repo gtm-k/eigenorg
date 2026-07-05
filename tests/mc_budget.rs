@@ -15,11 +15,12 @@ fn heaviest_output_stays_under_200kb() {
     // (~0.6-1 MB) and is deliberately out of this budget's scope. Payload is
     // independent of iteration count (percentiles collapse iterations).
     //
-    // Assert the budget over EVERY committed org scenario fixture, not one hand-picked
-    // config, so a newly-added heavy scenario cannot slip past unmeasured (T5). Team
-    // fixtures are skipped — the team engine returns notImplemented until P7a.
+    // Assert the budget over EVERY committed scenario fixture — org AND (since
+    // P7a landed the team arm) team — not one hand-picked config, so a
+    // newly-added heavy scenario cannot slip past unmeasured (T5).
     let dir = fixture_path("fixtures/scenarios");
-    let mut checked = 0usize;
+    let mut checked_org = 0usize;
+    let mut checked_team = 0usize;
     for entry in std::fs::read_dir(&dir).expect("read fixtures/scenarios") {
         let path = entry.unwrap().path();
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -32,9 +33,6 @@ fn heaviest_output_stays_under_200kb() {
             .and_then(|s| s.as_str())
             .unwrap_or_default()
             .to_string();
-        if sim != "org" {
-            continue;
-        }
         let out =
             run_json(&json).unwrap_or_else(|e| panic!("run {}: {}", path.display(), e.to_json()));
         let bytes = serde_json::to_string(&out).unwrap().len();
@@ -43,9 +41,17 @@ fn heaviest_output_stays_under_200kb() {
             "{} output {bytes} bytes exceeds the 200 KB budget",
             path.display()
         );
-        checked += 1;
+        if sim == "org" {
+            checked_org += 1;
+        } else {
+            checked_team += 1;
+        }
     }
-    assert!(checked > 0, "no org scenario fixtures were checked");
+    assert!(checked_org > 0, "no org scenario fixtures were checked");
+    assert!(
+        checked_team >= 7,
+        "expected the team fixture set (4 golden twins + 3 preset twins)"
+    );
 }
 
 #[test]
