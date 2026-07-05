@@ -44,6 +44,14 @@ fn capability(e: &Entity, f: &str) -> f64 {
 
 /// Function coverage map (M17): qualified, attention-and-availability-weighted
 /// capability pointed at each function, relative to its team-size-scaled demand.
+///
+/// §7.2 convention (renderer-facing): `rating` is authoritative — it is derived
+/// from the FULL-precision score against the green/amber thresholds BEFORE the
+/// two-decimal display rounding of `score`. Renderers (P7b) must show the
+/// returned `rating` and must NOT recompute it from the rounded `score`, which
+/// could disagree at a threshold boundary (e.g. an unrounded 0.796 rates amber
+/// against a 0.8 green threshold, yet rounds to 0.80 — recomputing off that
+/// rounded value would wrongly read green).
 pub fn function_coverage(entities: &[Entity], params: &Params) -> BTreeMap<String, Coverage> {
     let n_e = entities.len() as f64;
     let green = params.p("coverageGreenThreshold");

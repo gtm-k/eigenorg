@@ -3,9 +3,11 @@
 //! `src/mechanics/` is the numeric-literal-lint scope: every model coefficient
 //! is read from [`crate::params`] by id, and the only bare float literals
 //! permitted here are the structural identities in the lint allowlist (0.0, 1.0,
-//! 2.0, 7.0, 9.0, 10.0, 100.0 — pairwise-channel /2, the sigmoid/clamp
-//! identities, the SH→misalignment scale, the /10 cohesion-coupling and ×100
-//! index scalings). A smuggled coefficient literal fails `mechanics_has_no_bare_coefficient_literals`.
+//! 2.0, 3.0, 5.0, 7.0, 9.0, 10.0, 100.0 — pairwise-channel /2, triangular-mean
+//! /3, the §3.2 1–10 property-scale midpoint /5 (M14's mean(handoffFriction)/5),
+//! the sigmoid/clamp identities, the SH→misalignment scale, the /10
+//! cohesion-coupling and ×100 index scalings). A smuggled coefficient literal
+//! fails `mechanics_has_no_bare_coefficient_literals`.
 
 pub mod org;
 pub mod team;

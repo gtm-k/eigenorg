@@ -119,7 +119,10 @@ fn mechanics_has_no_bare_coefficient_literals() {
             linted += 1;
         }
     }
-    assert!(linted >= 2, "expected to lint mechanics/mod.rs and org.rs");
+    assert!(
+        linted >= 3,
+        "expected to lint mechanics/mod.rs, org.rs, and team.rs"
+    );
 }
 
 #[test]
