@@ -160,6 +160,17 @@
       <p id="share-status" class="status" role="status" aria-live="polite"></p>
     </section>
 
+    <!-- ============ model assumptions drawer (P8 transparency moat) ============ -->
+    <section class="panel" aria-labelledby="assumptions-heading">
+      <p class="eyebrow">Transparency</p>
+      <h2 id="assumptions-heading">Model transparency</h2>
+      <p class="note">Every coefficient the engine runs on, extracted straight from <span class="mono">MODEL.md</span> with its research anchor, evidence tier and limitation. A CI drift gate keeps this drawer identical to the shipped model — nothing here is hand-copied.</p>
+      <!-- The drawer renders www/assumptions.json verbatim; ui/assumptions.js
+           builds a native <details> tree into this mount (shape-driven). -->
+      <div id="assumptions-mount"></div>
+      <p id="assumptions-status" class="empty-note" hidden></p>
+    </section>
+
     <footer class="page-footer">
       <p class="framing">A thinking aid grounded in research — not a prediction engine.</p>
       <p class="meta">Model coefficients carry evidence tiers and ranges in <span class="mono">MODEL.md</span>; adjustable via config (paramOverrides). Zero requests leave this page.</p>

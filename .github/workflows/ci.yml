@@ -159,3 +159,8 @@ jobs:
         run: |
           set -o pipefail
           bash scripts/check_pkg_import_isolation.sh
+
+      - name: Coefficient-literal gate — no hand-typed model coefficients in www/js (PLAN Gate-ownership; P8-owned; PREMORTEM Story 3)
+        run: |
+          set -o pipefail
+          node scripts/check_no_coefficient_literals.mjs

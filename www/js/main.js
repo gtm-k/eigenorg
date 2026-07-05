@@ -26,6 +26,7 @@ import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/priorit
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
+import { fetchAssumptions, renderAssumptionsDrawer } from './ui/assumptions.js';
 import { modelVersionBanner, extractShareFragment } from './url-codec.js';
 
 /** @param {string} sel @returns {HTMLElement} */
@@ -591,3 +592,31 @@ async function boot() {
 boot().catch((err) => {
   setStatus(statusEl, `failed to start: ${err instanceof Error ? err.message : String(err)}`, 'error');
 });
+
+// ---- model assumptions drawer (independent of the run flow) ------------------------
+
+/**
+ * Fetch www/assumptions.json and render the transparency drawer. Independent of
+ * the engine run flow, so a drawer failure never blocks the simulator. The
+ * drawer renders the artifact VERBATIM (PREMORTEM Story 3) — no coefficient is
+ * authored here.
+ */
+async function mountAssumptionsDrawer() {
+  const mount = el('#assumptions-mount');
+  const status = el('#assumptions-status');
+  try {
+    const data = await fetchAssumptions();
+    const { problems } = renderAssumptionsDrawer(mount, data);
+    if (problems.length > 0) {
+      // Shape drift in the extracted artifact — surface it rather than render a
+      // silently blank row (the drift gate would also catch this in CI).
+      status.textContent = `The model artifact changed shape (${problems.length} issue(s)); some rows may be incomplete.`;
+      status.hidden = false;
+    }
+  } catch (err) {
+    status.textContent = `Could not load the model assumptions: ${err instanceof Error ? err.message : String(err)}`;
+    status.hidden = false;
+  }
+}
+
+void mountAssumptionsDrawer();
