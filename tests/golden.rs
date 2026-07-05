@@ -190,3 +190,49 @@ fn retuned_v2_org_goldens_green() {
     }
     assert_eq!(checked, 12, "expected 4+3+5 = 12 org-side v2 goldens");
 }
+
+/// P4 hard gate: the remaining org-side goldens — §11.3 prioritizationTax (6),
+/// §11.4 fasterDysfunction (6, including the monteCarlo visual-separability
+/// predicate `fdSeparability`), §11.5 dunbarCliff (5), §11.7 layerConfigurator
+/// (4) — GREEN via the generic evaluator, all with the ONE default coefficient
+/// set (seed 42, 500 iterations, per §10). With coordinationCollapse (P3) this
+/// completes 4/5 of the launch stress suite; hollowMiddle (team) is P7a's.
+#[test]
+fn remaining_org_goldens_green() {
+    let scenarios: &[(&str, &[&str], usize)] = &[
+        ("prioritizationTax", &["threeLayer", "oneLayer"], 6),
+        (
+            "fasterDysfunction",
+            &["sh3", "sh7", "sh3NoAi", "sh7NoAi"],
+            6,
+        ),
+        ("dunbarCliff", &["main"], 5),
+        ("layerConfigurator", &["aiMiddle", "allHuman"], 4),
+    ];
+    let assertions = load_assertions();
+    for (scenario, runs, expected) in scenarios {
+        let run_map = scenario_runs(scenario, runs);
+        let mut checked = 0;
+        for a in assertions.iter().filter(|a| &a.scenario == scenario) {
+            let o = evaluate(a, &run_map);
+            println!(
+                "[p4-golden] {:<26} {} measured={:.4} bound={} tol={}",
+                a.id,
+                if o.pass { "pass" } else { "FAIL" },
+                o.measured,
+                a.bound,
+                a.tolerance
+            );
+            assert!(
+                o.pass,
+                "org golden {} FAILED: measured {} ({})",
+                a.id, o.measured, o.detail
+            );
+            checked += 1;
+        }
+        assert_eq!(
+            checked, *expected,
+            "expected {expected} {scenario} assertions"
+        );
+    }
+}
