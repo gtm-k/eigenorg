@@ -231,25 +231,35 @@ pub fn evaluate(a: &Assertion, runs: &BTreeMap<String, Output>) -> Outcome {
         "ratioAbove" => {
             let bound = a.bound.as_f64().unwrap_or(f64::NAN);
             match value_for(&a.metric, runs, &step) {
-                Some(v) if !v.is_nan() => outcome(
+                // A non-finite ratio is degenerate — 0/0 (NaN) or x/0 (+inf). Both
+                // FAIL loudly rather than silently satisfying `ratioAbove` (§11.1).
+                Some(v) if v.is_finite() => outcome(
                     &a.id,
                     v >= bound * (1.0 - tol),
                     v,
                     format!(">= {}", bound * (1.0 - tol)),
                 ),
-                _ => fail(&a.id, "ratio 0/0 (NaN) or unresolved"),
+                _ => fail(
+                    &a.id,
+                    "ratio non-finite (0/0 NaN or x/0 +inf) or unresolved",
+                ),
             }
         }
         "ratioBelow" => {
             let bound = a.bound.as_f64().unwrap_or(f64::NAN);
             match value_for(&a.metric, runs, &step) {
-                Some(v) if !v.is_nan() => outcome(
+                // A non-finite ratio fails loudly (a zero-denominator +inf must not
+                // silently pass `ratioBelow` either) (§11.1).
+                Some(v) if v.is_finite() => outcome(
                     &a.id,
                     v <= bound * (1.0 + tol),
                     v,
                     format!("<= {}", bound * (1.0 + tol)),
                 ),
-                _ => fail(&a.id, "ratio 0/0 (NaN) or unresolved"),
+                _ => fail(
+                    &a.id,
+                    "ratio non-finite (0/0 NaN or x/0 +inf) or unresolved",
+                ),
             }
         }
         "riseAtLeast" | "dropAtLeast" | "growthRatioAbove" => {

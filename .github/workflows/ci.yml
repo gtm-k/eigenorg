@@ -10,6 +10,10 @@ on:
   # pull_request:
   #   branches: [main]
 
+# Least privilege: CI only reads the repo (no writes to contents, packages, etc.).
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 

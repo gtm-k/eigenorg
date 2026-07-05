@@ -330,6 +330,11 @@ impl TeamConfig {
         if !ws.arrival_per_step.is_finite() || !(0.2..=5.0).contains(&ws.arrival_per_step) {
             return Err("team.workStream.arrivalPerStep must be in [0.2, 5]".to_string());
         }
+        // Finiteness first: a NaN fraction slips past both the sum tolerance and the
+        // negativity check below (`NaN > 0.001` and `NaN < 0.0` are both false).
+        if !ws.mix.routine.is_finite() || !ws.mix.complex.is_finite() || !ws.mix.novel.is_finite() {
+            return Err("team.workStream.mix fractions must be finite".to_string());
+        }
         let mix_sum = ws.mix.routine + ws.mix.complex + ws.mix.novel;
         if (mix_sum - 1.0).abs() > 0.001 {
             return Err("team.workStream.mix must sum to 1 (+/- 0.001)".to_string());

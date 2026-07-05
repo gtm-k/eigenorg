@@ -9,5 +9,5 @@
     "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable", "WebWorker"]
   },
-  "include": ["www/js/**/*.js", "scripts/**/*.mjs", "scripts/**/*.js"]
+  "include": ["www/js/**/*.js", "www/js/**/*.mjs", "scripts/**/*.mjs", "scripts/**/*.js"]
 }

@@ -60,6 +60,26 @@ pub fn parse_and_validate(
     Ok(config)
 }
 
+/// Org-side AI-injection guard (P3b scope). The M9 amplification, M11 execution
+/// boost / coordination relief, and M12 cohesion-AI term all land in P4; until
+/// then an org run with `aiInjection.enabled == true` would execute with those
+/// mechanics inert — a silent-wrong output. Guard it with a typed
+/// `NotImplemented`, mirroring the team arm. Signature-stable: P4 removes this
+/// guard when M9/M11/M12-AI land. A `false`/absent injection (every committed
+/// config) is untouched, so no default-path output changes.
+fn org_ai_injection_guard(config: &Config) -> Result<(), EngineError> {
+    if let Some(org) = &config.org {
+        if org.ai_injection.enabled {
+            return Err(EngineError::NotImplemented(
+                "org AI injection (M9/M11 effects, M12 cohesion-AI) lands in P4; \
+                 aiInjection.enabled=true is not yet supported"
+                    .to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Native monolithic run: validate, dispatch, run every iteration, aggregate.
 ///
 /// Replay looseness is driven by the explicit `config.replay` flag (§12.4), not by
@@ -74,6 +94,7 @@ pub fn run_config(config: Config) -> Result<Output, EngineError> {
             "team simulator lands in P7a (the wasm export signature is frozen here)".to_string(),
         )),
         Sim::Org => {
+            org_ai_injection_guard(&config)?;
             let replay = config.replay;
             let mut run = OrgRun::new(config, replay).map_err(EngineError::Validation)?;
             run.run_chunk(run.total_iterations());
@@ -111,6 +132,7 @@ impl Run {
                     .to_string(),
             )),
             Sim::Org => {
+                org_ai_injection_guard(&config)?;
                 let replay = config.replay;
                 let run = OrgRun::new(config, replay).map_err(EngineError::Validation)?;
                 Ok(Run::Org(run))
@@ -172,6 +194,26 @@ mod tests {
         let err = run_json(cfg).unwrap_err();
         assert!(matches!(err, EngineError::NotImplemented(_)));
         assert!(err.to_json().contains("notImplemented"));
+    }
+
+    #[test]
+    fn org_ai_injection_is_typed_not_implemented() {
+        // aiInjection.enabled=true is P4 scope; running it now would produce a
+        // silent-wrong output, so it is a typed NotImplemented (not a run).
+        let cfg = r#"{"schemaVersion":"1","modelVersion":"2.0.0","sim":"org","seed":42,
+            "iterations":50,"horizon":10,
+            "org":{"headcountStart":12,"headcountGrowthPerStep":0,"topology":"flat",
+            "hierarchyDepth":2,"ownershipLayers":1,"modality":"asyncFirst","structuralHealth":6,
+            "aiInjection":{"enabled":true,"atStep":0}}}"#;
+        let err = run_json(cfg).unwrap_err();
+        assert!(matches!(err, EngineError::NotImplemented(_)));
+        assert!(err.to_json().contains("notImplemented"));
+        // The false/absent injection every committed config uses still runs.
+        let ok = cfg.replace("\"enabled\":true", "\"enabled\":false");
+        assert!(
+            run_json(&ok).is_ok(),
+            "aiInjection.enabled=false still runs"
+        );
     }
 
     #[test]

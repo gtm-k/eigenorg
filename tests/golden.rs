@@ -1,12 +1,17 @@
-//! Golden-harness gate (MODEL.md §11 / PLAN P3b).
+//! Golden-harness gate (MODEL.md §11 / PLAN P3b + P3c).
 //!
-//! Hard gates: the five `coordinationCollapse` assertions are GREEN via the
-//! generic evaluator (the harness-fidelity canary — if this forced any
-//! coefficient change the orchestrator would be surfaced, per PLAN), and the
-//! normative exact identities hold (neutral-identity byte-parity + the
-//! `mxTiebreakerRecovers` exact 1.0). The provisional §11.8–§11.10 v2 bounds are
-//! evaluated and REPORTED but not asserted — their bounds are provisional and
-//! P3c retunes them; MODEL.md is not edited here.
+//! Hard gates: the five `coordinationCollapse` assertions AND the 12 org-side v2
+//! assertions (§11.8 accountabilityDiffusion, §11.9 committeeInversion, §11.10
+//! matrix) are GREEN via the generic evaluator. `coordinationCollapse` is the
+//! harness-fidelity canary (if it forced any coefficient change the orchestrator
+//! would be surfaced, per PLAN); the §11.8–§11.10 bounds are no longer provisional
+//! — P3c retuned them against the engine harness (seed 42, 500 iters) and they are
+//! hard-asserted here. The normative exact identities hold (neutral-identity
+//! byte-parity + the `mxTiebreakerRecovers` exact 1.0). The team-side §11.11
+//! reviewBottleneck goldens and the §11.6 `hmReviewWaitNeutral` identity are
+//! calibrator-proven only — the engine's team arm is NotImplemented until P7a, so
+//! P7a owns their engine assertion. All v2 golden bounds are FINAL per the two
+//! mini-G2 decisions (2026-07-04); MODEL.md is not edited here.
 
 mod common;
 
@@ -142,13 +147,13 @@ fn matrix_tiebreaker_recovers_is_exact_identity() {
 }
 
 /// Retuned org-side v2 goldens (§11.8 accountabilityDiffusion, §11.9
-/// committeeInversion, §11.10 matrix): after P3c calibration these bounds are no
-/// longer provisional — every predicate must PASS via the engine golden harness
-/// (seed 42, 500 iters). The team-side §11.11 reviewBottleneck goldens are NOT
-/// here: the engine's team arm is NotImplemented until P7a, so they cannot run on
-/// the engine and their bounds stay provisional pending the P3c needs-decision
-/// (the scoped calibrator surfaced a scenario/mechanics mismatch — see the
-/// calibration report).
+/// committeeInversion, §11.10 matrix): after P3c calibration these bounds are FINAL
+/// (the two mini-G2 decisions, 2026-07-04) — every predicate must PASS via the
+/// engine golden harness (seed 42, 500 iters). The team-side §11.11 reviewBottleneck
+/// goldens and the §11.6 `hmReviewWaitNeutral` identity are NOT here: the engine's
+/// team arm is NotImplemented until P7a, so they are calibrator-proven only and their
+/// engine assertion is owned by P7a (per PLAN). Their bounds are FINAL, not
+/// provisional.
 #[test]
 fn retuned_v2_org_goldens_green() {
     let scenarios: &[(&str, &[&str])] = &[

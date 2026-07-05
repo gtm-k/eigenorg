@@ -60,12 +60,21 @@ payload or an error envelope `{ "error": { "type", "message" } }` (`type ∈
 
 - `sim` is `"org"` or `"team"`; it must match `config.sim`. The **team** arm
   returns a typed `notImplemented` error until P7a (signature frozen; body later).
+- An org run with `org.aiInjection.enabled == true` also returns a typed
+  `notImplemented` error: the M9/M11 execution effects and the M12 cohesion-AI term
+  are P4 scope, so running injection now would emit a silent-wrong output. **P4
+  removes this guard when M9/M11/M12-AI land; signature-stable.** Every committed
+  config sets `enabled: false`, so the default path is unaffected.
 - **Lifecycle:** `begin_run` → repeated `run_chunk(n)` until
   `completedCount == totalIterations` → `finalize()`. `finalize()` is a pure read
   (idempotent). **Cancel = `cancel()` (or a new `begin_run`), then begin again;**
   a fresh run reproduces the previous output byte-for-byte.
 - **State machine:** `run_chunk`/`finalize` before `begin_run` → `badState`;
   `finalize` before completion → `badState`.
+- **Transitional (non-contract) exports.** `echo` and `monte_carlo_pi` (`src/api.rs`)
+  are P2 walking-skeleton surfaces kept only so the skeleton page loads until P5
+  rewrites the worker. They are **not** part of the frozen surface — P5 removes them
+  with the worker rewrite — so the freeze does not bind them.
 
 ### Worker protocol (P5 implements; shape frozen here)
 

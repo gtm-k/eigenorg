@@ -13,29 +13,64 @@ use std::path::Path;
 /// ×100 index scaling. NOT model coefficients (those all come from params.json).
 const ALLOWED: &[&str] = &["0.0", "1.0", "2.0", "3.0", "7.0", "9.0", "10.0", "100.0"];
 
+/// Scan a line for float numeric literals in every Rust surface form: an integer
+/// part with optional `_` grouping, an optional `.fraction` (the fraction digits
+/// may be empty — a trailing dot `2.`), and an optional `[eE][+-]?exponent`. A
+/// token is a *float* only if it carries a fraction dot or an exponent (a bare
+/// integer is not a coefficient). Underscores are stripped from the returned
+/// literal before the caller's allowlist compare, so `1_000.5` normalizes to
+/// `1000.5`. Tuple/field access (`w.1`), method calls chained on an int, and range
+/// `..` are excluded so they never masquerade as literals.
 fn float_literals(code: &str) -> Vec<String> {
     let b = code.as_bytes();
     let mut out = Vec::new();
     let mut i = 0;
     while i < b.len() {
-        if b[i].is_ascii_digit() {
-            let prev_joins =
-                i > 0 && (b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_' || b[i - 1] == b'.');
-            let start = i;
-            while i < b.len() && b[i].is_ascii_digit() {
+        // A literal starts at a digit that does not continue an identifier or follow
+        // a `.` (which would make it the fraction/index of a prior token).
+        let starts = b[i].is_ascii_digit()
+            && !(i > 0
+                && (b[i - 1].is_ascii_alphanumeric() || b[i - 1] == b'_' || b[i - 1] == b'.'));
+        if !starts {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        // Integer part (digits + `_` grouping).
+        while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'_') {
+            i += 1;
+        }
+        let mut is_float = false;
+        // Fraction: a single `.` that is not a range `..` and not a method/field
+        // access chained on the int (`.` followed by a letter or `_`).
+        if i < b.len() && b[i] == b'.' {
+            let after = b.get(i + 1).copied();
+            let is_range = after == Some(b'.');
+            let is_access = matches!(after, Some(c) if c.is_ascii_alphabetic() || c == b'_');
+            if !is_range && !is_access {
+                is_float = true;
                 i += 1;
-            }
-            if i + 1 < b.len() && b[i] == b'.' && b[i + 1].is_ascii_digit() {
-                i += 1;
-                while i < b.len() && b[i].is_ascii_digit() {
+                while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'_') {
                     i += 1;
                 }
-                if !prev_joins {
-                    out.push(code[start..i].to_string());
+            }
+        }
+        // Exponent: [eE] [+-]? digit (digit | _)*.
+        if i < b.len() && (b[i] == b'e' || b[i] == b'E') {
+            let mut j = i + 1;
+            if j < b.len() && (b[j] == b'+' || b[j] == b'-') {
+                j += 1;
+            }
+            if j < b.len() && b[j].is_ascii_digit() {
+                is_float = true;
+                i = j;
+                while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'_') {
+                    i += 1;
                 }
             }
-        } else {
-            i += 1;
+        }
+        if is_float {
+            out.push(code[start..i].replace('_', ""));
         }
     }
     out
@@ -87,4 +122,21 @@ fn lint_scanner_self_check() {
     // Sanity: the scanner finds real floats, skips ints and tuple access.
     let found = float_literals("let x = 0.036 * a[0] + w.1 - 2;");
     assert_eq!(found, vec!["0.036".to_string()]);
+    // Evasion forms are caught: scientific notation, trailing dot, and
+    // underscore-grouped literals (underscores stripped before the compare).
+    assert_eq!(float_literals("let a = 1e-2;"), vec!["1e-2".to_string()]);
+    assert_eq!(float_literals("let b = 2.;"), vec!["2.".to_string()]);
+    assert_eq!(
+        float_literals("let c = 1_000.5;"),
+        vec!["1000.5".to_string()]
+    );
+    assert_eq!(
+        float_literals("let d = 6.02E23;"),
+        vec!["6.02E23".to_string()]
+    );
+    // Ranges and field access are not literals.
+    assert_eq!(
+        float_literals("for t in 0..horizon { w.1 }"),
+        Vec::<String>::new()
+    );
 }

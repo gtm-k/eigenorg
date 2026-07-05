@@ -20,9 +20,18 @@ if grep -rInE '<script[^>]*src=.{0,2}https?://' "$dir"; then fail '^^ <script sr
 if grep -rInE '<link[^>]*href=.{0,2}https?://' "$dir"; then fail '^^ <link href> to an absolute http(s) URL'; fi
 if grep -rInE 'import\(.{0,3}https?://' "$dir"; then fail '^^ dynamic import() of an absolute http(s) URL'; fi
 if grep -rInE 'new Worker\(.{0,3}https?://' "$dir"; then fail '^^ new Worker() from an absolute http(s) URL'; fi
+# Static ESM import from an absolute http(s) URL (import ... from "https://...").
+if grep -rInE 'from[[:space:]].{0,2}https?://' "$dir"; then fail '^^ static ESM import from an absolute http(s) URL'; fi
+# <img src> and CSS url() to an absolute http(s) URL.
+if grep -rInE '<img[^>]*src=.{0,2}https?://' "$dir"; then fail '^^ <img src> to an absolute http(s) URL'; fi
+if grep -rInE 'url\(.{0,2}https?://' "$dir"; then fail '^^ CSS url() to an absolute http(s) URL'; fi
 # Protocol-relative //host targets (quote/paren/equals then //hostchar).
 if grep -rInE '['"'"'"`(=]//[A-Za-z0-9]' "$dir"; then fail '^^ protocol-relative //host request target'; fi
+# Request-sink tripwires (any use is disallowed on a zero-external-requests site).
 if grep -rIn 'sendBeacon' "$dir"; then fail '^^ sendBeacon usage'; fi
+if grep -rIn 'XMLHttpRequest' "$dir"; then fail '^^ XMLHttpRequest usage'; fi
+if grep -rIn 'new WebSocket' "$dir"; then fail '^^ new WebSocket usage'; fi
+if grep -rIn 'new EventSource' "$dir"; then fail '^^ new EventSource usage'; fi
 
 if [ "$status" -ne 0 ]; then
   echo "FAIL: external-request pattern found in $dir — the site must make zero external requests"
