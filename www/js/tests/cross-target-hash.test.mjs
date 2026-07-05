@@ -56,8 +56,10 @@ test('the frozen chunked API reports typed errors', { skip: !built }, async () =
   // run_chunk before begin_run is a BadState error envelope.
   const before = JSON.parse(wasm.run_chunk(1));
   assert.equal(before.error?.type, 'badState');
-  // A team config is a typed NotImplemented until P7a.
+  // The P3-era team NotImplemented stub is gone (removed at P7a): a team config
+  // begins a real run through the same frozen surface.
   const teamCfg = readFileSync('fixtures/scenarios/reviewBottleneck__bottleneck.json', 'utf8');
   const team = JSON.parse(wasm.begin_run('team', teamCfg, 42n));
-  assert.equal(team.error?.type, 'notImplemented');
+  assert.ok(team.ok, `team begin_run failed: ${JSON.stringify(team)}`);
+  wasm.cancel();
 });
