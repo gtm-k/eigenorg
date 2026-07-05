@@ -22,6 +22,9 @@ if grep -rInE 'import\(.{0,3}https?://' "$dir"; then fail '^^ dynamic import() o
 if grep -rInE 'new Worker\(.{0,3}https?://' "$dir"; then fail '^^ new Worker() from an absolute http(s) URL'; fi
 # Static ESM import from an absolute http(s) URL (import ... from "https://...").
 if grep -rInE 'from[[:space:]].{0,2}https?://' "$dir"; then fail '^^ static ESM import from an absolute http(s) URL'; fi
+# Bare side-effect static import of an absolute http(s) URL (import "https://..."), which
+# carries no `from` and so escapes the static-import pattern above. Whitespace-tolerant.
+if grep -rInE 'import[[:space:]]*['"'"'"]https?://' "$dir"; then fail '^^ bare side-effect import of an absolute http(s) URL'; fi
 # <img src> and CSS url() to an absolute http(s) URL.
 if grep -rInE '<img[^>]*src=.{0,2}https?://' "$dir"; then fail '^^ <img src> to an absolute http(s) URL'; fi
 if grep -rInE 'url\(.{0,2}https?://' "$dir"; then fail '^^ CSS url() to an absolute http(s) URL'; fi
