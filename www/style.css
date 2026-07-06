@@ -1427,6 +1427,30 @@ progress {
   text-align: center;
 }
 
+/* Broken-shared-link notice on the landing (BLOCKER B). Amber FUNCTIONAL status
+   colour + icon + text — never colour alone; centered via inline-flex + auto
+   margins on the text-centered landing. */
+.landing-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 auto var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  max-width: 40rem;
+  font-size: 0.9375rem;
+  text-align: left;
+  color: var(--color-stale);
+  background: rgba(217, 164, 65, 0.08);
+  border: 1px solid rgba(217, 164, 65, 0.35);
+  border-radius: var(--radius-md);
+}
+
+.landing-notice-icon {
+  flex: none;
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .door-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -1691,13 +1715,15 @@ progress {
   padding: 0.75rem 1.5rem;
 }
 
-/* ---- results bar: persistent Run again + stale badge (spec section 6) ---- */
-.results {
-  margin-top: var(--space-8);
+/* ---- run strip (always visible) + gated results (spec section 6, BLOCKER A) ---- */
+/* The run feedback + persistent actions live in .run-strip, OUTSIDE #org-results,
+   so first-run progress/status show while #org-results stays gated on hasRun. */
+.run-strip {
+  margin: var(--space-8) 0 var(--space-6);
 }
 
-.results-bar {
-  margin-bottom: var(--space-6);
+.results {
+  margin-top: 0;
 }
 
 .results-actions {

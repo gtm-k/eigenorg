@@ -38,6 +38,10 @@
         <h1 id="landing-title" class="landing-title">Two ways to look at one organization.</h1>
         <p class="landing-lede">Performance is a property of structure, not headcount. Pick the altitude you want to test — the whole org, or a single team. Every run is 500 seeded Monte&nbsp;Carlo simulations, entirely in your browser.</p>
       </header>
+      <!-- Shown on the landing when a shared '#s=' link fails to open (BLOCKER B):
+           the shell (and #run-status) is hidden here, so the failure needs a
+           landing-level, keyboard/AT-visible notice. Icon + text, never colour-only. -->
+      <p id="landing-notice" class="landing-notice" role="status" hidden><span class="landing-notice-icon" aria-hidden="true">⚠</span> <span id="landing-notice-text"></span></p>
       <div id="door-grid" class="door-grid" role="group" aria-label="Choose what to explore"></div>
       <p class="landing-foot framing">A thinking aid grounded in research — not a prediction engine. Nothing leaves your browser.</p>
     </div>
@@ -99,21 +103,28 @@
           </div>
         </section>
 
-        <!-- RESULTS -->
-        <div id="org-results" class="results">
-          <div class="results-bar">
-            <div class="results-actions">
-              <!-- Revealed on the first completed run (main.js): "Run again" only
-                   makes sense once there is a run to repeat. -->
-              <button id="run-button-2" type="button" data-run-label="Run again" hidden disabled>Run again</button>
-              <progress id="run-progress" max="1500" value="0" aria-label="simulation progress"></progress>
-            </div>
-            <p id="org-stale" class="stale-badge" role="status" hidden><span class="stale-icon" aria-hidden="true">⟳</span> Results are out of date — run again to refresh the charts</p>
-            <p id="run-status" class="status" role="status" aria-live="polite">starting engine…</p>
-            <p id="run-readout" class="readout" aria-label="run parameters">
-              <span id="ro-model">model —</span><span id="ro-seed"></span><span id="ro-iters"></span><span id="ro-elapsed"></span>
-            </p>
+        <!-- RUN STRIP — always visible: the run feedback + persistent actions.
+             Kept OUTSIDE #org-results so first-run progress/status still show while
+             the results region is gated on state.hasRun (BLOCKER A). -->
+        <div class="run-strip">
+          <div class="results-actions">
+            <!-- Revealed on the first completed run (main.js): "Run again" only
+                 makes sense once there is a run to repeat. -->
+            <button id="run-button-2" type="button" data-run-label="Run again" hidden disabled>Run again</button>
+            <progress id="run-progress" max="1500" value="0" aria-label="simulation progress"></progress>
           </div>
+          <p id="org-stale" class="stale-badge" role="status" hidden><span class="stale-icon" aria-hidden="true">⟳</span> Results are out of date — run again to refresh the charts</p>
+          <p id="run-status" class="status" role="status" aria-live="polite">starting engine…</p>
+        </div>
+
+        <!-- RESULTS — GATED on state.hasRun (main.js): hidden until the first run
+             paints, so a fresh visit AND a post-"Start over" re-entry are
+             byte-equivalent (BLOCKER A). Revealed in paintResults, re-hidden in
+             resetToDefault. -->
+        <div id="org-results" class="results" hidden>
+          <p id="run-readout" class="readout" aria-label="run parameters">
+            <span id="ro-model">model —</span><span id="ro-seed"></span><span id="ro-iters"></span><span id="ro-elapsed"></span>
+          </p>
 
           <!-- ============ before/after pane (the story) ============ -->
           <section class="panel panel-lift reveal-item" aria-labelledby="pane-heading">
@@ -232,18 +243,20 @@
             </div>
             <p id="card-status" class="status" role="status" aria-live="polite"></p>
           </section>
-
-          <!-- ============ model assumptions drawer (P8 transparency moat) ============ -->
-          <section class="panel" aria-labelledby="assumptions-heading">
-            <p class="eyebrow">Under the hood</p>
-            <h2 id="assumptions-heading">Every coefficient the engine uses</h2>
-            <p class="note">Extracted straight from <span class="mono">MODEL.md</span> with its research anchor, evidence tier and limitation. A CI drift gate keeps this drawer identical to the shipped model — nothing here is hand-copied.</p>
-            <!-- The drawer renders www/assumptions.json verbatim; ui/assumptions.js
-                 builds a native <details> tree into this mount (shape-driven). -->
-            <div id="assumptions-mount"></div>
-            <p id="assumptions-status" class="empty-note" hidden></p>
-          </section>
         </div>
+
+        <!-- model assumptions drawer (P8 transparency moat) — kept OUTSIDE the
+             gated #org-results so this run-independent transparency stays visible
+             on a fresh visit and after "Start over" (BLOCKER A). -->
+        <section class="panel" aria-labelledby="assumptions-heading">
+          <p class="eyebrow">Under the hood</p>
+          <h2 id="assumptions-heading">Every coefficient the engine uses</h2>
+          <p class="note">Extracted straight from <span class="mono">MODEL.md</span> with its research anchor, evidence tier and limitation. A CI drift gate keeps this drawer identical to the shipped model — nothing here is hand-copied.</p>
+          <!-- The drawer renders www/assumptions.json verbatim; ui/assumptions.js
+               builds a native <details> tree into this mount (shape-driven). -->
+          <div id="assumptions-mount"></div>
+          <p id="assumptions-status" class="empty-note" hidden></p>
+        </section>
       </div>
 
       <!-- ===== Team Building (P7b builds the real content into this mount) ===== -->

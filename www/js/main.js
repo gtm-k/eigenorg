@@ -269,12 +269,15 @@ async function runAll() {
       paintResults({ plan, primary, contrast, aiOff, layerTwin, totalRuns, primaryElapsedMs, planElapsedMs, replayPayload, runPresetId });
     }
   } catch (err) {
-    if (/** @type {any} */ (err).cancelled) {
-      // A Start-over cancel already set the clean-slate "ready" status
-      // (resetToDefault) — don't stomp it with "run cancelled" (M4/C2).
-      if (!state.startingOver) setStatus(statusEl, 'run cancelled', '');
-    } else {
-      setStatus(statusEl, `run failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    // A Start-over cancel already set the clean-slate "ready" status
+    // (resetToDefault) — don't stomp it with a status for the abandoned run,
+    // whether it ended cancelled OR failed (M4/C2 + fold L1).
+    if (!state.startingOver) {
+      if (/** @type {any} */ (err).cancelled) {
+        setStatus(statusEl, 'run cancelled', '');
+      } else {
+        setStatus(statusEl, `run failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      }
     }
   } finally {
     setRunButtons(false);
@@ -298,6 +301,18 @@ async function runAll() {
  */
 function paintResults(r) {
   const { plan, primary, contrast, aiOff, layerTwin } = r;
+
+  // BLOCKER A: #org-results is gated on state.hasRun (hidden on a fresh visit and
+  // after Start over). Reveal it — and add the one-shot chart-reveal class —
+  // BEFORE painting the charts, then resize the just-shown canvases, so Chart.js
+  // measures the real container size (it reads zero while display:none).
+  const resultsEl = el('#org-results');
+  const firstReveal = resultsEl.hidden;
+  resultsEl.hidden = false;
+  if (firstReveal) {
+    resultsEl.classList.add('charts-revealed');
+    resizeCharts();
+  }
   const config = plan.primary;
   const output = primary.output;
 
@@ -458,14 +473,12 @@ function paintResults(r) {
   };
 
   // P10a re-run model: the charts now match the setup — record that a run has
-  // completed (M1 stale-guard), reveal the persistent "Run again" (only
-  // meaningful once a run exists), play the one-shot chart reveal, drop the
-  // stale badge and collapse the setup panel to its "Your setup" chips
-  // (markResultsFresh). Idempotent: the CSS reveal animation plays only the
-  // first time the class lands.
+  // completed (M1 stale-guard + BLOCKER A gate), reveal the persistent "Run
+  // again" (only meaningful once a run exists), drop the stale badge and collapse
+  // the setup panel to its "Your setup" chips (markResultsFresh). #org-results
+  // was already revealed + the chart-reveal played at the top of paintResults.
   state.hasRun = true;
   el('#run-button-2').hidden = false;
-  el('#org-results').classList.add('charts-revealed');
   markResultsFresh();
 }
 
@@ -647,6 +660,19 @@ function resizeCharts() {
 }
 
 /**
+ * Empty every chart's datasets — used by Start over so the gated results region
+ * holds no abandoned-run data even if it is later revealed (BLOCKER A). On the
+ * next run paintResults refills them.
+ */
+function resetCharts() {
+  for (const chart of Object.values(charts)) {
+    chart.data.labels = [];
+    for (const ds of chart.data.datasets) ds.data = [];
+    chart.update('none');
+  }
+}
+
+/**
  * The scenario label for the current config (a preset name, a shared run, or a
  * custom edit) — the first "Your setup" chip.
  * @returns {string}
@@ -738,10 +764,26 @@ function resetToDefault() {
   el('#preset-note').textContent = presetNote(preset);
   configurator.setCompareDefault(false);
 
-  // Reset the results region + setup strip to the pre-run state.
+  // Reset the results region + setup strip to the pre-run state. Re-hiding
+  // #org-results (BLOCKER A) makes a post-Start-over re-entry byte-equivalent to
+  // a fresh boot: the abandoned run's charts/readout/panes are gone, not
+  // lingering under a reset default-preset setup.
   state.hasRun = false;
+  el('#org-results').hidden = true;
   el('#org-results').classList.remove('charts-revealed', 'is-stale');
   el('#run-button-2').hidden = true;
+  // Clear run-derived CONTENT too. The configurator's flow/recovery/legibility
+  // panels live in the (always-visible) setup, so they MUST be cleared
+  // (setPending) — gating #org-results would not hide them. The gated results'
+  // readout, charts and bottleneck badge are additionally emptied so nothing
+  // stale lingers even if the region is later revealed.
+  configurator.setPending();
+  resetCharts();
+  el('#ro-model').textContent = 'model —';
+  el('#ro-seed').textContent = '';
+  el('#ro-iters').textContent = '';
+  el('#ro-elapsed').textContent = '';
+  el('#bottleneck-badge').hidden = true;
   orgStrip.markFresh(); // hide the stale badge + collapse …
   orgStrip.expand(); // … then reopen the controls for a fresh setup
 
@@ -782,6 +824,7 @@ const nav = createNavShell({
     },
   ],
   onEnter(id) {
+    el('#landing-notice').hidden = true; // clear any broken-link notice on entry (BLOCKER B)
     if (id === 'org') resizeCharts(); // charts were sized while the mount was hidden
   },
   onStartOver: resetToDefault,
@@ -824,16 +867,19 @@ async function boot() {
   // run, against the engine-stamped modelVersion.
   /** @type {any} */
   let replayBoot = null;
-  // A '#s=' that is present but malformed/unsupported must NOT fail silently:
-  // the decode error status below is kept visible (the "ready…" line is skipped
-  // when this is set) so a broken shared link is observable (C1; pre-existing —
-  // line 786 previously overwrote the error unconditionally).
+  // A shared '#s=' link that fails to open must NOT fail silently. Two failure
+  // modes, both surfaced on the LANDING (the shell's #run-status is hidden while
+  // the landing shows — BLOCKER B): (1) an undecodable payload THROWS; (2) a
+  // '#s=' present but unparseable makes readShareFromHash return null (not a
+  // throw). Either sets decodeError, which renders the landing notice below.
   let decodeError = false;
   try {
     replayBoot = await readShareFromHash(window.location.hash, null);
-  } catch (err) {
+  } catch {
     decodeError = true;
-    setStatus(statusEl, `could not open the shared link: ${err instanceof Error ? err.message : String(err)}`, 'error');
+  }
+  if (!replayBoot && !decodeError && window.location.hash.startsWith('#s=')) {
+    decodeError = true; // (B-a) a '#s=' prefix was present but nothing parsed
   }
 
   if (replayBoot) {
@@ -862,11 +908,10 @@ async function boot() {
   setRunButtons(false);
   refreshSetupChips();
   probe.bootReadyMs = performance.now(); // navigation start → Run clickable
-  // C1: keep a share-link decode error visible; only announce "ready" when the
-  // link (if any) decoded cleanly, so a broken '#s=' is never silently swallowed.
-  if (!decodeError) {
-    setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
-  }
+  // The shell's own status is always "ready" — a broken shared link is surfaced
+  // on the LANDING notice (BLOCKER B), not in the hidden shell, so entering a
+  // door later lands on a coherent fresh "ready" state.
+  setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
 
   if (replayBoot) {
     // A shared link is an Organization run: open that door directly (skipping
@@ -876,7 +921,13 @@ async function boot() {
     void runAll();
   } else {
     // A fresh visit lands on the two doors; the user picks an altitude to enter.
-    // No focus-on-load — the reader sees the h1 + lede first (M2).
+    // No focus-on-load — the reader sees the h1 + lede first (M2). A broken
+    // shared link surfaces a visible, plain-language landing notice (BLOCKER B).
+    if (decodeError) {
+      el('#landing-notice-text').textContent =
+        "That shared link couldn't be opened — it may be corrupted or truncated. Pick a door below to start fresh.";
+      el('#landing-notice').hidden = false;
+    }
     nav.showLanding();
   }
 }
