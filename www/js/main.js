@@ -21,7 +21,7 @@ import {
   autoRunsOnInteraction,
   stagesGeneration,
 } from './ui/runplan.js';
-import { renderControls, applyOrgValue } from './ui/org.js';
+import { renderControls, applyOrgValue, orgSetupChips } from './ui/org.js';
 import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
 import { renderOnboarding, readDiagnosticSeen, shouldShowDiagnostic } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
@@ -30,6 +30,7 @@ import { readShareFromHash, wireShareButton } from './ui/share.js';
 import { wireCard } from './share/card.js';
 import { fetchAssumptions, renderAssumptionsDrawer } from './ui/assumptions.js';
 import { modelVersionBanner, extractShareFragment } from './url-codec.js';
+import { createNavShell, createSetupStrip } from './ui/nav.js';
 
 /** @param {string} sel @returns {HTMLElement} */
 function el(sel) {
@@ -53,9 +54,8 @@ const client = createEngineClient(createWorkerTransport(worker));
 // ---- elements ------------------------------------------------------------------
 
 const runButtons = [
-  /** @type {HTMLButtonElement} */ (el('#run-button')),
-  /** @type {HTMLButtonElement} */ (el('#run-button-2')),
-  /** @type {HTMLButtonElement} */ (el('#run-button-3')), // P6 configurator section run trigger
+  /** @type {HTMLButtonElement} */ (el('#run-button')), // primary CTA inside the setup panel
+  /** @type {HTMLButtonElement} */ (el('#run-button-2')), // persistent "Run again" in the results bar
 ];
 const progressBar = /** @type {HTMLProgressElement} */ (el('#run-progress'));
 const statusEl = el('#run-status');
@@ -132,7 +132,10 @@ function setMeaning(id, text) {
 /** @param {boolean} running */
 function setRunButtons(running) {
   for (const b of runButtons) {
-    b.textContent = running ? 'Cancel run' : 'Run simulation';
+    // Each run button keeps its own idle label (via data-run-label:
+    // "Run simulation" / "Run again"); both become "Cancel run" while a plan
+    // is in flight.
+    b.textContent = running ? 'Cancel run' : (b.dataset.runLabel ?? 'Run simulation');
     b.disabled = false;
   }
 }
@@ -438,6 +441,15 @@ function paintResults(r) {
     primaryOutputJson: primary.outputJson,
     primaryConfig: plan.primary,
   };
+
+  // P10a re-run model: the charts now match the setup — reveal the persistent
+  // "Run again" (only meaningful once a run exists), play the one-shot chart
+  // reveal, drop the stale badge and collapse the setup panel to its "Your
+  // setup" chips (markResultsFresh). Idempotent: the CSS reveal animation plays
+  // only the first time the class lands.
+  el('#run-button-2').hidden = false;
+  el('#org-results').classList.add('charts-revealed');
+  markResultsFresh();
 }
 
 // ---- config-change plumbing (P5b-F1) ----------------------------------------------
@@ -479,6 +491,7 @@ function stageConfigChange(interaction) {
   share.disarm(); // (e) no share until a matching fresh run completes
   card.disarm(); // the last card is now stale — no export until a fresh run
   clearShareHash();
+  markResultsStale(); // charts no longer match the setup — show the stale badge
 }
 
 /**
@@ -555,6 +568,7 @@ const configurator = renderConfigurator(el('#configurator'), {
     stageGeneration('compareToggle');
     share.disarm();
     card.disarm();
+    markResultsStale(); // the pending run shape changed — flag the charts stale
     setStatus(statusEl, 'comparison changed — run to update the all-human comparison', '');
   },
 });
@@ -574,7 +588,9 @@ const onboarding = renderOnboarding(el('#diagnostic'), {
     setStatus(statusEl, `Structural Health set to ${score} from your diagnostic — run to see how this structure behaves.`, '');
   },
   onSkip() {
-    // The plain slider remains the standing control; move focus to it.
+    // The plain slider remains the standing control; reopen the setup panel in
+    // place (it may be collapsed to the chip summary) and move focus to it.
+    orgStrip.expand();
     el('#ctl-structuralHealth').focus();
     setStatus(statusEl, 'Set Structural Health with the slider, then run.', '');
   },
@@ -601,6 +617,102 @@ const card = wireCard({
   statusEl: el('#card-status'),
 });
 probe.renderCard = (/** @type {number} */ w, /** @type {number} */ h) => card.renderDataUrl(w, h);
+
+// ---- two-altitude shell + setup strip (P10a) --------------------------------
+
+/**
+ * Resize every chart to its (now-visible) container. Charts are created into the
+ * hidden org mount at boot, so they must re-measure when the Organization door
+ * opens — otherwise Chart.js keeps the zero-size it read while hidden.
+ */
+function resizeCharts() {
+  for (const chart of Object.values(charts)) chart.resize();
+}
+
+/**
+ * The scenario label for the current config (a preset name, a shared run, or a
+ * custom edit) — the first "Your setup" chip.
+ * @returns {string}
+ */
+function currentScenarioLabel() {
+  if (state.replayPayload) return 'Shared run';
+  if (state.presetId) return state.presets.get(state.presetId)?.label ?? 'Custom configuration';
+  return 'Custom configuration';
+}
+
+// The mode-agnostic "Your setup → Edit in place → Run again → stale" affordance
+// (spec §6). The org controls + configurator live in #org-setup-body; a completed
+// run collapses them to the chip summary, Edit setup reopens them in place.
+const orgStrip = createSetupStrip({
+  body: el('#org-setup-body'),
+  summary: el('#org-setup-summary'),
+  chipHost: el('#org-setup-chips'),
+  editButton: /** @type {HTMLButtonElement} */ (el('#edit-setup')),
+  staleBadge: el('#org-stale'),
+  focusTarget: () =>
+    /** @type {HTMLElement | null} */ (document.querySelector('#org-setup-body button, #org-setup-body input')),
+});
+
+/** Refresh the "Your setup" chips from the current (possibly pending) config. */
+function refreshSetupChips() {
+  if (!state.config) return;
+  orgStrip.setChips(orgSetupChips(state.config, currentScenarioLabel()));
+}
+
+/** A staged edit: charts no longer match the setup — show the stale badge. */
+function markResultsStale() {
+  el('#org-results').classList.add('is-stale');
+  orgStrip.markStale();
+  refreshSetupChips();
+}
+
+/** A completed run: charts match the setup again — collapse setup to the chips. */
+function markResultsFresh() {
+  // If focus is inside the setup body it is about to be display:none'd by the
+  // collapse; move it to the persistent "Run again" so keyboard focus is never
+  // dropped to <body>. (When a run is launched from "Run again", focus is
+  // already outside the setup body and this is a no-op.)
+  const focusWasInSetup = el('#org-setup-body').contains(document.activeElement);
+  el('#org-results').classList.remove('is-stale');
+  refreshSetupChips();
+  orgStrip.markFresh();
+  const runAgain = /** @type {HTMLButtonElement} */ (el('#run-button-2'));
+  if (focusWasInSetup && !runAgain.hidden) runAgain.focus();
+}
+
+// The two-altitude nav shell (spec §4). Doors are registered by { id, label,
+// question, desc, icon, mount }; the shell drives the landing cards + the
+// segmented toggle from this list, so P7b adds the Team door's real content by
+// populating #team-mount — without editing nav.js. The Team door shows a
+// placeholder in P10a (its composer is P7b).
+const nav = createNavShell({
+  landing: el('#landing'),
+  doorGrid: el('#door-grid'),
+  shell: el('#shell'),
+  toggle: el('#altitude-toggle'),
+  startOver: /** @type {HTMLButtonElement} */ (el('#start-over')),
+  doors: [
+    {
+      id: 'org',
+      label: 'Organization Building',
+      question: "Is my org's structure sound?",
+      desc: 'Shape a whole organization and see how its structure drives disorder, decision speed and coordination cost.',
+      icon: '🏢',
+      mount: el('#org-mount'),
+    },
+    {
+      id: 'team',
+      label: 'Team Building',
+      question: "Will this team's makeup work?",
+      desc: 'Compose one team of humans and AI and see throughput, quality, cohesion and where coverage gaps open up.',
+      icon: '👥',
+      mount: el('#team-mount'),
+    },
+  ],
+  onEnter(id) {
+    if (id === 'org') resizeCharts(); // charts were sized while the mount was hidden
+  },
+});
 
 for (const b of runButtons) b.addEventListener('click', () => void runAll());
 
@@ -669,10 +781,19 @@ async function boot() {
   controls.refresh();
   configurator.refresh();
   setRunButtons(false);
+  refreshSetupChips();
   probe.bootReadyMs = performance.now(); // navigation start → Run clickable
   setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
 
-  if (replayBoot) void runAll(); // a shared link replays without a click
+  if (replayBoot) {
+    // A shared link is an Organization run: open that door directly (skipping
+    // the landing) and replay without a click.
+    nav.enter('org');
+    void runAll();
+  } else {
+    // A fresh visit lands on the two doors; the user picks an altitude to enter.
+    nav.showLanding();
+  }
 }
 
 boot().catch((err) => {

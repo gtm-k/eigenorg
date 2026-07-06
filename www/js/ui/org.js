@@ -175,6 +175,41 @@ export function applyOrgValue(config, id, value) {
   return next;
 }
 
+/** Plain topology nouns for the "Your setup" chip summary. @type {Record<string, string>} */
+const TOPOLOGY_LABELS = {
+  flat: 'Flat',
+  hierarchical: 'Hierarchical',
+  pods: 'Pods',
+  federated: 'Federated',
+};
+
+/**
+ * The "Your setup" chip summary (spec §6): a compact, human-readable digest of
+ * the current org configuration, shown at the top of the results while the setup
+ * panel is collapsed. Pure (node-tested); reads only config fields and authors no
+ * model number (every value is a plain input the user set).
+ * @param {any} config the current org config
+ * @param {string} scenarioLabel the active scenario / preset label
+ * @returns {Array<{ label: string, value: string }>}
+ */
+export function orgSetupChips(config, scenarioLabel) {
+  const org = config?.org ?? {};
+  const topology = TOPOLOGY_LABELS[org.topology] ?? String(org.topology ?? '—');
+  const modality = org.modality === 'meetingHeavy' ? 'Meeting-heavy' : 'Async-first';
+  const layers = Number(org.ownershipLayers);
+  const aiOn =
+    Boolean(org.aiInjection?.enabled) && Number(org.aiInjection?.atStep) < Number(config?.horizon ?? 0);
+  return [
+    { label: 'Scenario', value: scenarioLabel },
+    { label: 'People', value: String(org.headcountStart ?? '—') },
+    { label: 'Shape', value: topology },
+    { label: 'Structural Health', value: `${org.structuralHealth ?? '—'} of 10` },
+    { label: 'Approval layers', value: Number.isFinite(layers) ? String(layers) : '—' },
+    { label: 'Coordination', value: modality },
+    { label: 'AI injection', value: aiOn ? 'on' : 'off' },
+  ];
+}
+
 // ---- DOM rendering (browser only) --------------------------------------------
 
 /**
