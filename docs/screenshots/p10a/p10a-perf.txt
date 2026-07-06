@@ -8,44 +8,46 @@ one 500-iteration Monte Carlo run; planElapsedMs = the full 2–3-run plan;
 bootReadyMs = navigation start -> Run clickable). Landing preset =
 fasterDysfunction (AI on, 3-run plan). Viewport 1280x900.
 
-Re-measured after the round-1 repair (M1/M2/M3/M4+C2/C1 + F1/F2). Numbers are
-unchanged materially from the initial build — the fixes are UI-state/a11y only
-and add no per-frame work.
+Re-measured after round-2 repair (BLOCKER A results-gating, BLOCKER B broken-link
+notice, fold L1). Numbers unchanged materially — the fixes are UI-state/a11y only.
 
 Budget A — a 500-iteration sim runs in < 1.5 s:
-  run 1: primary 500-iter run = 544 ms
-  run 2: primary 500-iter run = 497 ms
-  run 3: primary 500-iter run = 530 ms
-  full 3-run plan = 1448 ms
-  => single 500-iteration sim ~0.52 s  << 1.5 s budget. PASS.
+  run 1: primary 500-iter run = 639 ms
+  run 2: primary 500-iter run = 572 ms
+  run 3: primary 500-iter run = 580 ms
+  full 3-run plan = 1556 ms
+  => single 500-iteration sim ~0.60 s  << 1.5 s budget. PASS.
 
 Budget B — a full walkthrough in < 90 s:
-  boot (navigation start -> Run clickable) = 401 ms
+  boot (navigation start -> Run clickable) = 402 ms
   scripted walkthrough (land -> open Organization door -> 3 sequential runs
-    -> results painted) = 4886 ms (machine-paced proxy; the P5/P6 convention).
-  => 4.9 s  << 90 s budget. PASS.
+    -> results painted) = 5270 ms (machine-paced proxy; the P5/P6 convention).
+  => 5.3 s  << 90 s budget. PASS.
 
-Zero-console-errors + zero-external-requests (same session, Playwright logs):
-  console errors (whole session, incl. the malformed-'#s=' decode-error path): 0
-  network requests: all to the local /eigenorg/ origin (relative). No CDN, no
-    external host; Chart.js served from www/vendor/, wasm from www/pkg via the
-    worker. PASS.
+Zero-console-errors + zero-external-requests (whole session, Playwright logs):
+  console errors (incl. all broken-'#s=' paths + Start-over during a run): 0
+  network requests: all to the local /eigenorg/ origin (relative). PASS.
 
-Repair-verified behaviours (Playwright, same session):
-  - M1: editing a control BEFORE any run keeps #org-stale hidden + charts
-    undimmed; after a run, an edit shows the stale badge + dims the charts.
-  - M2: cold load leaves document.activeElement = <body> (no focus-on-load) and
-    the h1 at the top; Start over focuses the first door.
-  - M3: #org-mount / #team-mount report role="region".
-  - M4/C2: Start over -> re-enter Org = clean slate (default preset SH 3, setup
-    expanded, Run-again hidden, no stale, status "ready…"); Start over DURING a
-    run cancels it with no late paint and leaves the "ready…" status.
-  - C1: a valid-charset but undecodable '#s=' hash keeps the "could not open the
-    shared link…" error status (no "ready…" overwrite).
-  - F1: with reduced-motion emulated, .door:hover transform = none (no lift);
-    no-preference applies the eased lift.
-  - F2: the primary CTA has animationName "none" when unfocused; the breathe is
-    scoped to .cta:focus-visible inside the reduced-motion guard.
+Round-2 blocker verifications (Playwright, same session):
+  - BLOCKER A (Start over left painted results): #org-results is gated on
+    state.hasRun (hidden on a fresh visit and after Start over; revealed +
+    charts resized on paintResults). Proof: fresh-boot Org view vs
+    (run -> Start over -> re-enter) is BYTE-EQUIVALENT — #org-results display:none,
+    readout "model —", charts empty, bottleneck badge hidden, configurator flow
+    table cleared (setPending), setup expanded on the default preset. First run
+    reveals the region and sizes the canvases (entropy canvas 455px, data present).
+  - BLOCKER B (broken share links failed silently): a VISIBLE landing notice
+    ("That shared link couldn't be opened…", role=status, ⚠ icon + text) shows for
+    '#s=' (empty), '#s=!' (garbage chars), and '#s=AAAAAAAA' (valid charset, bad
+    payload). No-hash load and a non-share '#about' hash show NO notice (normal
+    "ready"). A VALID share link (1913-char '#s=…', within budget) replays into the
+    Organization door with no notice. The notice clears on door entry.
+  - fold L1: the Start-over status guard now covers BOTH the "run cancelled" and
+    "run failed" catch branches (a genuine worker error at Start-over no longer
+    stomps the clean "ready").
+  - Round-1 proofs re-confirmed (no regression): M1 pre-run stale suppressed +
+    post-run stale works; M2 cold-load activeElement=<body>; C2 Start-over during
+    a run cancels with no late paint and leaves "ready"; Team toggle works.
 
 Notes:
   - The redesign's motion is CSS-only (fade-ups, focus-scoped breathing ring,
