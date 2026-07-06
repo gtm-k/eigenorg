@@ -27,190 +27,258 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%235e6ad2'/%3E%3Ctext x='8' y='12' font-size='11' font-family='monospace' fill='white' text-anchor='middle'%3Ee%3C/text%3E%3C/svg%3E">
 </head>
 <body>
-  <main>
-    <header class="page-header">
-      <h1>eigenorg</h1>
-      <p class="framing">A thinking aid grounded in research — not a prediction engine. Every run is a seeded Monte Carlo simulation; nothing leaves your browser.</p>
+  <!-- ================= Landing: two doors (spec §4) ================= -->
+  <!-- The doors double as the explainer: each is phrased as the question it
+       answers. nav.js builds the door cards into #door-grid from the registered
+       door list, so P7b's Team door needs no change here. -->
+  <section id="landing" class="landing" aria-labelledby="landing-title">
+    <div class="landing-inner">
+      <header class="landing-header">
+        <p class="brand-mark">eigenorg</p>
+        <h1 id="landing-title" class="landing-title">Two ways to look at one organization.</h1>
+        <p class="landing-lede">Performance is a property of structure, not headcount. Pick the altitude you want to test — the whole org, or a single team. Every run is 500 seeded Monte&nbsp;Carlo simulations, entirely in your browser.</p>
+      </header>
+      <!-- Shown on the landing when a shared '#s=' link fails to open (BLOCKER B):
+           the shell (and #run-status) is hidden here, so the failure needs a
+           landing-level, keyboard/AT-visible notice. Icon + text, never colour-only. -->
+      <p id="landing-notice" class="landing-notice" role="status" hidden><span class="landing-notice-icon" aria-hidden="true">⚠</span> <span id="landing-notice-text"></span></p>
+      <div id="door-grid" class="door-grid" role="group" aria-label="Choose what to explore"></div>
+      <p class="landing-foot framing">A thinking aid grounded in research — not a prediction engine. Nothing leaves your browser.</p>
+    </div>
+  </section>
+
+  <!-- ================= Shell: persistent altitude nav + mode content ============= -->
+  <div id="shell" class="shell" hidden>
+    <header class="altitude-bar">
+      <span class="altitude-brand">eigenorg</span>
+      <!-- nav.js fills the segmented toggle: both altitudes visible, active
+           coloured + weighted + aria-current (never colour alone). -->
+      <div id="altitude-toggle" class="altitude-toggle"></div>
+      <button id="start-over" class="altitude-restart ghost" type="button"><span aria-hidden="true">↺</span> Start over</button>
     </header>
 
-    <div id="replay-banner" class="banner" role="status" hidden></div>
+    <main class="mode-region">
+      <div id="replay-banner" class="banner" role="status" hidden></div>
 
-    <!-- ============ scenario + run ============ -->
-    <section class="panel" aria-labelledby="run-heading">
-      <p class="eyebrow">Scenario</p>
-      <div class="panel-header">
-        <h2 id="run-heading">Org Entropy Simulator</h2>
-      </div>
-      <div id="preset-picker" class="chip-row" role="group" aria-label="scenario presets"></div>
-      <p id="preset-note" class="note"></p>
-      <div class="run-row">
-        <button id="run-button" type="button" disabled>Run simulation</button>
-        <progress id="run-progress" max="1500" value="0" aria-label="simulation progress"></progress>
-      </div>
-      <p id="run-status" class="status" role="status" aria-live="polite">starting engine…</p>
-      <p id="run-readout" class="readout" aria-label="run parameters">
-        <span id="ro-model">model —</span><span id="ro-seed"></span><span id="ro-iters"></span><span id="ro-elapsed"></span>
-      </p>
-    </section>
+      <!-- ===== Organization Building ===== -->
+      <div id="org-mount" class="mode-content" role="region" aria-label="Organization Building">
+        <header class="mode-intro">
+          <p class="eyebrow">Organization Building</p>
+          <h2 class="mode-title">Is your org's structure sound?</h2>
+          <p class="mode-sub">Shape a whole organization — its size, how it's wired, and who has to sign off — then watch how disorder, decision speed and coordination cost play out over 500 simulated runs.</p>
+        </header>
 
-    <!-- ============ before/after pane (the story) ============ -->
-    <section class="panel" aria-labelledby="pane-heading">
-      <p class="eyebrow">Before / after</p>
-      <!-- Neutral default; paint() sets "Same org, same AI — structure decides"
-           only when AI is actually active in the pane pair (P5b-F1 fold). -->
-      <h2 id="pane-heading">Same org — structure decides</h2>
-      <p id="meaning-pane" class="meaning"></p>
-      <div class="pane-grid">
-        <article class="pane-card" aria-labelledby="pane-before-title">
-          <h3 id="pane-before-title"><span id="pane-before-label">Structural Health 3</span> <span id="pane-before-tag" class="tag" hidden>your org</span></h3>
-          <div class="chart-box chart-box-sm">
-            <canvas id="pane-before-chart" role="img" aria-label="Entropy over time at the lower Structural Health: median line inside the 10th to 90th percentile band"></canvas>
+        <!-- SETUP — collapses to the "Your setup" chip summary after a run,
+             reopens in place via Edit setup (spec §6). -->
+        <section class="panel panel-lift setup" aria-labelledby="setup-heading">
+          <div id="org-setup-summary" class="setup-summary" hidden>
+            <div class="setup-summary-head">
+              <p class="eyebrow">Your setup</p>
+              <button id="edit-setup" class="ghost" type="button" aria-expanded="true" aria-controls="org-setup-body">Edit setup</button>
+            </div>
+            <div id="org-setup-chips" class="setup-chips"></div>
           </div>
-          <dl class="stat-row" id="pane-before-stats"></dl>
-        </article>
-        <article class="pane-card" aria-labelledby="pane-after-title">
-          <h3 id="pane-after-title"><span id="pane-after-label">Structural Health 7</span> <span id="pane-after-tag" class="tag" hidden>your org</span></h3>
-          <div class="chart-box chart-box-sm">
-            <canvas id="pane-after-chart" role="img" aria-label="Entropy over time at the higher Structural Health: median line inside the 10th to 90th percentile band"></canvas>
+
+          <div id="org-setup-body" class="setup-body">
+            <p class="eyebrow">Scenario</p>
+            <h2 id="setup-heading" class="setup-title">Start from a scenario, then adjust</h2>
+            <div id="preset-picker" class="chip-row" role="group" aria-label="scenario presets"></div>
+            <p id="preset-note" class="note"></p>
+
+            <div class="setup-group">
+              <h3 class="setup-subhead">Your org</h3>
+              <p class="note">Changes apply on the next run. Structural Health folds five observable diagnostics (ownership, WIP discipline, async norms, decision authority, recovery path) into one 1–10 scale.</p>
+              <div id="org-controls" class="controls-grid"></div>
+            </div>
+
+            <div class="setup-group">
+              <h3 class="setup-subhead">Approval stack <span class="setup-subhead-note">a control inside your org</span></h3>
+              <p class="note">Build the sign-off chain a decision must clear — 1 to 5 layers, each a Human PM, Human Director, AI Prioritization Agent, or Committee seat. This is the part that produces the decision-latency number. Tap a seat type to assign it; changes apply on the next run.</p>
+              <div id="configurator" class="configurator"></div>
+            </div>
+
+            <div class="run-row setup-run">
+              <button id="run-button" class="cta" type="button" data-run-label="Run simulation" disabled>Run simulation</button>
+            </div>
           </div>
-          <dl class="stat-row" id="pane-after-stats"></dl>
-        </article>
+        </section>
+
+        <!-- RUN STRIP — always visible: the run feedback + persistent actions.
+             Kept OUTSIDE #org-results so first-run progress/status still show while
+             the results region is gated on state.hasRun (BLOCKER A). -->
+        <div class="run-strip">
+          <div class="results-actions">
+            <!-- Revealed on the first completed run (main.js): "Run again" only
+                 makes sense once there is a run to repeat. -->
+            <button id="run-button-2" type="button" data-run-label="Run again" hidden disabled>Run again</button>
+            <progress id="run-progress" max="1500" value="0" aria-label="simulation progress"></progress>
+          </div>
+          <p id="org-stale" class="stale-badge" role="status" hidden><span class="stale-icon" aria-hidden="true">⟳</span> Results are out of date — run again to refresh the charts</p>
+          <p id="run-status" class="status" role="status" aria-live="polite">starting engine…</p>
+        </div>
+
+        <!-- RESULTS — GATED on state.hasRun (main.js): hidden until the first run
+             paints, so a fresh visit AND a post-"Start over" re-entry are
+             byte-equivalent (BLOCKER A). Revealed in paintResults, re-hidden in
+             resetToDefault. -->
+        <div id="org-results" class="results" hidden>
+          <p id="run-readout" class="readout" aria-label="run parameters">
+            <span id="ro-model">model —</span><span id="ro-seed"></span><span id="ro-iters"></span><span id="ro-elapsed"></span>
+          </p>
+
+          <!-- ============ before/after pane (the story) ============ -->
+          <section class="panel panel-lift reveal-item" aria-labelledby="pane-heading">
+            <p class="eyebrow">Before / after</p>
+            <!-- Neutral default; paint() sets "Same org, same AI — structure decides"
+                 only when AI is actually active in the pane pair (P5b-F1 fold). -->
+            <h2 id="pane-heading">Same org — structure decides</h2>
+            <p id="meaning-pane" class="meaning"></p>
+            <div class="pane-grid">
+              <article class="pane-card" aria-labelledby="pane-before-title">
+                <h3 id="pane-before-title"><span id="pane-before-label">Structural Health 3</span> <span id="pane-before-tag" class="tag" hidden>your org</span></h3>
+                <div class="chart-box chart-box-sm">
+                  <canvas id="pane-before-chart" role="img" aria-label="Entropy over time at the lower Structural Health: median line inside the 10th to 90th percentile band"></canvas>
+                </div>
+                <dl class="stat-row" id="pane-before-stats"></dl>
+              </article>
+              <article class="pane-card" aria-labelledby="pane-after-title">
+                <h3 id="pane-after-title"><span id="pane-after-label">Structural Health 7</span> <span id="pane-after-tag" class="tag" hidden>your org</span></h3>
+                <div class="chart-box chart-box-sm">
+                  <canvas id="pane-after-chart" role="img" aria-label="Entropy over time at the higher Structural Health: median line inside the 10th to 90th percentile band"></canvas>
+                </div>
+                <dl class="stat-row" id="pane-after-stats"></dl>
+              </article>
+            </div>
+          </section>
+
+          <!-- ============ onboarding diagnostic (P8; shown once after first result) ============ -->
+          <!-- Non-modal; ui/onboarding.js builds the 5-question form into this section
+               and unhides it after the first non-replay result. Skippable to the plain
+               slider above; never blocks landing (PREMORTEM A2). -->
+          <section id="diagnostic" class="panel diagnostic" hidden></section>
+
+          <!-- ============ charts ============ -->
+          <div class="charts-grid">
+            <section class="panel reveal-item" aria-labelledby="entropy-heading">
+              <p class="eyebrow">Disorder</p>
+              <h2 id="entropy-heading">Entropy</h2>
+              <p id="meaning-entropy" class="meaning">Composite disorder index (0–100), p50 line inside the p10–p90 Monte Carlo band.</p>
+              <div class="chart-box">
+                <canvas id="entropy-chart" role="img" aria-label="Entropy over time: median line with 10th to 90th percentile band; a labeled vertical line marks the AI injection step when active"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="velocity-heading">
+              <p class="eyebrow">Decisions</p>
+              <div class="panel-header">
+                <h2 id="velocity-heading">Decision velocity</h2>
+                <span id="bottleneck-badge" class="badge" hidden></span>
+              </div>
+              <p id="meaning-velocity" class="meaning">A 0–100 speedometer for decisions: layers add friction, queues drag it lower.</p>
+              <div class="chart-box">
+                <canvas id="velocity-chart" role="img" aria-label="Decision velocity over time: median line with 10th to 90th percentile band; the bottleneck layer is named in the badge above"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="comm-heading">
+              <p class="eyebrow">Coordination</p>
+              <h2 id="comm-heading">Communication load</h2>
+              <p id="meaning-communication" class="meaning">Open channels inside and between teams; labeled vertical lines mark cognitive band crossings.</p>
+              <div class="chart-box">
+                <canvas id="comm-chart" role="img" aria-label="Communication channels over time: median line with 10th to 90th percentile band; labeled vertical lines mark cognitive band crossings"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="delta-heading">
+              <p class="eyebrow">Counterfactual</p>
+              <h2 id="delta-heading">AI injection delta</h2>
+              <p id="meaning-delta" class="meaning">Pointwise difference, AI minus no-AI, on this exact org.</p>
+              <div class="chart-box">
+                <canvas id="delta-chart" role="img" aria-label="AI injection delta: entropy difference (solid) and throughput difference (dashed) between the AI run and the no-AI counterfactual"></canvas>
+              </div>
+              <p id="delta-empty" class="empty-note" hidden></p>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="meetings-heading">
+              <p class="eyebrow">Coordination</p>
+              <h2 id="meetings-heading">Meeting overhead</h2>
+              <p id="meaning-meetings" class="meaning">Share of each step's capacity spent coordinating instead of working.</p>
+              <div class="chart-box">
+                <canvas id="meetings-chart" role="img" aria-label="Meeting overhead as a percentage of capacity over time: median line with 10th to 90th percentile band"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="health-heading">
+              <p class="eyebrow">Multi-level health</p>
+              <h2 id="health-heading">Teams vs the org</h2>
+              <p id="meaning-health" class="meaning">Team cohesion vs org-level health: divergence means healthy teams inside a sick org.</p>
+              <div class="chart-box">
+                <canvas id="health-chart" role="img" aria-label="Org health (solid) versus mean team cohesion (dashed) over time"></canvas>
+              </div>
+            </section>
+          </div>
+
+          <!-- ============ share ============ -->
+          <section class="panel" aria-labelledby="share-heading">
+            <p class="eyebrow">Reproduce</p>
+            <h2 id="share-heading">Share this run</h2>
+            <p class="note">The link embeds the seed, the config and the full resolved coefficient set — whoever opens it replays this exact run, byte for byte, in their own browser.</p>
+            <div class="run-row">
+              <button id="share-button" type="button" disabled>Copy share link</button>
+            </div>
+            <p id="share-status" class="status" role="status" aria-live="polite"></p>
+          </section>
+
+          <!-- ============ output / share card (P8) ============ -->
+          <section class="panel" aria-labelledby="card-heading">
+            <p class="eyebrow">Take it with you</p>
+            <h2 id="card-heading">Result card</h2>
+            <p class="note">A 1200×628 image of this run — the decision-latency headline, the throughput-and-entropy story and the research-framing line, ready to post. Generated entirely in your browser; nothing is uploaded.</p>
+            <div class="card-preview">
+              <canvas id="card-canvas" width="1200" height="628" role="img" aria-label="Shareable result card: a decision-latency headline in working days, throughput and entropy after AI injection, and a before/after entropy chart contrasting a strained and a sound org (lower versus higher Structural Health)."></canvas>
+            </div>
+            <div class="run-row">
+              <button id="card-download" type="button" disabled>Download card</button>
+              <button id="card-share" type="button" class="ghost" disabled>Share…</button>
+            </div>
+            <p id="card-status" class="status" role="status" aria-live="polite"></p>
+          </section>
+        </div>
+
+        <!-- model assumptions drawer (P8 transparency moat) — kept OUTSIDE the
+             gated #org-results so this run-independent transparency stays visible
+             on a fresh visit and after "Start over" (BLOCKER A). -->
+        <section class="panel" aria-labelledby="assumptions-heading">
+          <p class="eyebrow">Under the hood</p>
+          <h2 id="assumptions-heading">Every coefficient the engine uses</h2>
+          <p class="note">Extracted straight from <span class="mono">MODEL.md</span> with its research anchor, evidence tier and limitation. A CI drift gate keeps this drawer identical to the shipped model — nothing here is hand-copied.</p>
+          <!-- The drawer renders www/assumptions.json verbatim; ui/assumptions.js
+               builds a native <details> tree into this mount (shape-driven). -->
+          <div id="assumptions-mount"></div>
+          <p id="assumptions-status" class="empty-note" hidden></p>
+        </section>
       </div>
-    </section>
 
-    <!-- ============ onboarding diagnostic (P8; shown once after first result) ============ -->
-    <!-- Non-modal; ui/onboarding.js builds the 5-question form into this section
-         and unhides it after the first non-replay result. Skippable to the plain
-         slider below; never blocks landing (PREMORTEM A2). -->
-    <section id="diagnostic" class="panel diagnostic" hidden></section>
-
-    <!-- ============ org controls ============ -->
-    <section class="panel" aria-labelledby="controls-heading">
-      <p class="eyebrow">Your org</p>
-      <div class="panel-header">
-        <h2 id="controls-heading">Structure controls</h2>
-        <button id="run-button-2" type="button" class="ghost" disabled>Run simulation</button>
+      <!-- ===== Team Building (P7b builds the real content into this mount) ===== -->
+      <div id="team-mount" class="mode-content" role="region" aria-label="Team Building" hidden>
+        <header class="mode-intro">
+          <p class="eyebrow">Team Building</p>
+          <h2 class="mode-title">Will this team's makeup work?</h2>
+          <p class="mode-sub">Compose one team — who does the work, humans and AI, and who reviews it — then see throughput, quality, cohesion and where coverage gaps open up.</p>
+        </header>
+        <section class="panel panel-lift placeholder">
+          <p class="placeholder-icon" aria-hidden="true">👥</p>
+          <h3 class="placeholder-title">Team Building — arriving in the beta</h3>
+          <p class="placeholder-body">The team composer and its charts are on the way. The simulation engine is already built and validated; the interface for it lands next. For now, switch back to <strong>Organization Building</strong> to explore how whole-org structure decides the outcome.</p>
+        </section>
       </div>
-      <p class="note">Changes apply on the next run. Structural Health folds five observable diagnostics (ownership, WIP discipline, async norms, decision authority, recovery path) into one 1–10 scale.</p>
-      <div id="org-controls" class="controls-grid"></div>
-    </section>
-
-    <!-- ============ prioritization layer configurator (P6, signature) ============ -->
-    <section class="panel" aria-labelledby="configurator-heading">
-      <p class="eyebrow">Prioritization stack</p>
-      <div class="panel-header">
-        <h2 id="configurator-heading">Prioritization Layer Configurator</h2>
-        <button id="run-button-3" type="button" class="ghost" disabled>Run simulation</button>
-      </div>
-      <p class="note">Build the approval stack a decision must clear — 1 to 5 layers, each a Human PM, Human Director, AI Prioritization Agent, or Committee seat. Tap a seat type to assign it; changes apply on the next run. The flow diagram and the all-human comparison below read straight from the run.</p>
-      <!-- The configurator builds its own controls, flow table and comparison
-           into this mount (P5 module convention). -->
-      <div id="configurator" class="configurator"></div>
-    </section>
-
-    <!-- ============ charts ============ -->
-    <div class="charts-grid">
-      <section class="panel" aria-labelledby="entropy-heading">
-        <p class="eyebrow">Disorder</p>
-        <h2 id="entropy-heading">Entropy</h2>
-        <p id="meaning-entropy" class="meaning">Composite disorder index (0–100), p50 line inside the p10–p90 Monte Carlo band.</p>
-        <div class="chart-box">
-          <canvas id="entropy-chart" role="img" aria-label="Entropy over time: median line with 10th to 90th percentile band; a labeled vertical line marks the AI injection step when active"></canvas>
-        </div>
-      </section>
-
-      <section class="panel" aria-labelledby="velocity-heading">
-        <p class="eyebrow">Decisions</p>
-        <div class="panel-header">
-          <h2 id="velocity-heading">Decision velocity</h2>
-          <span id="bottleneck-badge" class="badge" hidden></span>
-        </div>
-        <p id="meaning-velocity" class="meaning">A 0–100 speedometer for decisions: layers add friction, queues drag it lower.</p>
-        <div class="chart-box">
-          <canvas id="velocity-chart" role="img" aria-label="Decision velocity over time: median line with 10th to 90th percentile band; the bottleneck layer is named in the badge above"></canvas>
-        </div>
-      </section>
-
-      <section class="panel" aria-labelledby="comm-heading">
-        <p class="eyebrow">Coordination</p>
-        <h2 id="comm-heading">Communication load</h2>
-        <p id="meaning-communication" class="meaning">Open channels inside and between teams; labeled vertical lines mark cognitive band crossings.</p>
-        <div class="chart-box">
-          <canvas id="comm-chart" role="img" aria-label="Communication channels over time: median line with 10th to 90th percentile band; labeled vertical lines mark cognitive band crossings"></canvas>
-        </div>
-      </section>
-
-      <section class="panel" aria-labelledby="delta-heading">
-        <p class="eyebrow">Counterfactual</p>
-        <h2 id="delta-heading">AI injection delta</h2>
-        <p id="meaning-delta" class="meaning">Pointwise difference, AI minus no-AI, on this exact org.</p>
-        <div class="chart-box">
-          <canvas id="delta-chart" role="img" aria-label="AI injection delta: entropy difference (solid) and throughput difference (dashed) between the AI run and the no-AI counterfactual"></canvas>
-        </div>
-        <p id="delta-empty" class="empty-note" hidden></p>
-      </section>
-
-      <section class="panel" aria-labelledby="meetings-heading">
-        <p class="eyebrow">Coordination</p>
-        <h2 id="meetings-heading">Meeting overhead</h2>
-        <p id="meaning-meetings" class="meaning">Share of each step's capacity spent coordinating instead of working.</p>
-        <div class="chart-box">
-          <canvas id="meetings-chart" role="img" aria-label="Meeting overhead as a percentage of capacity over time: median line with 10th to 90th percentile band"></canvas>
-        </div>
-      </section>
-
-      <section class="panel" aria-labelledby="health-heading">
-        <p class="eyebrow">Multi-level health</p>
-        <h2 id="health-heading">Teams vs the org</h2>
-        <p id="meaning-health" class="meaning">Team cohesion vs org-level health: divergence means healthy teams inside a sick org.</p>
-        <div class="chart-box">
-          <canvas id="health-chart" role="img" aria-label="Org health (solid) versus mean team cohesion (dashed) over time"></canvas>
-        </div>
-      </section>
-    </div>
-
-    <!-- ============ share ============ -->
-    <section class="panel" aria-labelledby="share-heading">
-      <p class="eyebrow">Reproduce</p>
-      <h2 id="share-heading">Share this run</h2>
-      <p class="note">The link embeds the seed, the config and the full resolved coefficient set — whoever opens it replays this exact run, byte for byte, in their own browser.</p>
-      <div class="run-row">
-        <button id="share-button" type="button" disabled>Copy share link</button>
-      </div>
-      <p id="share-status" class="status" role="status" aria-live="polite"></p>
-    </section>
-
-    <!-- ============ output / share card (P8) ============ -->
-    <section class="panel" aria-labelledby="card-heading">
-      <p class="eyebrow">Share the story</p>
-      <h2 id="card-heading">Result card</h2>
-      <p class="note">A 1200×628 image of this run — the decision-latency headline, the throughput-and-entropy story and the research-framing line, ready to post. Generated entirely in your browser; nothing is uploaded.</p>
-      <div class="card-preview">
-        <canvas id="card-canvas" width="1200" height="628" role="img" aria-label="Shareable result card: a decision-latency headline in working days, throughput and entropy after AI injection, and a before/after entropy chart contrasting a strained and a sound org (lower versus higher Structural Health)."></canvas>
-      </div>
-      <div class="run-row">
-        <button id="card-download" type="button" disabled>Download card</button>
-        <button id="card-share" type="button" class="ghost" disabled>Share…</button>
-      </div>
-      <p id="card-status" class="status" role="status" aria-live="polite"></p>
-    </section>
-
-    <!-- ============ model assumptions drawer (P8 transparency moat) ============ -->
-    <section class="panel" aria-labelledby="assumptions-heading">
-      <p class="eyebrow">Under the hood</p>
-      <h2 id="assumptions-heading">Every coefficient the engine uses</h2>
-      <p class="note">Extracted straight from <span class="mono">MODEL.md</span> with its research anchor, evidence tier and limitation. A CI drift gate keeps this drawer identical to the shipped model — nothing here is hand-copied.</p>
-      <!-- The drawer renders www/assumptions.json verbatim; ui/assumptions.js
-           builds a native <details> tree into this mount (shape-driven). -->
-      <div id="assumptions-mount"></div>
-      <p id="assumptions-status" class="empty-note" hidden></p>
-    </section>
+    </main>
 
     <footer class="page-footer">
       <p class="framing">A thinking aid grounded in research — not a prediction engine.</p>
       <p class="meta">Model coefficients carry evidence tiers and ranges in <span class="mono">MODEL.md</span>; adjustable via config (paramOverrides). Zero requests leave this page.</p>
     </footer>
-  </main>
+  </div>
 
   <script src="./vendor/chart.umd.min.js"></script>
   <script type="module" src="./js/main.js"></script>

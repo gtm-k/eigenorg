@@ -22,6 +22,11 @@
   --color-success: #27a644;
   --color-error: #e5484d; /* semantic error; DESIGN.md marketing surface has none */
 
+  /* Amber status for the "out of date" badge (spec §6). A FUNCTIONAL status
+     colour like --color-success / --color-error — NOT a second brand accent;
+     the stale signal is always carried by an icon + text, never colour alone. */
+  --color-stale: #d9a441;
+
   /* DESIGN.md spacing rhythm (8px system) */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -29,12 +34,35 @@
   --space-4: 1rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
+  /* P10a warmth: more generous section rhythm for the two-altitude shell. */
+  --space-10: 3rem;
+  --space-12: 4rem;
+
+  /* P10a warmth: slightly larger radii + soft depth on KEY panels only
+     (doors, setup, the before/after story). Dense chart panels keep 8px. */
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow-lift: 0 18px 48px -24px rgba(1, 1, 2, 0.9);
+  --shadow-door: 0 24px 64px -32px rgba(1, 1, 2, 0.95);
+  /* Subtle indigo radial glow behind the landing hero (spec §8 warmth blend —
+     single hue, static, honours reduced motion; the one sanctioned exception to
+     DESIGN.md's no-atmospheric-gradient rule). */
+  --glow-hero: radial-gradient(60% 55% at 50% 12%, rgba(94, 106, 210, 0.16), rgba(94, 106, 210, 0.04) 45%, transparent 72%);
 
   --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* The `hidden` attribute must always win: several elements below carry a class
+   that sets `display` (.landing grid, .stale-badge flex, .mode-content), and an
+   equal-specificity author rule would otherwise beat the UA `[hidden]` rule and
+   leave a "hidden" element on screen. */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -75,9 +103,10 @@ h1 {
 }
 
 .page-footer {
+  max-width: 66rem;
+  margin: var(--space-8) auto 0;
+  padding: var(--space-4) var(--space-4) var(--space-8);
   border-top: 1px solid var(--color-hairline);
-  margin-top: var(--space-8);
-  padding-top: var(--space-4);
 }
 
 .page-footer .meta {
@@ -1323,4 +1352,518 @@ progress {
   max-width: 100%;
   border: 1px solid var(--color-hairline);
   border-radius: 8px;
+}
+
+/* ==================================================================== */
+/* P10a — two-altitude shell: landing doors, altitude toggle, setup     */
+/* strip, results bar, warmth (depth/radii/spacing) + quiet motion.     */
+/* Refined Linear per DESIGN.md; single accent; no new decorative hue.  */
+/* Nothing signals by colour alone (active door + stale both carry a     */
+/* non-colour cue). All motion honours prefers-reduced-motion.          */
+/* ==================================================================== */
+
+/* ---- soft depth on KEY panels only (doors/setup/story; spec section 8) ---- */
+.panel-lift {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lift);
+}
+
+/* ---- landing: two doors (the signature moment, spec section 4) ---- */
+.landing {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-10) var(--space-4) var(--space-8);
+  overflow: hidden;
+}
+
+/* Subtle indigo radial glow behind the hero — static, single-hue warmth. */
+.landing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--glow-hero);
+  pointer-events: none;
+}
+
+.landing-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 54rem;
+  text-align: center;
+}
+
+.brand-mark {
+  margin: 0 0 var(--space-6);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--color-ink-subtle);
+}
+
+.landing-title {
+  margin: 0 auto var(--space-4);
+  max-width: 22ch;
+  font-size: clamp(2.25rem, 5vw + 1rem, 3.5rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -1.8px;
+  color: var(--color-ink);
+}
+
+.landing-lede {
+  margin: 0 auto var(--space-8);
+  max-width: 40rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+}
+
+.landing-foot {
+  margin: var(--space-8) auto 0;
+  max-width: 40rem;
+  text-align: center;
+}
+
+/* Broken-shared-link notice on the landing (BLOCKER B). Amber FUNCTIONAL status
+   colour + icon + text — never colour alone; centered via inline-flex + auto
+   margins on the text-centered landing. */
+.landing-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 auto var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  max-width: 40rem;
+  font-size: 0.9375rem;
+  text-align: left;
+  color: var(--color-stale);
+  background: rgba(217, 164, 65, 0.08);
+  border: 1px solid rgba(217, 164, 65, 0.35);
+  border-radius: var(--radius-md);
+}
+
+.landing-notice-icon {
+  flex: none;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.door-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  text-align: left;
+}
+
+@media (min-width: 720px) {
+  .door-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-6);
+  }
+}
+
+/* A door is a big tappable card that doubles as the explainer. Full override of
+   the primary-button base (transparent surface, not the accent fill). */
+.door {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: var(--space-6);
+  text-align: left;
+  color: var(--color-ink);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-door);
+  cursor: pointer;
+}
+
+.door:hover:not(:disabled) {
+  background: var(--color-surface-2);
+  border-color: var(--color-primary);
+  /* The hover LIFT (transform) is motion — it lives in the reduced-motion guard
+     below (F1); colour/border changes stay here (eased by the button rule). */
+}
+
+.door:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 3px;
+}
+
+.door-icon {
+  font-size: 2rem;
+  line-height: 1;
+  margin-bottom: var(--space-2);
+}
+
+.door-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-primary-hover);
+}
+
+.door-question {
+  font-size: 1.375rem;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  color: var(--color-ink);
+}
+
+.door-desc {
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--color-ink-subtle);
+}
+
+.door-enter {
+  margin-top: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-primary-hover);
+}
+
+.door-enter::after {
+  content: ' \2192';
+}
+
+/* ---- shell: persistent altitude bar + segmented toggle (spec section 4) ---- */
+.altitude-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  max-width: 66rem;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-4);
+  background: color-mix(in srgb, var(--color-canvas) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.altitude-brand {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--color-ink);
+}
+
+.altitude-toggle {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  margin: 0 auto 0 var(--space-2);
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+}
+
+/* Segment: full override of the primary-button base. Active = accent fill +
+   weight + underline + aria-current (never colour alone). */
+.altitude-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0.375rem 0.875rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--color-ink-subtle);
+  font-weight: 400;
+}
+
+.altitude-seg:hover:not(.active) {
+  color: var(--color-ink);
+  background: var(--color-surface-2);
+}
+
+.altitude-seg.active {
+  background: var(--color-primary);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 0 rgba(255, 255, 255, 0.5); /* underline cue, not colour-alone */
+}
+
+.altitude-seg:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+.altitude-seg-icon {
+  font-size: 0.9375rem;
+}
+
+.altitude-restart {
+  flex: none;
+}
+
+/* ---- mode content ---- */
+.mode-content[hidden] {
+  display: none;
+}
+
+.mode-intro {
+  margin: var(--space-6) 0 var(--space-6);
+}
+
+.mode-title {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: clamp(1.75rem, 3vw + 1rem, 2.25rem);
+  font-weight: 600;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  color: var(--color-ink);
+}
+
+.mode-sub {
+  margin: 0;
+  max-width: 46rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+}
+
+/* ---- setup panel (collapses to the "Your setup" chips, spec section 6) ---- */
+.setup {
+  padding: var(--space-6);
+}
+
+.setup-summary-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.setup-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.setup-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--color-ink);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-md);
+}
+
+.setup-chip-key {
+  font-size: 0.6875rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-ink-tertiary);
+}
+
+.setup-body[hidden] {
+  display: none;
+}
+
+.setup-title {
+  margin: 0 0 var(--space-3);
+}
+
+.setup-group {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-hairline);
+}
+
+.setup-subhead {
+  margin: 0 0 var(--space-1);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--color-ink);
+}
+
+.setup-subhead-note {
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--color-ink-subtle);
+}
+
+.setup-subhead-note::before {
+  content: '\2014\00a0';
+}
+
+.setup-run {
+  margin-top: var(--space-6);
+  margin-bottom: 0;
+}
+
+/* Primary CTA: larger tap target + a quiet breathing focus halo (spec section 8). */
+.cta {
+  font-size: 0.9375rem;
+  padding: 0.75rem 1.5rem;
+}
+
+/* ---- run strip (always visible) + gated results (spec section 6, BLOCKER A) ---- */
+/* The run feedback + persistent actions live in .run-strip, OUTSIDE #org-results,
+   so first-run progress/status show while #org-results stays gated on hasRun. */
+.run-strip {
+  margin: var(--space-8) 0 var(--space-6);
+}
+
+.results {
+  margin-top: 0;
+}
+
+.results-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.results-actions progress {
+  flex: 1 1 10rem;
+}
+
+/* Stale badge: amber STATUS colour + icon + text — never colour alone. */
+.stale-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-stale);
+  background: rgba(217, 164, 65, 0.08);
+  border: 1px solid rgba(217, 164, 65, 0.35);
+  border-radius: var(--radius-md);
+}
+
+.stale-icon {
+  font-size: 0.9375rem;
+  line-height: 1;
+}
+
+/* Stale = the charts are dimmed as a SECONDARY cue (the badge is the primary,
+   colour-independent signal). Instant under reduced motion; eased otherwise. */
+.results.is-stale .charts-grid,
+.results.is-stale .pane-grid {
+  opacity: 0.5;
+}
+
+/* ---- Team Building placeholder (P7b builds the real content) ---- */
+.placeholder {
+  text-align: center;
+  padding: var(--space-10) var(--space-6);
+}
+
+.placeholder-icon {
+  margin: 0 0 var(--space-3);
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.placeholder-title {
+  margin: 0 0 var(--space-3);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  color: var(--color-ink);
+}
+
+.placeholder-body {
+  margin: 0 auto;
+  max-width: 40rem;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--color-ink-subtle);
+}
+
+/* ==================================================================== */
+/* P10a — quiet motion. ALL of it lives behind prefers-reduced-motion    */
+/* (spec section 8): staggered fade-ups, a breathing CTA halo, and a     */
+/* chart-container fade-up (CSS on the container — NOT stroke-dashoffset; */
+/* charts are Chart.js on canvas with per-frame animation deliberately   */
+/* off). No per-frame JS animation anywhere.                             */
+/* ==================================================================== */
+
+@keyframes eig-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes eig-breathe {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.35); }
+  50% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.55), 0 0 18px 1px rgba(94, 106, 210, 0.22); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Landing: header -> doors (staggered) -> framing line. */
+  .landing-header { animation: eig-fade-up 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .door { animation: eig-fade-up 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .door:nth-child(1) { animation-delay: 140ms; }
+  .door:nth-child(2) { animation-delay: 230ms; }
+  .landing-foot { animation: eig-fade-up 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 340ms; }
+
+  /* Entering a door: the intro + setup panel fade up once. */
+  .mode-content.entered .mode-intro { animation: eig-fade-up 440ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .mode-content.entered > .setup { animation: eig-fade-up 440ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 70ms; }
+  .mode-content.entered .placeholder { animation: eig-fade-up 460ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 70ms; }
+
+  /* First data: the chart containers + story cards fade up (light stagger). */
+  .charts-revealed .reveal-item { animation: eig-fade-up 500ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(2) { animation-delay: 50ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(3) { animation-delay: 85ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(4) { animation-delay: 120ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(5) { animation-delay: 155ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(6) { animation-delay: 190ms; }
+
+  /* Primary CTA: a quiet breathing ring while it holds keyboard focus
+     (spec §8 "breathing focus ring"; F2 — scoped to :focus-visible, not always-on). */
+  .cta:focus-visible { animation: eig-breathe 3600ms ease-in-out infinite; }
+
+  /* Door hover LIFT (F1): motion-guarded + eased, so reduced-motion users get
+     no movement and everyone else gets a smooth lift. */
+  .door { transition: transform 160ms ease; }
+  .door:hover:not(:disabled) { transform: translateY(-2px); }
+
+  /* Smooth stale -> fresh. */
+  .results .charts-grid,
+  .results .pane-grid { transition: opacity 240ms ease; }
+}
+
+/* ---- responsive: the altitude bar + setup on small viewports ---- */
+@media (max-width: 560px) {
+  .altitude-toggle {
+    order: 3;
+    width: 100%;
+    margin: var(--space-2) 0 0;
+    justify-content: center;
+  }
+
+  .altitude-restart {
+    margin-left: auto;
+  }
+
+  .setup {
+    padding: var(--space-4);
+  }
+
+  .door {
+    padding: var(--space-4);
+  }
 }

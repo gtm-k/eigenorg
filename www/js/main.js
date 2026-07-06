@@ -21,7 +21,7 @@ import {
   autoRunsOnInteraction,
   stagesGeneration,
 } from './ui/runplan.js';
-import { renderControls, applyOrgValue } from './ui/org.js';
+import { renderControls, applyOrgValue, orgSetupChips } from './ui/org.js';
 import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
 import { renderOnboarding, readDiagnosticSeen, shouldShowDiagnostic } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
@@ -30,6 +30,7 @@ import { readShareFromHash, wireShareButton } from './ui/share.js';
 import { wireCard } from './share/card.js';
 import { fetchAssumptions, renderAssumptionsDrawer } from './ui/assumptions.js';
 import { modelVersionBanner, extractShareFragment } from './url-codec.js';
+import { createNavShell, createSetupStrip } from './ui/nav.js';
 
 /** @param {string} sel @returns {HTMLElement} */
 function el(sel) {
@@ -53,9 +54,8 @@ const client = createEngineClient(createWorkerTransport(worker));
 // ---- elements ------------------------------------------------------------------
 
 const runButtons = [
-  /** @type {HTMLButtonElement} */ (el('#run-button')),
-  /** @type {HTMLButtonElement} */ (el('#run-button-2')),
-  /** @type {HTMLButtonElement} */ (el('#run-button-3')), // P6 configurator section run trigger
+  /** @type {HTMLButtonElement} */ (el('#run-button')), // primary CTA inside the setup panel
+  /** @type {HTMLButtonElement} */ (el('#run-button-2')), // persistent "Run again" in the results bar
 ];
 const progressBar = /** @type {HTMLProgressElement} */ (el('#run-progress'));
 const statusEl = el('#run-status');
@@ -115,6 +115,14 @@ const state = {
   // A preset pick that lands mid-run sets this so the in-flight plan's unwind
   // auto-runs the picked preset (decision 6). A control edit / Cancel clears it.
   pendingRerun: false,
+  // True once a run has completed and painted (P10a M1). Before the first run
+  // there is nothing to be "out of date", so editing a control must NOT show the
+  // stale badge or dim the (empty) charts. Reset by Start over.
+  hasRun: false,
+  // Set while a Start-over cancel is unwinding an in-flight run (P10a M4/C2): it
+  // suppresses the async "run cancelled" status so the clean-slate "ready" line
+  // resetToDefault set is not stomped. Cleared in runAll's finally.
+  startingOver: false,
 };
 
 // Probe hook for the scripted acceptance measurements (Playwright): exposes
@@ -132,7 +140,10 @@ function setMeaning(id, text) {
 /** @param {boolean} running */
 function setRunButtons(running) {
   for (const b of runButtons) {
-    b.textContent = running ? 'Cancel run' : 'Run simulation';
+    // Each run button keeps its own idle label (via data-run-label:
+    // "Run simulation" / "Run again"); both become "Cancel run" while a plan
+    // is in flight.
+    b.textContent = running ? 'Cancel run' : (b.dataset.runLabel ?? 'Run simulation');
     b.disabled = false;
   }
 }
@@ -204,6 +215,10 @@ async function runAll() {
 
   /** @param {number} runIndex @returns {(p: { completedCount: number, totalIterations: number }) => void} */
   const onProgress = (runIndex) => ({ completedCount }) => {
+    // A cancel (Run/Cancel toggle or Start over) may leave in-flight progress
+    // messages queued; ignore them so a stray tick never stomps the post-cancel
+    // status (e.g. the Start-over "ready" line) or bumps the progress bar (M4/C2).
+    if (state.planCancelled) return;
     progressBar.value = runIndex * iterations + completedCount;
     setStatus(statusEl, `running… ${progressBar.value}/${totalWork} iterations (${totalRuns} runs)`, '');
   };
@@ -254,14 +269,20 @@ async function runAll() {
       paintResults({ plan, primary, contrast, aiOff, layerTwin, totalRuns, primaryElapsedMs, planElapsedMs, replayPayload, runPresetId });
     }
   } catch (err) {
-    if (/** @type {any} */ (err).cancelled) {
-      setStatus(statusEl, 'run cancelled', '');
-    } else {
-      setStatus(statusEl, `run failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    // A Start-over cancel already set the clean-slate "ready" status
+    // (resetToDefault) — don't stomp it with a status for the abandoned run,
+    // whether it ended cancelled OR failed (M4/C2 + fold L1).
+    if (!state.startingOver) {
+      if (/** @type {any} */ (err).cancelled) {
+        setStatus(statusEl, 'run cancelled', '');
+      } else {
+        setStatus(statusEl, `run failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+      }
     }
   } finally {
     setRunButtons(false);
     progressBar.value = 0;
+    state.startingOver = false;
     // A preset picked mid-run scheduled an auto-rerun (decision 6). Now that the
     // cancelled plan has fully unwound and the client is idle, run the picked
     // preset. queueMicrotask defers past this finally so runAll re-enters clean.
@@ -280,6 +301,18 @@ async function runAll() {
  */
 function paintResults(r) {
   const { plan, primary, contrast, aiOff, layerTwin } = r;
+
+  // BLOCKER A: #org-results is gated on state.hasRun (hidden on a fresh visit and
+  // after Start over). Reveal it — and add the one-shot chart-reveal class —
+  // BEFORE painting the charts, then resize the just-shown canvases, so Chart.js
+  // measures the real container size (it reads zero while display:none).
+  const resultsEl = el('#org-results');
+  const firstReveal = resultsEl.hidden;
+  resultsEl.hidden = false;
+  if (firstReveal) {
+    resultsEl.classList.add('charts-revealed');
+    resizeCharts();
+  }
   const config = plan.primary;
   const output = primary.output;
 
@@ -438,6 +471,15 @@ function paintResults(r) {
     primaryOutputJson: primary.outputJson,
     primaryConfig: plan.primary,
   };
+
+  // P10a re-run model: the charts now match the setup — record that a run has
+  // completed (M1 stale-guard + BLOCKER A gate), reveal the persistent "Run
+  // again" (only meaningful once a run exists), drop the stale badge and collapse
+  // the setup panel to its "Your setup" chips (markResultsFresh). #org-results
+  // was already revealed + the chart-reveal played at the top of paintResults.
+  state.hasRun = true;
+  el('#run-button-2').hidden = false;
+  markResultsFresh();
 }
 
 // ---- config-change plumbing (P5b-F1) ----------------------------------------------
@@ -479,6 +521,7 @@ function stageConfigChange(interaction) {
   share.disarm(); // (e) no share until a matching fresh run completes
   card.disarm(); // the last card is now stale — no export until a fresh run
   clearShareHash();
+  markResultsStale(); // charts no longer match the setup — show the stale badge
 }
 
 /**
@@ -555,6 +598,7 @@ const configurator = renderConfigurator(el('#configurator'), {
     stageGeneration('compareToggle');
     share.disarm();
     card.disarm();
+    markResultsStale(); // the pending run shape changed — flag the charts stale
     setStatus(statusEl, 'comparison changed — run to update the all-human comparison', '');
   },
 });
@@ -574,7 +618,9 @@ const onboarding = renderOnboarding(el('#diagnostic'), {
     setStatus(statusEl, `Structural Health set to ${score} from your diagnostic — run to see how this structure behaves.`, '');
   },
   onSkip() {
-    // The plain slider remains the standing control; move focus to it.
+    // The plain slider remains the standing control; reopen the setup panel in
+    // place (it may be collapsed to the chip summary) and move focus to it.
+    orgStrip.expand();
     el('#ctl-structuralHealth').focus();
     setStatus(statusEl, 'Set Structural Health with the slider, then run.', '');
   },
@@ -601,6 +647,188 @@ const card = wireCard({
   statusEl: el('#card-status'),
 });
 probe.renderCard = (/** @type {number} */ w, /** @type {number} */ h) => card.renderDataUrl(w, h);
+
+// ---- two-altitude shell + setup strip (P10a) --------------------------------
+
+/**
+ * Resize every chart to its (now-visible) container. Charts are created into the
+ * hidden org mount at boot, so they must re-measure when the Organization door
+ * opens — otherwise Chart.js keeps the zero-size it read while hidden.
+ */
+function resizeCharts() {
+  for (const chart of Object.values(charts)) chart.resize();
+}
+
+/**
+ * Empty every chart's datasets — used by Start over so the gated results region
+ * holds no abandoned-run data even if it is later revealed (BLOCKER A). On the
+ * next run paintResults refills them.
+ */
+function resetCharts() {
+  for (const chart of Object.values(charts)) {
+    chart.data.labels = [];
+    for (const ds of chart.data.datasets) ds.data = [];
+    chart.update('none');
+  }
+}
+
+/**
+ * The scenario label for the current config (a preset name, a shared run, or a
+ * custom edit) — the first "Your setup" chip.
+ * @returns {string}
+ */
+function currentScenarioLabel() {
+  if (state.replayPayload) return 'Shared run';
+  if (state.presetId) return state.presets.get(state.presetId)?.label ?? 'Custom configuration';
+  return 'Custom configuration';
+}
+
+// The mode-agnostic "Your setup → Edit in place → Run again → stale" affordance
+// (spec §6). The org controls + configurator live in #org-setup-body; a completed
+// run collapses them to the chip summary, Edit setup reopens them in place.
+const orgStrip = createSetupStrip({
+  body: el('#org-setup-body'),
+  summary: el('#org-setup-summary'),
+  chipHost: el('#org-setup-chips'),
+  editButton: /** @type {HTMLButtonElement} */ (el('#edit-setup')),
+  staleBadge: el('#org-stale'),
+  focusTarget: () =>
+    /** @type {HTMLElement | null} */ (document.querySelector('#org-setup-body button, #org-setup-body input')),
+});
+
+/** Refresh the "Your setup" chips from the current (possibly pending) config. */
+function refreshSetupChips() {
+  if (!state.config) return;
+  orgStrip.setChips(orgSetupChips(state.config, currentScenarioLabel()));
+}
+
+/** A staged edit: charts no longer match the setup — show the stale badge.
+ *  Before the first run there are no results to be "out of date" (M1): keep the
+ *  chips fresh but never show the stale badge or dim the empty charts. */
+function markResultsStale() {
+  refreshSetupChips();
+  if (!state.hasRun) return;
+  el('#org-results').classList.add('is-stale');
+  orgStrip.markStale();
+}
+
+/** A completed run: charts match the setup again — collapse setup to the chips. */
+function markResultsFresh() {
+  // If focus is inside the setup body it is about to be display:none'd by the
+  // collapse; move it to the persistent "Run again" so keyboard focus is never
+  // dropped to <body>. (When a run is launched from "Run again", focus is
+  // already outside the setup body and this is a no-op.)
+  const focusWasInSetup = el('#org-setup-body').contains(document.activeElement);
+  el('#org-results').classList.remove('is-stale');
+  refreshSetupChips();
+  orgStrip.markFresh();
+  const runAgain = /** @type {HTMLButtonElement} */ (el('#run-button-2'));
+  if (focusWasInSetup && !runAgain.hidden) runAgain.focus();
+}
+
+/**
+ * "Start over" (spec §6): return Organization Building to a clean slate. Cancels
+ * any in-flight run (no late paint of an abandoned run — C2), clears replay /
+ * share / card state, reloads the default preset, resets the results region +
+ * setup strip to their pre-run state, and restores the boot "ready" status.
+ * Modeled on boot()'s fresh-visit init so the two stay consistent. (Full guided-
+ * flow replay is P10b; P10a just needs a coherent clean re-entry — M4.)
+ */
+function resetToDefault() {
+  // Cancel an in-flight plan the same way the Run/Cancel toggle does, and bump
+  // the generation so any completion still in flight lands STALE and never
+  // paints a run the user abandoned (C2).
+  if (client.busy) {
+    state.pendingRerun = false;
+    state.planCancelled = true;
+    state.startingOver = true; // suppress the async "run cancelled" status (M4/C2)
+    client.cancel();
+  }
+  state.generation += 1;
+
+  // Clear replay, disarm the share/card exports, drop any '#s=' fragment + banner.
+  state.replayPayload = null;
+  state.replayConfig = null;
+  share.disarm();
+  card.disarm();
+  clearShareHash();
+  bannerEl.hidden = true;
+  onboarding.hide(); // dismiss the once-only diagnostic if it was on screen
+
+  // Reload the default preset into the single canonical config.
+  state.presetId = DEFAULT_PRESET_ID;
+  const preset = state.presets.get(DEFAULT_PRESET_ID);
+  const ref = PRESET_REFS.find((p) => p.id === DEFAULT_PRESET_ID);
+  state.config = primaryRunConfig(preset, /** @type {any} */ (ref));
+  picker.setActive(DEFAULT_PRESET_ID);
+  el('#preset-note').textContent = presetNote(preset);
+  configurator.setCompareDefault(false);
+
+  // Reset the results region + setup strip to the pre-run state. Re-hiding
+  // #org-results (BLOCKER A) makes a post-Start-over re-entry byte-equivalent to
+  // a fresh boot: the abandoned run's charts/readout/panes are gone, not
+  // lingering under a reset default-preset setup.
+  state.hasRun = false;
+  el('#org-results').hidden = true;
+  el('#org-results').classList.remove('charts-revealed', 'is-stale');
+  el('#run-button-2').hidden = true;
+  // Clear run-derived CONTENT too. The configurator's flow/recovery/legibility
+  // panels live in the (always-visible) setup, so they MUST be cleared
+  // (setPending) — gating #org-results would not hide them. The gated results'
+  // readout, charts and bottleneck badge are additionally emptied so nothing
+  // stale lingers even if the region is later revealed.
+  configurator.setPending();
+  resetCharts();
+  el('#ro-model').textContent = 'model —';
+  el('#ro-seed').textContent = '';
+  el('#ro-iters').textContent = '';
+  el('#ro-elapsed').textContent = '';
+  el('#bottleneck-badge').hidden = true;
+  orgStrip.markFresh(); // hide the stale badge + collapse …
+  orgStrip.expand(); // … then reopen the controls for a fresh setup
+
+  controls.refresh();
+  configurator.refresh();
+  refreshSetupChips();
+  setRunButtons(false);
+  setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
+}
+
+// The two-altitude nav shell (spec §4). Doors are registered by { id, label,
+// question, desc, icon, mount }; the shell drives the landing cards + the
+// segmented toggle from this list, so P7b adds the Team door's real content by
+// populating #team-mount — without editing nav.js. The Team door shows a
+// placeholder in P10a (its composer is P7b).
+const nav = createNavShell({
+  landing: el('#landing'),
+  doorGrid: el('#door-grid'),
+  shell: el('#shell'),
+  toggle: el('#altitude-toggle'),
+  startOver: /** @type {HTMLButtonElement} */ (el('#start-over')),
+  doors: [
+    {
+      id: 'org',
+      label: 'Organization Building',
+      question: "Is my org's structure sound?",
+      desc: 'Shape a whole organization and see how its structure drives disorder, decision speed and coordination cost.',
+      icon: '🏢',
+      mount: el('#org-mount'),
+    },
+    {
+      id: 'team',
+      label: 'Team Building',
+      question: "Will this team's makeup work?",
+      desc: 'Compose one team of humans and AI and see throughput, quality, cohesion and where coverage gaps open up.',
+      icon: '👥',
+      mount: el('#team-mount'),
+    },
+  ],
+  onEnter(id) {
+    el('#landing-notice').hidden = true; // clear any broken-link notice on entry (BLOCKER B)
+    if (id === 'org') resizeCharts(); // charts were sized while the mount was hidden
+  },
+  onStartOver: resetToDefault,
+});
 
 for (const b of runButtons) b.addEventListener('click', () => void runAll());
 
@@ -639,10 +867,19 @@ async function boot() {
   // run, against the engine-stamped modelVersion.
   /** @type {any} */
   let replayBoot = null;
+  // A shared '#s=' link that fails to open must NOT fail silently. Two failure
+  // modes, both surfaced on the LANDING (the shell's #run-status is hidden while
+  // the landing shows — BLOCKER B): (1) an undecodable payload THROWS; (2) a
+  // '#s=' present but unparseable makes readShareFromHash return null (not a
+  // throw). Either sets decodeError, which renders the landing notice below.
+  let decodeError = false;
   try {
     replayBoot = await readShareFromHash(window.location.hash, null);
-  } catch (err) {
-    setStatus(statusEl, `could not open the shared link: ${err instanceof Error ? err.message : String(err)}`, 'error');
+  } catch {
+    decodeError = true;
+  }
+  if (!replayBoot && !decodeError && window.location.hash.startsWith('#s=')) {
+    decodeError = true; // (B-a) a '#s=' prefix was present but nothing parsed
   }
 
   if (replayBoot) {
@@ -669,10 +906,30 @@ async function boot() {
   controls.refresh();
   configurator.refresh();
   setRunButtons(false);
+  refreshSetupChips();
   probe.bootReadyMs = performance.now(); // navigation start → Run clickable
+  // The shell's own status is always "ready" — a broken shared link is surfaced
+  // on the LANDING notice (BLOCKER B), not in the hidden shell, so entering a
+  // door later lands on a coherent fresh "ready" state.
   setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
 
-  if (replayBoot) void runAll(); // a shared link replays without a click
+  if (replayBoot) {
+    // A shared link is an Organization run: open that door directly (skipping
+    // the landing) and replay without a click. No focus-on-load (M2): the entry
+    // is programmatic, not a user action.
+    nav.enter('org', { focus: false });
+    void runAll();
+  } else {
+    // A fresh visit lands on the two doors; the user picks an altitude to enter.
+    // No focus-on-load — the reader sees the h1 + lede first (M2). A broken
+    // shared link surfaces a visible, plain-language landing notice (BLOCKER B).
+    if (decodeError) {
+      el('#landing-notice-text').textContent =
+        "That shared link couldn't be opened — it may be corrupted or truncated. Pick a door below to start fresh.";
+      el('#landing-notice').hidden = false;
+    }
+    nav.showLanding();
+  }
 }
 
 boot().catch((err) => {

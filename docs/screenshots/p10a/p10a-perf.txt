@@ -1,0 +1,57 @@
+eigenorg — P10a perf re-confirmation (measured, not asserted)
+=============================================================
+
+Method: scripted probe in Chromium (Playwright MCP) against the built site
+served by scripts/serve.mjs under the /eigenorg/ Pages subpath emulation.
+Timings read from the in-page probe hook window.__eigenorg (primaryElapsedMs =
+one 500-iteration Monte Carlo run; planElapsedMs = the full 2–3-run plan;
+bootReadyMs = navigation start -> Run clickable). Landing preset =
+fasterDysfunction (AI on, 3-run plan). Viewport 1280x900.
+
+Re-measured after round-2 repair (BLOCKER A results-gating, BLOCKER B broken-link
+notice, fold L1). Numbers unchanged materially — the fixes are UI-state/a11y only.
+
+Budget A — a 500-iteration sim runs in < 1.5 s:
+  run 1: primary 500-iter run = 639 ms
+  run 2: primary 500-iter run = 572 ms
+  run 3: primary 500-iter run = 580 ms
+  full 3-run plan = 1556 ms
+  => single 500-iteration sim ~0.60 s  << 1.5 s budget. PASS.
+
+Budget B — a full walkthrough in < 90 s:
+  boot (navigation start -> Run clickable) = 402 ms
+  scripted walkthrough (land -> open Organization door -> 3 sequential runs
+    -> results painted) = 5270 ms (machine-paced proxy; the P5/P6 convention).
+  => 5.3 s  << 90 s budget. PASS.
+
+Zero-console-errors + zero-external-requests (whole session, Playwright logs):
+  console errors (incl. all broken-'#s=' paths + Start-over during a run): 0
+  network requests: all to the local /eigenorg/ origin (relative). PASS.
+
+Round-2 blocker verifications (Playwright, same session):
+  - BLOCKER A (Start over left painted results): #org-results is gated on
+    state.hasRun (hidden on a fresh visit and after Start over; revealed +
+    charts resized on paintResults). Proof: fresh-boot Org view vs
+    (run -> Start over -> re-enter) is BYTE-EQUIVALENT — #org-results display:none,
+    readout "model —", charts empty, bottleneck badge hidden, configurator flow
+    table cleared (setPending), setup expanded on the default preset. First run
+    reveals the region and sizes the canvases (entropy canvas 455px, data present).
+  - BLOCKER B (broken share links failed silently): a VISIBLE landing notice
+    ("That shared link couldn't be opened…", role=status, ⚠ icon + text) shows for
+    '#s=' (empty), '#s=!' (garbage chars), and '#s=AAAAAAAA' (valid charset, bad
+    payload). No-hash load and a non-share '#about' hash show NO notice (normal
+    "ready"). A VALID share link (1913-char '#s=…', within budget) replays into the
+    Organization door with no notice. The notice clears on door entry.
+  - fold L1: the Start-over status guard now covers BOTH the "run cancelled" and
+    "run failed" catch branches (a genuine worker error at Start-over no longer
+    stomps the clean "ready").
+  - Round-1 proofs re-confirmed (no regression): M1 pre-run stale suppressed +
+    post-run stale works; M2 cold-load activeElement=<body>; C2 Start-over during
+    a run cancels with no late paint and leaves "ready"; Team toggle works.
+
+Notes:
+  - The redesign's motion is CSS-only (fade-ups, focus-scoped breathing ring,
+    chart-container fade-up); Chart.js per-frame animation stays disabled (P5
+    perf discipline), so the restyle adds no per-frame JS animation cost.
+  - The chart reveal is a CSS opacity/transform fade-up on the .chart-box
+    container (NOT stroke-dashoffset — the charts are Chart.js on canvas).
