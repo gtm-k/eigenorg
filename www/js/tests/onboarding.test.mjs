@@ -14,6 +14,7 @@ import {
   scoreStructuralHealth,
   readDiagnosticSeen,
   markDiagnosticSeen,
+  shouldShowDiagnostic,
   STORAGE_KEY,
 } from '../ui/onboarding.js';
 
@@ -97,4 +98,25 @@ test('storage errors (private browsing) never throw — read is false, write is 
   const s = throwingStorage();
   assert.doesNotThrow(() => markDiagnosticSeen(s));
   assert.equal(readDiagnosticSeen(s), false);
+});
+
+// ---- MED-2: the diagnostic gates on a GENUINE preset run only ------------------
+
+test('MED-2: a first PRESET result SHOWS the diagnostic', () => {
+  assert.equal(shouldShowDiagnostic({ replay: false, presetId: 'fasterDysfunction', alreadyHandled: false }), true);
+});
+
+test('MED-2: a custom-authored first run does NOT show/consume the diagnostic (empty preset id)', () => {
+  // The regression the fix closes: editing a control before the first run makes
+  // this a CUSTOM run (presetId ''), which must not fire OR consume the once-only flag.
+  assert.equal(shouldShowDiagnostic({ replay: false, presetId: '', alreadyHandled: false }), false);
+});
+
+test('MED-2: a share-link replay never shows the diagnostic (even for a non-empty id)', () => {
+  assert.equal(shouldShowDiagnostic({ replay: true, presetId: 'fasterDysfunction', alreadyHandled: false }), false);
+  assert.equal(shouldShowDiagnostic({ replay: true, presetId: '', alreadyHandled: false }), false);
+});
+
+test('MED-2: once handled (this session or a prior one), it never shows again', () => {
+  assert.equal(shouldShowDiagnostic({ replay: false, presetId: 'fasterDysfunction', alreadyHandled: true }), false);
 });

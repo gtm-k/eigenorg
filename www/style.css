@@ -1306,10 +1306,6 @@ progress {
   margin-top: var(--space-2);
 }
 
-.diagnostic-result:not(:empty) {
-  margin: var(--space-3) 0 0;
-}
-
 /* ==================================================================== */
 /* P8 — output / share card                                            */
 /* The canvas backing store is 1200×628 (the exported PNG size); CSS    */

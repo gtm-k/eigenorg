@@ -23,7 +23,7 @@ import {
 } from './ui/runplan.js';
 import { renderControls, applyOrgValue } from './ui/org.js';
 import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
-import { renderOnboarding, readDiagnosticSeen } from './ui/onboarding.js';
+import { renderOnboarding, readDiagnosticSeen, shouldShowDiagnostic } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
@@ -178,6 +178,12 @@ async function runAll() {
   // stale — see completionPolicy below (P5b-F1).
   const planGeneration = state.generation;
   const replayPayload = state.replayPayload;
+  // Capture the RUN SOURCE at launch (MED-2): the preset id this plan runs from,
+  // or '' for a custom-authored / replayed run. Threaded to paintResults so the
+  // once-only diagnostic gates on a GENUINE preset run — never a custom first run
+  // that would silently consume the flag — and the card scenario label matches
+  // the source that actually ran (not a later mutation of state.presetId).
+  const runPresetId = replayPayload ? '' : state.presetId;
   const baseConfig = replayPayload ? state.replayConfig : state.config;
   const plan = buildRunPlan(baseConfig);
   // P6 legibility twin: when the configurator's compare toggle is on AND the
@@ -245,7 +251,7 @@ async function runAll() {
       // share armed for a config the controls no longer show.)
       setStatus(statusEl, 'configuration changed — run to update the charts', '');
     } else {
-      paintResults({ plan, primary, contrast, aiOff, layerTwin, totalRuns, primaryElapsedMs, planElapsedMs, replayPayload });
+      paintResults({ plan, primary, contrast, aiOff, layerTwin, totalRuns, primaryElapsedMs, planElapsedMs, replayPayload, runPresetId });
     }
   } catch (err) {
     if (/** @type {any} */ (err).cancelled) {
@@ -270,7 +276,7 @@ async function runAll() {
  * Paint every panel from a completed plan.
  * @param {{ plan: any, primary: any, contrast: any, aiOff: any, layerTwin: any,
  *           totalRuns: number, primaryElapsedMs: number, planElapsedMs: number,
- *           replayPayload: any }} r
+ *           replayPayload: any, runPresetId: string }} r
  */
 function paintResults(r) {
   const { plan, primary, contrast, aiOff, layerTwin } = r;
@@ -376,8 +382,8 @@ function paintResults(r) {
   // discipline as share.arm). Scenario label follows the current source.
   const scenarioLabel = r.replayPayload
     ? 'Shared run'
-    : state.presetId
-      ? (state.presets.get(state.presetId)?.label ?? 'Custom configuration')
+    : r.runPresetId
+      ? (state.presets.get(r.runPresetId)?.label ?? 'Custom configuration')
       : 'Custom configuration';
   card.arm({
     scenarioLabel,
@@ -402,11 +408,13 @@ function paintResults(r) {
     seed: config.seed,
   });
 
-  // P8 onboarding: shown ONCE, after the FIRST preset/authored result — NOT on
-  // share-URL replay arrivals (decision default 3; a share visitor is
-  // reproducing a specific run). It appears under the results, never blocking
-  // landing (the user has already seen a full result by now — PREMORTEM A2).
-  if (!r.replayPayload && !diagnosticHandled) {
+  // P8 onboarding: shown ONCE, after the FIRST genuine PRESET result — NOT on a
+  // share-URL replay (a share visitor is reproducing a specific run) and NOT on a
+  // custom-authored first run (which must not silently consume the once-only
+  // flag; MED-2, triage default 3). The run source is captured at launch
+  // (r.runPresetId). It appears under the results, never blocking landing (the
+  // user has already seen a full result by now — PREMORTEM A2).
+  if (shouldShowDiagnostic({ replay: Boolean(r.replayPayload), presetId: r.runPresetId, alreadyHandled: diagnosticHandled })) {
     diagnosticHandled = true;
     onboarding.show();
   }
@@ -511,6 +519,9 @@ function stageAndRefresh(next) {
   state.config = next;
   stageConfigChange('edit');
   state.pendingRerun = false; // an edit cancels a pending preset auto-run
+  state.presetId = ''; // authoring a config = custom run (MED-2): no preset source,
+  // so the once-only diagnostic won't fire/consume on a custom first run and the
+  // card scenario label reads "Custom configuration".
   picker.setActive('');
   el('#preset-note').textContent = 'Custom configuration — changes apply on the next run.';
   controls.refresh();

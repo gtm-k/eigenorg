@@ -6,10 +6,13 @@
 // phrase) / 1 (somewhere between) / 2 (right phrase); the score maps to the
 // 1–10 Structural Health slider by the PINNED §3.4 formula (do NOT invent a
 // different mapping). Shown ONCE after the first result, skippable to the plain
-// slider (which stays the standing control), never blocking landing (A2).
+// slider (which stays the standing control), never blocking landing (A2). It is
+// gated on the FIRST genuine PRESET result (shouldShowDiagnostic), never a
+// custom-authored first run or a share-link replay (triage default 3).
 //
-// Result framing is non-judgmental and referent-based (global rule): it reports
-// the score against the diagnostic, it never says an org is "broken".
+// Result feedback is non-judgmental and referent-based (global rule): the score
+// is reported through #run-status (main.js onComplete), never saying an org is
+// "broken".
 
 /**
  * @typedef {{ id: string, dimension: string, question: string,
@@ -117,14 +120,22 @@ export function markDiagnosticSeen(storage) {
 }
 
 /**
- * Non-judgmental result sentence: reports the score against the diagnostic, and
- * says what happens next (the slider is set; re-run to apply). No shaming, no
- * "your org is broken" (global rule).
- * @param {number} score 1–10
- * @returns {string}
+ * Gate for the once-only Structural-Health diagnostic (triage default 3): it
+ * shows after the FIRST genuine PRESET result only. A replay arrival reproduces a
+ * specific shared run (an onboarding interrupt mid-replay is intrusive), and a
+ * CUSTOM-authored first run must NOT trigger OR consume the once-only flag — only
+ * a non-empty preset id (a real preset selection the user did not edit) qualifies.
+ * Pure so the run-source gate is node-tested, not just wired in main.js.
+ * @param {{ replay: boolean, presetId: string, alreadyHandled: boolean }} ctx
+ *   `replay` — this paint is a shared-link replay; `presetId` — the preset id
+ *   captured at RUN LAUNCH ('' for a custom-authored run); `alreadyHandled` —
+ *   the diagnostic already showed this session or a prior one.
+ * @returns {boolean}
  */
-export function resultSentence(score) {
-  return `Based on your five answers, this org sits at Structural Health ${score} of 10. We set the slider to ${score} — run the simulation to see how this structure behaves.`;
+export function shouldShowDiagnostic(ctx) {
+  if (ctx.replay) return false;
+  if (ctx.alreadyHandled) return false;
+  return Boolean(ctx.presetId);
 }
 
 // ---- DOM controller (browser only) -----------------------------------------------
@@ -213,15 +224,13 @@ export function renderOnboarding(root, opts) {
   skipBtn.type = 'button';
   actions.append(applyBtn, skipBtn);
 
-  const resultEl = make('p', 'diagnostic-result status');
-  resultEl.setAttribute('role', 'status');
-  resultEl.setAttribute('aria-live', 'polite');
-
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
     const answers = readers.map((r) => r());
     const score = scoreStructuralHealth(answers);
-    resultEl.textContent = resultSentence(score);
+    // Result feedback flows through #run-status (main.js onComplete): the panel
+    // hides in the same tick, so an in-panel result line would never render or
+    // announce (FOLD-B — dead code removed; #run-status is the live region).
     markDiagnosticSeen(opts.storage);
     opts.onComplete(score);
     hide();
@@ -234,7 +243,7 @@ export function renderOnboarding(root, opts) {
   });
 
   form.appendChild(actions);
-  root.append(heading, intro, form, resultEl);
+  root.append(heading, intro, form);
   root.hidden = true;
 
   let shown = false;
