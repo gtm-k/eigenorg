@@ -805,20 +805,23 @@ const nav = createNavShell({
   shell: el('#shell'),
   toggle: el('#altitude-toggle'),
   startOver: /** @type {HTMLButtonElement} */ (el('#start-over')),
+  // Door copy = the FINAL hero lockup (DESIGN-ELEVATION-spec §0). The short
+  // labels ("Organization" / "One team") also drive the altitude toggle, which
+  // coheres with the connective line "the whole org, or a single team".
   doors: [
     {
       id: 'org',
-      label: 'Organization Building',
-      question: "Is my org's structure sound?",
-      desc: 'Shape a whole organization and see how its structure drives disorder, decision speed and coordination cost.',
+      label: 'Organization',
+      question: "Is your org's structure sound?",
+      desc: "Set its size, how it's wired, and who signs off — then run it.",
       icon: '🏢',
       mount: el('#org-mount'),
     },
     {
       id: 'team',
-      label: 'Team Building',
+      label: 'One team',
       question: "Will this team's makeup work?",
-      desc: 'Compose one team of humans and AI and see throughput, quality, cohesion and where coverage gaps open up.',
+      desc: 'Choose who does the work and who checks it — then run it.',
       icon: '👥',
       mount: el('#team-mount'),
     },

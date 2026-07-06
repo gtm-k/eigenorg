@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>eigenorg — org entropy simulator</title>
-  <meta name="description" content="Simulate how org structure, growth and AI injection shape coordination cost, decision speed and disorder. Runs entirely in your browser.">
+  <title>eigenorg — structure, not headcount</title>
+  <meta name="description" content="Test whether your org holds together before you build it. Shape an org, run 500 Monte Carlo simulations in your browser, and see whether structure — not headcount — decides the outcome.">
   <!-- Open Graph / Twitter card. og:image is RELATIVE while the repo is private
        (decision default 6); P9 finalizes the absolute Pages-origin URL at the
        public flip (LinkedIn scrapers need an absolute URL, which requires the
        live origin). Relative paths keep the zero-external-requests gate clean. -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="eigenorg — org entropy simulator">
+  <meta property="og:title" content="eigenorg — structure, not headcount">
   <meta property="og:description" content="Org performance is a property of structure, not headcount. Simulate coordination cost, decision latency and Faster Dysfunction — a thinking aid grounded in research, running entirely in your browser.">
   <meta property="og:image" content="./og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="eigenorg — org entropy simulator">
-  <meta name="twitter:description" content="A thinking aid grounded in research — not a prediction engine. Simulate how structure, growth and AI injection shape org entropy.">
+  <meta name="twitter:title" content="eigenorg — structure, not headcount">
+  <meta name="twitter:description" content="A thinking aid grounded in research — not a prediction engine. Shape an org, run 500 simulations in your browser, and see whether structure decides the outcome.">
   <meta name="twitter:image" content="./og-image.png">
   <!-- Relative asset paths ONLY: this page must work under the /eigenorg/
        Pages project subpath (PLAN P2 / PREMORTEM T2). -->
@@ -33,17 +33,61 @@
        door list, so P7b's Team door needs no change here. -->
   <section id="landing" class="landing" aria-labelledby="landing-title">
     <div class="landing-inner">
-      <header class="landing-header">
-        <p class="brand-mark">eigenorg</p>
-        <h1 id="landing-title" class="landing-title">Two ways to look at one organization.</h1>
-        <p class="landing-lede">Performance is a property of structure, not headcount. Pick the altitude you want to test — the whole org, or a single team. Every run is 500 seeded Monte&nbsp;Carlo simulations, entirely in your browser.</p>
-      </header>
+      <!-- Rail: anchors the top edge (kills the centered "float"). Wordmark left
+           (eigen·org, "org" in decorative lavender — grayscale-safe; meaning is
+           carried by the descriptor); in-browser reassurance right. -->
+      <div class="landing-rail">
+        <p class="brand-mark"><span class="brand-eigen">eigen</span><span class="brand-mid" aria-hidden="true">·</span><span class="brand-org">org</span></p>
+        <p class="landing-stat">500 simulations · in your browser · nothing uploaded</p>
+      </div>
+
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="hero-descriptor">
+            <span class="hero-descriptor-text">Test whether your org holds together — before you build it.</span>
+            <!-- Opt-in "why eigen?" — a self-contained native <details> popover
+                 (tap / keyboard, never hover-only). Carries the abstract name. -->
+            <details class="why-eigen">
+              <summary class="why-eigen-summary">why eigen?</summary>
+              <span class="why-eigen-pop" role="note">eigen — as in eigenvalues: the characteristic properties that define how a system behaves. eigenorg brings that lens to your org.</span>
+            </details>
+          </div>
+          <h1 id="landing-title" class="landing-title">Structure, not headcount.</h1>
+          <p class="landing-lede">Two orgs can hire the same people and still end up worlds apart — one holds together as it grows, the other slowly slides into disorder. The difference isn't who they hired; it's how they're wired.</p>
+        </div>
+
+        <div class="hero-signature">
+          <!-- "The Divergence" (spec §3): two entropy trajectories from one seed —
+               an ORDER path (lavender, solid) settling low/narrow, a DISORDER path
+               (grey, muted) fraying up/wide. Same origin, different structure,
+               different outcome — the thesis rendered as an image. Draws in once
+               (§6.2); base state is fully drawn so reduced-motion = instant.
+               Inline SVG, zero external requests. Decorative — hidden from AT. -->
+          <svg class="hero-divergence" viewBox="0 0 560 340" fill="none" aria-hidden="true" focusable="false">
+            <defs>
+              <radialGradient id="seedGlow">
+                <stop offset="0" stop-color="#5e6ad2" stop-opacity=".28"/>
+                <stop offset="1" stop-color="#5e6ad2" stop-opacity="0"/>
+              </radialGradient>
+            </defs>
+            <circle cx="40" cy="190" r="90" fill="url(#seedGlow)"/>
+            <path class="band band-dis" d="M40 190 C180 180 300 150 520 70 L520 205 C300 250 180 240 40 190Z"/>
+            <path class="band band-ord" d="M40 190 C200 214 360 256 520 262 L520 300 C360 292 200 252 40 190Z"/>
+            <path class="median median-dis" pathLength="100" d="M40 190 C170 178 250 150 320 150 C400 150 440 96 520 118"/>
+            <path class="median median-ord" pathLength="100" d="M40 190 C190 212 330 258 420 262 C470 264 500 260 520 258"/>
+            <circle class="seed" cx="40" cy="190" r="4.5"/>
+          </svg>
+        </div>
+      </div>
+
       <!-- Shown on the landing when a shared '#s=' link fails to open (BLOCKER B):
            the shell (and #run-status) is hidden here, so the failure needs a
            landing-level, keyboard/AT-visible notice. Icon + text, never colour-only. -->
       <p id="landing-notice" class="landing-notice" role="status" hidden><span class="landing-notice-icon" aria-hidden="true">⚠</span> <span id="landing-notice-text"></span></p>
+
+      <p class="landing-connective">One question, two zoom levels — the whole org, or a single team.</p>
       <div id="door-grid" class="door-grid" role="group" aria-label="Choose what to explore"></div>
-      <p class="landing-foot framing">A thinking aid grounded in research — not a prediction engine. Nothing leaves your browser.</p>
+      <p class="landing-foot framing">A thinking aid grounded in research — not a prediction engine.</p>
     </div>
   </section>
 
