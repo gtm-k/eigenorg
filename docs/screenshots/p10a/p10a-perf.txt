@@ -1,0 +1,35 @@
+eigenorg — P10a perf re-confirmation (measured, not asserted)
+=============================================================
+
+Method: scripted probe in Chromium (Playwright MCP) against the built site
+served by scripts/serve.mjs under the /eigenorg/ Pages subpath emulation.
+Timings read from the in-page probe hook window.__eigenorg (primaryElapsedMs =
+one 500-iteration Monte Carlo run; planElapsedMs = the full 2–3-run plan;
+bootReadyMs = navigation start -> Run clickable). Landing preset =
+fasterDysfunction (AI on, 3-run plan). Viewport 1280x900.
+
+Budget A — a 500-iteration sim runs in < 1.5 s:
+  run 1: primary 500-iter run = 593 ms   (full 3-run plan 1644 ms)
+  run 2: primary 500-iter run = 582 ms   (full 3-run plan 1594 ms)
+  run 3: primary 500-iter run = 579 ms   (full 3-run plan 1628 ms)
+  => single 500-iteration sim ~0.58 s  << 1.5 s budget. PASS.
+
+Budget B — a full walkthrough in < 90 s:
+  boot (navigation start -> Run clickable) = 434 ms
+  scripted walkthrough (land -> open Organization door -> 3 sequential runs
+    -> results painted) = 5425 ms (machine-paced proxy; the P5/P6 convention).
+  => 5.4 s  << 90 s budget. PASS.
+
+Zero-console-errors + zero-external-requests (same session, Playwright logs):
+  console errors (whole session): 0
+  console warnings (whole session): 0
+  network requests: 27, ALL to the local /eigenorg/ origin (relative). No CDN,
+    no external host; Chart.js served from www/vendor/, wasm from www/pkg via
+    the worker. PASS.
+
+Notes:
+  - The redesign's motion is CSS-only (fade-ups, breathing CTA halo, chart-
+    container fade-up); Chart.js per-frame animation stays disabled (P5 perf
+    discipline), so the restyle adds no per-frame JS animation cost.
+  - The chart reveal is a CSS opacity/transform fade-up on the .chart-box
+    container (NOT stroke-dashoffset — the charts are Chart.js on canvas).
