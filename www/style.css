@@ -965,3 +965,362 @@ progress {
   color: var(--color-ink-muted);
   max-width: 46rem;
 }
+
+/* ==================================================================== */
+/* P8 — Model Assumptions drawer                                        */
+/* Rendered verbatim from www/assumptions.json; native <details> for    */
+/* keyboard + screen-reader operability. Tiers are TEXT, never colour-  */
+/* alone. DESIGN.md Linear tokens reused, none restated.                */
+/* ==================================================================== */
+
+.drawer {
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  background: var(--color-surface-2);
+}
+
+.drawer > summary.drawer-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 8px;
+}
+
+.drawer > summary.drawer-summary::-webkit-details-marker {
+  display: none;
+}
+
+.drawer > summary.drawer-summary::before {
+  content: '▸';
+  color: var(--color-ink-subtle);
+  margin-right: var(--space-1);
+}
+
+.drawer[open] > summary.drawer-summary::before {
+  content: '▾';
+}
+
+.drawer > summary.drawer-summary:hover {
+  background: var(--color-surface-1);
+}
+
+.drawer > summary.drawer-summary:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: -2px;
+}
+
+.drawer-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.drawer-count {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
+  margin-right: auto;
+}
+
+.drawer-note {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--color-ink-subtle);
+  max-width: 46rem;
+}
+
+.assum-group {
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+.assum-group-head {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-ink-tertiary);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.assum-item {
+  border-top: 1px solid var(--color-hairline);
+}
+
+.assum-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-1);
+  min-height: 44px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.assum-summary::-webkit-details-marker {
+  display: none;
+}
+
+.assum-summary::before {
+  content: '+';
+  color: var(--color-ink-tertiary);
+  font-family: var(--font-mono);
+  width: 1rem;
+}
+
+.assum-item[open] > .assum-summary::before {
+  content: '−';
+}
+
+.assum-summary:hover {
+  color: var(--color-ink);
+}
+
+.assum-summary:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.assum-id {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-ink);
+}
+
+/* Tier badge: the WORD is the signal (never colour-alone). The border tint is
+   a secondary, redundant cue only. */
+.assum-tier {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: 999px;
+  padding: 0.0625rem 0.5rem;
+  white-space: nowrap;
+}
+
+.assum-tier[data-tier='peer-reviewed'] {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.assum-tier[data-tier='industry-report'] {
+  border-color: var(--color-primary);
+  color: var(--color-primary-hover);
+}
+
+.assum-body {
+  padding: 0 var(--space-1) var(--space-3) 1rem;
+}
+
+.assum-plain {
+  margin: 0 0 var(--space-2);
+  font-size: 0.8125rem;
+  color: var(--color-ink-muted);
+  max-width: 46rem;
+}
+
+.assum-meta {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.assum-meta-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: var(--space-2);
+}
+
+.assum-meta-label {
+  font-size: 0.6875rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-ink-tertiary);
+  margin: 0;
+}
+
+.assum-meta-value {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+}
+
+.assum-sublabel {
+  font-size: 0.6875rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--color-ink-tertiary);
+  margin: var(--space-3) 0 var(--space-1);
+}
+
+.assum-cites {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.75rem;
+  color: var(--color-ink-subtle);
+}
+
+.assum-cites li {
+  margin-bottom: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+/* ==================================================================== */
+/* P8 — Structural-Health onboarding diagnostic                        */
+/* Non-modal panel, shown once after the first result. fieldset/legend  */
+/* radio groups (keyboard + screen-reader native); nothing colour-alone.*/
+/* ==================================================================== */
+
+.panel.diagnostic {
+  border-left: 3px solid var(--color-primary);
+}
+
+.diagnostic-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  margin: 0 0 var(--space-2);
+}
+
+.diagnostic-title:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.diagnostic-intro {
+  margin: 0 0 var(--space-4);
+  font-size: 0.875rem;
+  color: var(--color-ink-subtle);
+  max-width: 46rem;
+}
+
+.diagnostic-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.diagnostic-q {
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  margin: 0;
+  min-width: 0;
+}
+
+.diagnostic-legend {
+  padding: 0;
+  display: block;
+}
+
+.diagnostic-dim {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-primary-hover);
+  margin-bottom: var(--space-1);
+}
+
+.diagnostic-question {
+  display: block;
+  font-size: 0.9375rem;
+  color: var(--color-ink);
+  margin-bottom: var(--space-3);
+}
+
+.diagnostic-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+  .diagnostic-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.diagnostic-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  color: var(--color-ink-muted);
+}
+
+.diagnostic-option:hover {
+  color: var(--color-ink);
+  border-color: var(--color-primary-focus);
+}
+
+.diagnostic-option input[type='radio'] {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-primary);
+  flex: none;
+  cursor: pointer;
+}
+
+.diagnostic-option input[type='radio']:focus-visible {
+  outline: 2px solid var(--color-primary-focus);
+  outline-offset: 2px;
+}
+
+/* Checked state = accent border + weight (never colour-alone: the radio dot +
+   the label text carry it too). :has() is well-supported; the radio dot is the
+   primary cue regardless. */
+.diagnostic-option:has(input:checked) {
+  border-color: var(--color-primary);
+  background: rgba(94, 106, 210, 0.12);
+  color: var(--color-ink);
+  font-weight: 500;
+}
+
+.diagnostic-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* ==================================================================== */
+/* P8 — output / share card                                            */
+/* The canvas backing store is 1200×628 (the exported PNG size); CSS    */
+/* scales the preview down to fit the column.                           */
+/* ==================================================================== */
+
+.card-preview {
+  margin-bottom: var(--space-4);
+}
+
+.card-preview canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+}

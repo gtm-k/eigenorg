@@ -5,6 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>eigenorg — org entropy simulator</title>
   <meta name="description" content="Simulate how org structure, growth and AI injection shape coordination cost, decision speed and disorder. Runs entirely in your browser.">
+  <!-- Open Graph / Twitter card. og:image is RELATIVE while the repo is private
+       (decision default 6); P9 finalizes the absolute Pages-origin URL at the
+       public flip (LinkedIn scrapers need an absolute URL, which requires the
+       live origin). Relative paths keep the zero-external-requests gate clean. -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="eigenorg — org entropy simulator">
+  <meta property="og:description" content="Org performance is a property of structure, not headcount. Simulate coordination cost, decision latency and Faster Dysfunction — a thinking aid grounded in research, running entirely in your browser.">
+  <meta property="og:image" content="./og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="eigenorg — org entropy simulator">
+  <meta name="twitter:description" content="A thinking aid grounded in research — not a prediction engine. Simulate how structure, growth and AI injection shape org entropy.">
+  <meta name="twitter:image" content="./og-image.png">
   <!-- Relative asset paths ONLY: this page must work under the /eigenorg/
        Pages project subpath (PLAN P2 / PREMORTEM T2). -->
   <link rel="stylesheet" href="./style.css">
@@ -63,6 +77,12 @@
         </article>
       </div>
     </section>
+
+    <!-- ============ onboarding diagnostic (P8; shown once after first result) ============ -->
+    <!-- Non-modal; ui/onboarding.js builds the 5-question form into this section
+         and unhides it after the first non-replay result. Skippable to the plain
+         slider below; never blocks landing (PREMORTEM A2). -->
+    <section id="diagnostic" class="panel diagnostic" hidden></section>
 
     <!-- ============ org controls ============ -->
     <section class="panel" aria-labelledby="controls-heading">
@@ -158,6 +178,32 @@
         <button id="share-button" type="button" disabled>Copy share link</button>
       </div>
       <p id="share-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ============ output / share card (P8) ============ -->
+    <section class="panel" aria-labelledby="card-heading">
+      <p class="eyebrow">Share the story</p>
+      <h2 id="card-heading">Result card</h2>
+      <p class="note">A 1200×628 image of this run — the decision-latency headline, the throughput-and-entropy story and the research-framing line, ready to post. Generated entirely in your browser; nothing is uploaded.</p>
+      <div class="card-preview">
+        <canvas id="card-canvas" width="1200" height="628" role="img" aria-label="Shareable result card: a decision-latency headline in working days, throughput and entropy after AI injection, and a before/after entropy chart contrasting a strained and a sound org (lower versus higher Structural Health)."></canvas>
+      </div>
+      <div class="run-row">
+        <button id="card-download" type="button" disabled>Download card</button>
+        <button id="card-share" type="button" class="ghost" disabled>Share…</button>
+      </div>
+      <p id="card-status" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ============ model assumptions drawer (P8 transparency moat) ============ -->
+    <section class="panel" aria-labelledby="assumptions-heading">
+      <p class="eyebrow">Under the hood</p>
+      <h2 id="assumptions-heading">Every coefficient the engine uses</h2>
+      <p class="note">Extracted straight from <span class="mono">MODEL.md</span> with its research anchor, evidence tier and limitation. A CI drift gate keeps this drawer identical to the shipped model — nothing here is hand-copied.</p>
+      <!-- The drawer renders www/assumptions.json verbatim; ui/assumptions.js
+           builds a native <details> tree into this mount (shape-driven). -->
+      <div id="assumptions-mount"></div>
+      <p id="assumptions-status" class="empty-note" hidden></p>
     </section>
 
     <footer class="page-footer">

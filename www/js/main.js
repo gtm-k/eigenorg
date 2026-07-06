@@ -21,11 +21,14 @@ import {
   autoRunsOnInteraction,
   stagesGeneration,
 } from './ui/runplan.js';
-import { renderControls } from './ui/org.js';
+import { renderControls, applyOrgValue } from './ui/org.js';
 import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
+import { renderOnboarding, readDiagnosticSeen, shouldShowDiagnostic } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
+import { wireCard } from './share/card.js';
+import { fetchAssumptions, renderAssumptionsDrawer } from './ui/assumptions.js';
 import { modelVersionBanner, extractShareFragment } from './url-codec.js';
 
 /** @param {string} sel @returns {HTMLElement} */
@@ -175,6 +178,12 @@ async function runAll() {
   // stale — see completionPolicy below (P5b-F1).
   const planGeneration = state.generation;
   const replayPayload = state.replayPayload;
+  // Capture the RUN SOURCE at launch (MED-2): the preset id this plan runs from,
+  // or '' for a custom-authored / replayed run. Threaded to paintResults so the
+  // once-only diagnostic gates on a GENUINE preset run — never a custom first run
+  // that would silently consume the flag — and the card scenario label matches
+  // the source that actually ran (not a later mutation of state.presetId).
+  const runPresetId = replayPayload ? '' : state.presetId;
   const baseConfig = replayPayload ? state.replayConfig : state.config;
   const plan = buildRunPlan(baseConfig);
   // P6 legibility twin: when the configurator's compare toggle is on AND the
@@ -242,7 +251,7 @@ async function runAll() {
       // share armed for a config the controls no longer show.)
       setStatus(statusEl, 'configuration changed — run to update the charts', '');
     } else {
-      paintResults({ plan, primary, contrast, aiOff, layerTwin, totalRuns, primaryElapsedMs, planElapsedMs, replayPayload });
+      paintResults({ plan, primary, contrast, aiOff, layerTwin, totalRuns, primaryElapsedMs, planElapsedMs, replayPayload, runPresetId });
     }
   } catch (err) {
     if (/** @type {any} */ (err).cancelled) {
@@ -267,7 +276,7 @@ async function runAll() {
  * Paint every panel from a completed plan.
  * @param {{ plan: any, primary: any, contrast: any, aiOff: any, layerTwin: any,
  *           totalRuns: number, primaryElapsedMs: number, planElapsedMs: number,
- *           replayPayload: any }} r
+ *           replayPayload: any, runPresetId: string }} r
  */
 function paintResults(r) {
   const { plan, primary, contrast, aiOff, layerTwin } = r;
@@ -369,6 +378,47 @@ function paintResults(r) {
 
   share.arm(plan.primary, output);
 
+  // P8 card: arm with a snapshot of THIS run (never the edit buffer — same
+  // discipline as share.arm). Scenario label follows the current source.
+  const scenarioLabel = r.replayPayload
+    ? 'Shared run'
+    : r.runPresetId
+      ? (state.presets.get(r.runPresetId)?.label ?? 'Custom configuration')
+      : 'Custom configuration';
+  card.arm({
+    scenarioLabel,
+    beforeSh: plan.beforeSh,
+    afterSh: plan.afterSh,
+    primarySh: Number(config.org.structuralHealth),
+    // The fragile/absorbs boundary, read LIVE from this run's resolvedParams
+    // (no hardcoded threshold) so the card's AI subhead can never over-claim
+    // dysfunction on a high-SH run (MED-4).
+    shRiskThreshold: Number(output.resolvedParams?.shRiskThreshold),
+    beforeEntropy: beforeRun.output.series.entropy,
+    afterEntropy: afterRun.output.series.entropy,
+    decisionLatency: output.series.decisionLatency,
+    throughput: output.series.throughput,
+    coordinationTax: output.series.coordinationTax,
+    entropy: output.series.entropy,
+    aiActive: aiOn,
+    injectStep: aiOn ? Number(config.org.aiInjection.atStep) : null,
+    aiOffThroughput: aiOff ? aiOff.output.series.throughput : null,
+    aiOffEntropy: aiOff ? aiOff.output.series.entropy : null,
+    modelVersion: output.modelVersion,
+    seed: config.seed,
+  });
+
+  // P8 onboarding: shown ONCE, after the FIRST genuine PRESET result — NOT on a
+  // share-URL replay (a share visitor is reproducing a specific run) and NOT on a
+  // custom-authored first run (which must not silently consume the once-only
+  // flag; MED-2, triage default 3). The run source is captured at launch
+  // (r.runPresetId). It appears under the results, never blocking landing (the
+  // user has already seen a full result by now — PREMORTEM A2).
+  if (shouldShowDiagnostic({ replay: Boolean(r.replayPayload), presetId: r.runPresetId, alreadyHandled: diagnosticHandled })) {
+    diagnosticHandled = true;
+    onboarding.show();
+  }
+
   // Replay banner: informational, computed against the version the engine
   // actually stamped on this output (decision log round 1).
   if (r.replayPayload) {
@@ -427,6 +477,7 @@ function stageConfigChange(interaction) {
   state.replayPayload = null; // editing/picking = authoring (CONTRACTS §4)
   state.replayConfig = null;
   share.disarm(); // (e) no share until a matching fresh run completes
+  card.disarm(); // the last card is now stale — no export until a fresh run
   clearShareHash();
 }
 
@@ -468,6 +519,9 @@ function stageAndRefresh(next) {
   state.config = next;
   stageConfigChange('edit');
   state.pendingRerun = false; // an edit cancels a pending preset auto-run
+  state.presetId = ''; // authoring a config = custom run (MED-2): no preset source,
+  // so the once-only diagnostic won't fire/consume on a custom first run and the
+  // card scenario label reads "Custom configuration".
   picker.setActive('');
   el('#preset-note').textContent = 'Custom configuration — changes apply on the next run.';
   controls.refresh();
@@ -500,7 +554,29 @@ const configurator = renderConfigurator(el('#configurator'), {
     // convention). Never auto-run (decision 6).
     stageGeneration('compareToggle');
     share.disarm();
+    card.disarm();
     setStatus(statusEl, 'comparison changed — run to update the all-human comparison', '');
+  },
+});
+
+// P8 onboarding diagnostic — the 5-question Structural-Health check, shown ONCE
+// after the first (non-replay) result, skippable to the plain slider (decision
+// default 2: set the slider + prompt to re-run, NEVER auto-run — matches the
+// P5/P6 "edits stage, never auto-run" convention). readDiagnosticSeen carries
+// the once-only guarantee across sessions (localStorage, try/catch inside).
+let diagnosticHandled = readDiagnosticSeen();
+const onboarding = renderOnboarding(el('#diagnostic'), {
+  onComplete(score) {
+    // Set the plain SH slider through the SAME authoring path a control edit
+    // uses (stageAndRefresh) so share disarms, replay clears and the slider
+    // display updates — then prompt a re-run (no auto-run, decision default 2).
+    stageAndRefresh(applyOrgValue(state.config, 'structuralHealth', score));
+    setStatus(statusEl, `Structural Health set to ${score} from your diagnostic — run to see how this structure behaves.`, '');
+  },
+  onSkip() {
+    // The plain slider remains the standing control; move focus to it.
+    el('#ctl-structuralHealth').focus();
+    setStatus(statusEl, 'Set Structural Health with the slider, then run.', '');
   },
 });
 
@@ -514,6 +590,17 @@ const share = wireShareButton(shareButton, shareStatusEl, {
     probe.shareFragment = fragment;
   },
 });
+
+// P8 output/share card — armed on every non-stale paint with a snapshot of the
+// run, disarmed by any staged change (same lifecycle as the share button). The
+// renderCard probe hook lets the og-image export render the same card at 1200×630.
+const card = wireCard({
+  canvas: /** @type {HTMLCanvasElement} */ (el('#card-canvas')),
+  downloadButton: /** @type {HTMLButtonElement} */ (el('#card-download')),
+  shareButton: /** @type {HTMLButtonElement} */ (el('#card-share')),
+  statusEl: el('#card-status'),
+});
+probe.renderCard = (/** @type {number} */ w, /** @type {number} */ h) => card.renderDataUrl(w, h);
 
 for (const b of runButtons) b.addEventListener('click', () => void runAll());
 
@@ -591,3 +678,31 @@ async function boot() {
 boot().catch((err) => {
   setStatus(statusEl, `failed to start: ${err instanceof Error ? err.message : String(err)}`, 'error');
 });
+
+// ---- model assumptions drawer (independent of the run flow) ------------------------
+
+/**
+ * Fetch www/assumptions.json and render the transparency drawer. Independent of
+ * the engine run flow, so a drawer failure never blocks the simulator. The
+ * drawer renders the artifact VERBATIM (PREMORTEM Story 3) — no coefficient is
+ * authored here.
+ */
+async function mountAssumptionsDrawer() {
+  const mount = el('#assumptions-mount');
+  const status = el('#assumptions-status');
+  try {
+    const data = await fetchAssumptions();
+    const { problems } = renderAssumptionsDrawer(mount, data);
+    if (problems.length > 0) {
+      // Shape drift in the extracted artifact — surface it rather than render a
+      // silently blank row (the drift gate would also catch this in CI).
+      status.textContent = `The model artifact changed shape (${problems.length} issue(s)); some rows may be incomplete.`;
+      status.hidden = false;
+    }
+  } catch (err) {
+    status.textContent = `Could not load the model assumptions: ${err instanceof Error ? err.message : String(err)}`;
+    status.hidden = false;
+  }
+}
+
+void mountAssumptionsDrawer();
