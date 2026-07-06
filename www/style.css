@@ -1462,7 +1462,8 @@ progress {
 .door:hover:not(:disabled) {
   background: var(--color-surface-2);
   border-color: var(--color-primary);
-  transform: translateY(-2px);
+  /* The hover LIFT (transform) is motion — it lives in the reduced-motion guard
+     below (F1); colour/border changes stay here (eased by the button rule). */
 }
 
 .door:focus-visible {
@@ -1805,8 +1806,14 @@ progress {
   .charts-revealed .charts-grid .reveal-item:nth-child(5) { animation-delay: 155ms; }
   .charts-revealed .charts-grid .reveal-item:nth-child(6) { animation-delay: 190ms; }
 
-  /* Primary CTA: a quiet breathing halo to draw the eye to Run. */
-  .cta:not(:disabled) { animation: eig-breathe 3600ms ease-in-out infinite; }
+  /* Primary CTA: a quiet breathing ring while it holds keyboard focus
+     (spec §8 "breathing focus ring"; F2 — scoped to :focus-visible, not always-on). */
+  .cta:focus-visible { animation: eig-breathe 3600ms ease-in-out infinite; }
+
+  /* Door hover LIFT (F1): motion-guarded + eased, so reduced-motion users get
+     no movement and everyone else gets a smooth lift. */
+  .door { transition: transform 160ms ease; }
+  .door:hover:not(:disabled) { transform: translateY(-2px); }
 
   /* Smooth stale -> fresh. */
   .results .charts-grid,
