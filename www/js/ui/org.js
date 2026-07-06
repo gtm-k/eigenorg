@@ -183,6 +183,14 @@ const TOPOLOGY_LABELS = {
   federated: 'Federated',
 };
 
+/** Topology nouns for the plain-English précis ("wired as …"). @type {Record<string, string>} */
+const TOPOLOGY_PRECIS = {
+  flat: 'a flat org',
+  hierarchical: 'a hierarchy',
+  pods: 'pods',
+  federated: 'a federation',
+};
+
 /**
  * The "Your setup" chip summary (spec §6): a compact, human-readable digest of
  * the current org configuration, shown at the top of the results while the setup
@@ -210,7 +218,60 @@ export function orgSetupChips(config, scenarioLabel) {
   ];
 }
 
+/**
+ * The plain-English setup précis (spec §4b.2) as an array of segments. A segment
+ * with `value:true` is an editable value the renderer emphasizes (bold ink — the
+ * accent stays reserved for Run, §C6). Pure (node-tested); reads only the fields
+ * `orgSetupChips()` reads (people / topology / modality / ownershipLayers /
+ * aiInjection) and authors NO model number — every value is a plain input the
+ * user set. (No scenarioLabel arg: the scenario is already the eyebrow + first
+ * chip; the sentence describes the configuration, not its preset name.)
+ * @param {any} config the current org config
+ * @returns {Array<{ text: string, value?: boolean }>}
+ */
+export function orgPrecisSentence(config) {
+  const org = config?.org ?? {};
+  const people = String(org.headcountStart ?? '—');
+  const topology = TOPOLOGY_PRECIS[org.topology] ?? 'a custom shape';
+  const modality = org.modality === 'meetingHeavy' ? 'meeting-heavy' : 'async-first';
+  const layers = Number(org.ownershipLayers);
+  const layerText = Number.isFinite(layers) ? `${layers}-layer approval chain` : 'a custom approval chain';
+  const aiOn =
+    Boolean(org.aiInjection?.enabled) && Number(org.aiInjection?.atStep) < Number(config?.horizon ?? 0);
+  /** @type {Array<{ text: string, value?: boolean }>} */
+  const parts = [
+    { text: "You're testing a " },
+    { text: `${people}-person`, value: true },
+    { text: ' org wired as ' },
+    { text: topology, value: true },
+    { text: ', ' },
+    { text: modality, value: true },
+    { text: ', cleared by a ' },
+    { text: layerText, value: true },
+  ];
+  if (aiOn) parts.push({ text: ', with ' }, { text: 'AI injected partway', value: true });
+  parts.push({ text: '.' });
+  return parts;
+}
+
 // ---- DOM rendering (browser only) --------------------------------------------
+
+/**
+ * Render the org précis into `host`, emphasizing the editable values (bold ink).
+ * Text-node only (no innerHTML). @param {HTMLElement} host @param {any} config
+ */
+export function renderOrgPrecis(host, config) {
+  host.textContent = '';
+  for (const seg of orgPrecisSentence(config)) {
+    if (seg.value) {
+      const strong = document.createElement('strong');
+      strong.textContent = seg.text;
+      host.appendChild(strong);
+    } else {
+      host.appendChild(document.createTextNode(seg.text));
+    }
+  }
+}
 
 /**
  * Render the control grid into `root`. Controls stay ENABLED during runs

@@ -21,8 +21,8 @@ import {
   autoRunsOnInteraction,
   stagesGeneration,
 } from './ui/runplan.js';
-import { renderControls, applyOrgValue, orgSetupChips } from './ui/org.js';
-import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
+import { renderControls, applyOrgValue, orgSetupChips, renderOrgPrecis } from './ui/org.js';
+import { renderConfigurator, allHumanTwin, hasNonHumanLayer, approvalStackSummary } from './ui/prioritization.js';
 import { renderOnboarding, readDiagnosticSeen, shouldShowDiagnostic } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
@@ -479,6 +479,7 @@ function paintResults(r) {
   // was already revealed + the chart-reveal played at the top of paintResults.
   state.hasRun = true;
   el('#run-button-2').hidden = false;
+  el('#approval-drawer').classList.remove('pre-run'); // reveal the now-populated flow/legibility blocks
   markResultsFresh();
 }
 
@@ -696,10 +697,13 @@ const orgStrip = createSetupStrip({
     /** @type {HTMLElement | null} */ (document.querySelector('#org-setup-body button, #org-setup-body input')),
 });
 
-/** Refresh the "Your setup" chips from the current (possibly pending) config. */
+/** Refresh the "Your setup" chips, the plain-English précis, and the approval
+ *  drawer's live value from the current (possibly pending) config. */
 function refreshSetupChips() {
   if (!state.config) return;
   orgStrip.setChips(orgSetupChips(state.config, currentScenarioLabel()));
+  renderOrgPrecis(el('#org-precis'), state.config);
+  el('#approval-drawer-value').textContent = approvalStackSummary(state.config);
 }
 
 /** A staged edit: charts no longer match the setup — show the stale badge.
@@ -772,6 +776,11 @@ function resetToDefault() {
   el('#org-results').hidden = true;
   el('#org-results').classList.remove('charts-revealed', 'is-stale');
   el('#run-button-2').hidden = true;
+  // BLOCKER A: the approval <details> must be COLLAPSED after Start over, exactly
+  // as on a fresh boot, and its run-derived flow/legibility re-gated on hasRun.
+  const approvalDrawer = el('#approval-drawer');
+  approvalDrawer.removeAttribute('open'); // collapse (details is open iff the attribute is present)
+  approvalDrawer.classList.add('pre-run');
   // Clear run-derived CONTENT too. The configurator's flow/recovery/legibility
   // panels live in the (always-visible) setup, so they MUST be cleared
   // (setPending) — gating #org-results would not hide them. The gated results'

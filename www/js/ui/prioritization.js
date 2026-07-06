@@ -156,6 +156,24 @@ export function hasNonHumanLayer(config) {
 }
 
 /**
+ * A one-line summary of the approval stack for the collapsed <details> drawer
+ * (spec §4b.4, actor-observability: the value is legible without expanding).
+ * Pure (node-tested); reads only the stack, authors no model number.
+ * @param {any} config
+ * @returns {string} e.g. "1 layer · Human PM" or "3 layers · Human PM, AI Prioritization Agent"
+ */
+export function approvalStackSummary(config) {
+  const stack = stackFromConfig(config);
+  const L = stack.length;
+  /** @type {string[]} */
+  const seen = [];
+  for (const t of stack) if (!seen.includes(t)) seen.push(t);
+  const labels = seen.map((t) => typeMeta(t).label);
+  const composition = labels.length <= 2 ? labels.join(', ') : `${labels.length} seat types`;
+  return `${L} layer${L === 1 ? '' : 's'} · ${composition}`;
+}
+
+/**
  * Write a stack back onto a config (the single P6 config writer). Authoring
  * semantics, mirroring P5's ui/org.js pattern exactly:
  *   - strips replay/paramOverrides (a stack edit is AUTHORING — CONTRACTS §4;

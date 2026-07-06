@@ -123,27 +123,51 @@
             <div id="org-setup-chips" class="setup-chips"></div>
           </div>
 
+          <!-- P10b §4b reading order: scenario → plain-English précis → RUN →
+               tune (optional) → ▸ approval stack (collapsed). Single hero H2 is
+               .mode-title above; the old competing #setup-heading is demoted to
+               the "Start from" eyebrow (M10). -->
           <div id="org-setup-body" class="setup-body">
-            <p class="eyebrow">Scenario</p>
-            <h2 id="setup-heading" class="setup-title">Start from a scenario, then adjust</h2>
+            <p class="eyebrow" id="setup-heading">Start from</p>
             <div id="preset-picker" class="chip-row" role="group" aria-label="scenario presets"></div>
             <p id="preset-note" class="note"></p>
 
-            <div class="setup-group">
-              <h3 class="setup-subhead">Your org</h3>
+            <!-- Plain-English précis of the pre-filled org (M4). Editable values are
+                 bold ink — the accent stays reserved for Run. Authored by the pure
+                 orgPrecisSentence() (org.js); refreshed on every config change. -->
+            <p id="org-precis" class="org-precis"></p>
+
+            <!-- Run dock (M4): the EXISTING #run-button, promoted above the controls
+                 so one tap runs. Desktop in-flow; mobile sticky-bottom (CSS). No
+                 second run path — #run-button-2 ("Run again") still lives in the
+                 always-visible .run-strip below. -->
+            <div class="setup-run-dock">
+              <button id="run-button" class="cta" type="button" data-run-label="Run 500 simulations" disabled>Run 500 simulations</button>
+              <span class="run-dock-caption">~1 second · in your browser</span>
+            </div>
+
+            <div class="setup-group tune-group">
+              <p class="eyebrow">Tune your org <span class="optional-tag">· optional</span></p>
               <p class="note">Changes apply on the next run. Structural Health folds five observable diagnostics (ownership, WIP discipline, async norms, decision authority, recovery path) into one 1–10 scale.</p>
               <div id="org-controls" class="controls-grid"></div>
             </div>
 
-            <div class="setup-group">
-              <h3 class="setup-subhead">Approval stack <span class="setup-subhead-note">a control inside your org</span></h3>
-              <p class="note">Build the sign-off chain a decision must clear — 1 to 5 layers, each a Human PM, Human Director, AI Prioritization Agent, or Committee seat. This is the part that produces the decision-latency number. Tap a seat type to assign it; changes apply on the next run.</p>
-              <div id="configurator" class="configurator"></div>
-            </div>
-
-            <div class="run-row setup-run">
-              <button id="run-button" class="cta" type="button" data-run-label="Run simulation" disabled>Run simulation</button>
-            </div>
+            <!-- Approval stack → closed <details> (M5): reuses the .drawer component
+                 (▸/▾, keyboard + SR native). The summary shows the live value
+                 (actor-observability) written by prioritization.js on config change.
+                 Its results-shaped blocks (flow, all-human) are gated on hasRun via
+                 the .pre-run class so they never sit empty in the setup. -->
+            <details id="approval-drawer" class="drawer approval-drawer pre-run">
+              <summary class="drawer-summary">
+                <span class="drawer-title">Approval stack</span>
+                <span class="drawer-value" id="approval-drawer-value"></span>
+                <span class="drawer-optional">optional</span>
+              </summary>
+              <div class="drawer-body">
+                <p class="note">Build the sign-off chain a decision must clear — 1 to 5 layers, each a Human PM, Human Director, AI Prioritization Agent, or Committee seat. This is the part that produces the decision-latency number. Tap a seat type to assign it; changes apply on the next run.</p>
+                <div id="configurator" class="configurator"></div>
+              </div>
+            </details>
           </div>
         </section>
 

@@ -251,7 +251,7 @@ button:hover:not(:disabled) {
 }
 
 button:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -481,7 +481,7 @@ progress {
 }
 
 .field input[type='number']:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 1px;
 }
 
@@ -497,7 +497,7 @@ progress {
 }
 
 .field input[type='range']:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
   border-radius: 8px;
 }
@@ -640,12 +640,7 @@ progress {
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  button,
-  .chip {
-    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
-  }
-}
+/* (button/.chip transitions are defined in the P10b §6.5 motion block below.) */
 
 /* ==================================================================== */
 /* P6 — Prioritization Layer Configurator (signature feature)          */
@@ -719,7 +714,7 @@ progress {
 }
 
 .cfg-compare input[type='checkbox']:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -807,7 +802,7 @@ progress {
 }
 
 .cfg-type:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -1069,7 +1064,7 @@ progress {
 }
 
 .drawer > summary.drawer-summary:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: -2px;
 }
 
@@ -1143,7 +1138,7 @@ progress {
 }
 
 .assum-summary:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: -2px;
   border-radius: 4px;
 }
@@ -1256,7 +1251,7 @@ progress {
 }
 
 .diagnostic-title:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 4px;
   border-radius: 4px;
 }
@@ -1344,7 +1339,7 @@ progress {
 }
 
 .diagnostic-option input[type='radio']:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -1684,7 +1679,7 @@ progress {
 }
 
 .door:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 3px;
 }
 
@@ -1790,7 +1785,7 @@ progress {
 }
 
 .altitude-seg:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -1833,7 +1828,7 @@ progress {
 
 /* ---- setup panel (collapses to the "Your setup" chips, spec section 6) ---- */
 .setup {
-  padding: var(--space-6);
+  padding: var(--space-8);
 }
 
 .setup-summary-head {
@@ -1877,8 +1872,9 @@ progress {
   margin: 0 0 var(--space-3);
 }
 
+/* P10b §2c — chunked rhythm: loose between sub-groups (32 margin + 24 pad-top). */
 .setup-group {
-  margin-top: var(--space-6);
+  margin-top: var(--space-8);
   padding-top: var(--space-6);
   border-top: 1px solid var(--color-hairline);
 }
@@ -1906,17 +1902,95 @@ progress {
   margin-bottom: 0;
 }
 
-/* Primary CTA: larger tap target + a quiet breathing focus halo (spec section 8). */
+/* Primary CTA: larger tap target + a quiet breathing focus halo (spec §6.6). */
 .cta {
-  font-size: 0.9375rem;
-  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.875rem 1.75rem;
+  min-height: 52px;
+}
+
+/* ---- P10b §4b: setup précis + run dock + progressive disclosure ---- */
+.org-precis {
+  margin: var(--space-4) 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+  max-width: 46rem;
+}
+
+/* Editable values in the précis: bold ink — NOT lavender (the accent stays
+   reserved for the Run CTA + the signature order-line, §C6). */
+.org-precis strong {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+/* Run dock (M4): the promoted #run-button, framed top+bottom by a hairline.
+   Desktop in-flow; mobile sticky-bottom (see the ≤560px block). */
+.setup-run-dock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin: var(--space-6) 0;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+/* Play glyph — survives main.js's textContent / data-run-label swap; AT ignores it. */
+.setup-run-dock .cta::before {
+  content: '\25B6';
+  margin-right: 0.5em;
+  font-size: 0.85em;
+}
+
+.run-dock-caption {
+  font-size: 0.8125rem;
+  color: var(--color-ink-subtle);
+}
+
+/* "Tune your org · optional" — the eyebrow is uppercase; the optional tag resets. */
+.optional-tag {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-ink-subtle);
+}
+
+/* Approval-stack drawer: live value + optional tag in the summary (M5). */
+.drawer-value {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.drawer-optional {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-tertiary);
+}
+
+.approval-drawer .drawer-body {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* Gate the results-shaped blocks (Prioritization flow, AI-seat-vs-all-human) on
+   hasRun (main.js toggles .pre-run) so they never sit empty in the setup. */
+.approval-drawer.pre-run .cfg-flow,
+.approval-drawer.pre-run .cfg-legibility {
+  display: none;
 }
 
 /* ---- run strip (always visible) + gated results (spec section 6, BLOCKER A) ---- */
 /* The run feedback + persistent actions live in .run-strip, OUTSIDE #org-results,
    so first-run progress/status show while #org-results stays gated on hasRun. */
 .run-strip {
-  margin: var(--space-8) 0 var(--space-6);
+  margin: var(--space-10) 0 var(--space-8);
 }
 
 .results {
@@ -1991,54 +2065,116 @@ progress {
 }
 
 /* ==================================================================== */
-/* P10a — quiet motion. ALL of it lives behind prefers-reduced-motion    */
-/* (spec section 8): staggered fade-ups, a breathing CTA halo, and a     */
-/* chart-container fade-up (CSS on the container — NOT stroke-dashoffset; */
-/* charts are Chart.js on canvas with per-frame animation deliberately   */
-/* off). No per-frame JS animation anywhere.                             */
+/* P10b §6 — motion system (CSS + WAAPI, NO GSAP). ALL of it lives behind  */
+/* prefers-reduced-motion: no-preference; transform / opacity / box-shadow */
+/* / stroke-dashoffset (SVG-only) only — no per-frame JS, Chart.js         */
+/* animation stays OFF, canvas inert. Base state is fully-drawn / opacity 1 */
+/* / no curtain, so reduced-motion degrades to instant with no flash.      */
 /* ==================================================================== */
 
 @keyframes eig-fade-up {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
+}
+
+@keyframes eig-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes eig-fade {
+  to { opacity: 1; }
+}
+
+@keyframes eig-wipe {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@keyframes eig-settle-ring {
+  0% { box-shadow: 0 0 0 0 rgba(94, 106, 210, 0); }
+  35% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.5), 0 0 22px 2px rgba(94, 106, 210, 0.22); }
+  100% { box-shadow: 0 0 0 0 rgba(94, 106, 210, 0); }
 }
 
 @keyframes eig-breathe {
   0%, 100% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.35); }
-  50% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.55), 0 0 18px 1px rgba(94, 106, 210, 0.22); }
+  50% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.45), 0 0 16px 1px rgba(94, 106, 210, 0.2); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Landing: header -> doors (staggered) -> framing line. */
-  .landing-header { animation: eig-fade-up 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .door { animation: eig-fade-up 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .door:nth-child(1) { animation-delay: 140ms; }
-  .door:nth-child(2) { animation-delay: 230ms; }
-  .landing-foot { animation: eig-fade-up 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 340ms; }
+  /* §6.2 — The Divergence draws in once (the calm order line resolves first).
+     stroke-dasharray/offset live ONLY here, so the base state is fully drawn
+     (reduced-motion = instant). pathLength="100" ⇒ no JS measurement. */
+  .median { stroke-dasharray: 100; stroke-dashoffset: 100; animation: eig-draw 760ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+  .median-ord { animation-delay: 160ms; }
+  .median-dis { animation-delay: 300ms; }
+  .band, .seed { opacity: 0; animation: eig-fade 420ms ease forwards; }
+  .band-ord { animation-delay: 620ms; }
+  .band-dis { animation-delay: 700ms; }
+  .seed { animation-delay: 120ms; }
 
-  /* Entering a door: the intro + setup panel fade up once. */
-  .mode-content.entered .mode-intro { animation: eig-fade-up 440ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .mode-content.entered > .setup { animation: eig-fade-up 440ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 70ms; }
-  .mode-content.entered .placeholder { animation: eig-fade-up 460ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 70ms; }
+  /* §6.4 — entrances (calm, ~40% faster than P10a). */
+  .landing-rail { animation: eig-fade-up 240ms var(--ease-out) both; }
+  .hero-copy { animation: eig-fade-up 260ms var(--ease-out) both; animation-delay: 60ms; }
+  .hero-signature { animation: eig-fade-up 260ms var(--ease-out) both; animation-delay: 120ms; }
+  .landing-connective { animation: eig-fade-up 240ms var(--ease-out) both; animation-delay: 200ms; }
+  .door { animation: eig-fade-up 300ms var(--ease-out) backwards; } /* backwards, NOT both — fixes the hover/press lift (M8) */
+  .door:nth-child(1) { animation-delay: 90ms; }
+  .door:nth-child(2) { animation-delay: 165ms; }
+  .landing-foot { animation: eig-fade-up 240ms var(--ease-out) both; animation-delay: 250ms; }
 
-  /* First data: the chart containers + story cards fade up (light stagger). */
-  .charts-revealed .reveal-item { animation: eig-fade-up 500ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(2) { animation-delay: 50ms; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(3) { animation-delay: 85ms; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(4) { animation-delay: 120ms; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(5) { animation-delay: 155ms; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(6) { animation-delay: 190ms; }
+  .mode-content.entered .mode-intro { animation: eig-fade-up 240ms var(--ease-out) both; }
+  .mode-content.entered > .setup { animation: eig-fade-up 260ms var(--ease-out) both; animation-delay: 60ms; }
+  .mode-content.entered .placeholder { animation: eig-fade-up 260ms var(--ease-out) both; animation-delay: 60ms; }
 
-  /* Primary CTA: a quiet breathing ring while it holds keyboard focus
-     (spec §8 "breathing focus ring"; F2 — scoped to :focus-visible, not always-on). */
-  .cta:focus-visible { animation: eig-breathe 3600ms ease-in-out infinite; }
+  /* §6.3 — results climax: the before/after pane charts sweep in on simulation
+     time (a surface-2 curtain collapsing to the right edge), "after" trailing
+     "before"; then the six explore charts arrive as a second wave. The curtain
+     uses `both` so it holds scaleX(1) during the 180ms lead-in AND scaleX(0)
+     after (its base ::after would otherwise re-cover on any repaint). */
+  .charts-revealed > .reveal-item:first-of-type { animation: eig-fade-up 280ms var(--ease-out) both; }
+  .charts-revealed .pane-card .chart-box { overflow: hidden; }
+  .charts-revealed .pane-card .chart-box::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--color-surface-2);
+    transform-origin: right center;
+    animation: eig-wipe 640ms cubic-bezier(0.2, 0, 0.1, 1) both;
+    animation-delay: 180ms;
+    pointer-events: none;
+  }
+  .charts-revealed .pane-card:nth-child(2) .chart-box::after { animation-delay: 340ms; }
+  /* one lavender settle-pulse on the user's own org (the tagged pane card). */
+  .charts-revealed .pane-card:has(.tag:not([hidden])) { animation: eig-settle-ring 900ms var(--ease-emphasis) 860ms both; }
 
-  /* Door hover LIFT (F1): motion-guarded + eased, so reduced-motion users get
-     no movement and everyone else gets a smooth lift. */
-  .door { transition: transform 160ms ease; }
-  .door:hover:not(:disabled) { transform: translateY(-2px); }
+  /* second wave: the six explore charts fade up AFTER the payoff registers. */
+  .charts-revealed .charts-grid .reveal-item { animation: eig-fade-up var(--dur-fade) var(--ease-out) both; animation-delay: 300ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(2) { animation-delay: 355ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(3) { animation-delay: 410ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(4) { animation-delay: 465ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(5) { animation-delay: 520ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(6) { animation-delay: 575ms; }
 
-  /* Smooth stale -> fresh. */
+  /* §6.5 — micro-interactions (the phone audience's only tactile feedback). */
+  .door { transition: transform var(--dur-hover) var(--ease-standard), box-shadow var(--dur-hover) var(--ease-standard); }
+  .door:hover:not(:disabled) { transform: translateY(-3px); box-shadow: var(--shadow-door-hover); }
+  .door:active:not(:disabled) { transform: translateY(-1px) scale(0.995); }
+  button, .chip {
+    transition: background-color var(--dur-hover) var(--ease-standard),
+      color var(--dur-hover) var(--ease-standard),
+      border-color var(--dur-hover) var(--ease-standard),
+      transform var(--dur-press) var(--ease-standard);
+  }
+  button:active:not(:disabled), .chip:active:not(:disabled),
+  .cfg-type:active, .segmented button:active { transform: translateY(1px); }
+  .altitude-seg { transition: box-shadow var(--dur-hover) var(--ease-standard); }
+  .altitude-seg:active { transform: translateY(1px); }
+
+  /* §6.6 — a quiet breathing ring while the CTA holds keyboard focus. */
+  .cta:focus-visible { animation: eig-breathe 3200ms var(--ease-standard) infinite; }
+
+  /* Smooth stale -> fresh (P10a). */
   .results .charts-grid,
   .results .pane-grid { transition: opacity 240ms ease; }
 }
@@ -2062,5 +2198,27 @@ progress {
 
   .door {
     padding: var(--space-4);
+  }
+
+  /* Run dock → sticky bottom, always reachable (§4b.3). It hides with the
+     setup-body after the first run, handing off to the run-strip's "Run again". */
+  .setup-run-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-inline: calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--color-hairline);
+    border-bottom: none;
+    background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .setup-run-dock .cta {
+    width: 100%;
+  }
+
+  .setup-body {
+    padding-bottom: var(--space-4);
   }
 }
