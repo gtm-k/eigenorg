@@ -119,6 +119,10 @@ const state = {
   // there is nothing to be "out of date", so editing a control must NOT show the
   // stale badge or dim the (empty) charts. Reset by Start over.
   hasRun: false,
+  // Set while a Start-over cancel is unwinding an in-flight run (P10a M4/C2): it
+  // suppresses the async "run cancelled" status so the clean-slate "ready" line
+  // resetToDefault set is not stomped. Cleared in runAll's finally.
+  startingOver: false,
 };
 
 // Probe hook for the scripted acceptance measurements (Playwright): exposes
@@ -211,6 +215,10 @@ async function runAll() {
 
   /** @param {number} runIndex @returns {(p: { completedCount: number, totalIterations: number }) => void} */
   const onProgress = (runIndex) => ({ completedCount }) => {
+    // A cancel (Run/Cancel toggle or Start over) may leave in-flight progress
+    // messages queued; ignore them so a stray tick never stomps the post-cancel
+    // status (e.g. the Start-over "ready" line) or bumps the progress bar (M4/C2).
+    if (state.planCancelled) return;
     progressBar.value = runIndex * iterations + completedCount;
     setStatus(statusEl, `running… ${progressBar.value}/${totalWork} iterations (${totalRuns} runs)`, '');
   };
@@ -262,13 +270,16 @@ async function runAll() {
     }
   } catch (err) {
     if (/** @type {any} */ (err).cancelled) {
-      setStatus(statusEl, 'run cancelled', '');
+      // A Start-over cancel already set the clean-slate "ready" status
+      // (resetToDefault) — don't stomp it with "run cancelled" (M4/C2).
+      if (!state.startingOver) setStatus(statusEl, 'run cancelled', '');
     } else {
       setStatus(statusEl, `run failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
     }
   } finally {
     setRunButtons(false);
     progressBar.value = 0;
+    state.startingOver = false;
     // A preset picked mid-run scheduled an auto-rerun (decision 6). Now that the
     // cancelled plan has fully unwound and the client is idle, run the picked
     // preset. queueMicrotask defers past this finally so runAll re-enters clean.
@@ -704,6 +715,7 @@ function resetToDefault() {
   if (client.busy) {
     state.pendingRerun = false;
     state.planCancelled = true;
+    state.startingOver = true; // suppress the async "run cancelled" status (M4/C2)
     client.cancel();
   }
   state.generation += 1;
