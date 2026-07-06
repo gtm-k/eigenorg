@@ -1452,7 +1452,9 @@ progress {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   letter-spacing: 0.01em;
-  color: var(--color-ink-tertiary);
+  /* ink-subtle (~6.2:1), not the spec's ink-tertiary (~3.4:1) — clears AA for this
+     12px reassurance text, consistent with the eyebrow AA fix (§2b). */
+  color: var(--color-ink-subtle);
 }
 
 /* Hero: asymmetric split — copy left, signature right (≥960px); stacked below. */
