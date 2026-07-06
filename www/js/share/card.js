@@ -97,6 +97,7 @@ export function cardHeadline(m) {
  *
  * @param {{
  *   scenarioLabel: string, beforeSh: number, afterSh: number, primarySh: number,
+ *   shRiskThreshold?: number,
  *   beforeEntropy: Array<any>, afterEntropy: Array<any>,
  *   decisionLatency: Array<any>, throughput: Array<any>, coordinationTax: Array<any>, entropy: Array<any>,
  *   aiActive: boolean, injectStep: number | null,
@@ -114,17 +115,22 @@ export function cardModel(snap) {
   /** @type {Array<{ label: string, value: string }>} */
   const stats = [];
 
+  // The entropy change from the AI injection to the horizon end. Drives BOTH the
+  // "Entropy after AI" chip sign AND (below) whether the subhead may claim
+  // dysfunction — so the two can never disagree on the PUBLIC share artifact.
+  let entropyChangeAfterAi = 0;
+
   if (snap.aiActive && snap.injectStep !== null) {
     // The seduction (throughput up) AND the cost (entropy up), both from the
-    // SAME broken-org run around the injection — the fdSeductiveThroughput /
+    // SAME strained-org run around the injection — the fdSeductiveThroughput /
     // fdEntropyWorsens story. Windows mirror the golden's [pre] vs [post].
     const inject = snap.injectStep;
     const pre = windowMeanP50(snap.throughput, inject - 7, inject - 1);
     const post = windowMeanP50(snap.throughput, inject + 1, inject + 7);
     const throughputBoostPct = pre > 0 ? Math.round((post / pre - 1) * 100) : 0;
-    const entropyRisePts = Math.round(finalP50(snap.entropy) - p50At(snap.entropy, inject));
+    entropyChangeAfterAi = Math.round(finalP50(snap.entropy) - p50At(snap.entropy, inject));
     stats.push({ label: 'Throughput after AI', value: `${signed(throughputBoostPct)}%` });
-    stats.push({ label: 'Entropy after AI', value: `${signed(entropyRisePts)} pts` });
+    stats.push({ label: 'Entropy after AI', value: `${signed(entropyChangeAfterAi)} pts` });
     stats.push({ label: 'Coordination tax', value: `${coordinationTaxPct}%` });
   } else {
     stats.push({ label: 'Throughput', value: `${throughputPerStep.toFixed(1)}/step` });
@@ -140,9 +146,31 @@ export function cardModel(snap) {
     ? `${snap.scenarioLabel} · AI on a Structural-Health-${snap.primarySh} org`
     : snap.scenarioLabel;
 
-  const subhead = snap.aiActive
-    ? 'Layering AI on low Structural Health moves work faster and makes it more disordered — faster dysfunction.'
-    : 'Org performance is a property of structure, not headcount.';
+  // The AI-branch subhead is DERIVED from THIS run so it can never contradict the
+  // eyebrow SH or the "Entropy after AI" chip sign (MED-4; fdSeductiveThroughput
+  // must-not-oversell on the artifact that travels alone). The faster-dysfunction
+  // narrative is gated on BOTH a fragile structure (primarySh at or below the
+  // model's shRiskThreshold — read from resolvedParams, no hardcoded threshold)
+  // AND a positive entropy change. When SH is high OR entropy did not rise, an
+  // accurate relief / guardrailed-improvement subhead is emitted instead. A
+  // missing/NaN threshold fails safe (fragileStructure = false → no over-claim).
+  const shRiskThreshold = Number(snap.shRiskThreshold);
+  const fragileStructure = Number.isFinite(shRiskThreshold) && Number(snap.primarySh) <= shRiskThreshold;
+  const entropyRoseAfterAi = entropyChangeAfterAi > 0;
+
+  let subhead;
+  if (!snap.aiActive) {
+    subhead = 'Org performance is a property of structure, not headcount.';
+  } else if (fragileStructure && entropyRoseAfterAi) {
+    subhead = 'Layering AI on low Structural Health moves work faster and makes it more disordered — faster dysfunction.';
+  } else if (entropyRoseAfterAi) {
+    // Entropy rose but the structure is not fragile: name the rise, never call it
+    // dysfunction (stays consistent with the positive entropy chip).
+    subhead = 'AI speeds the work, and at this Structural Health the added entropy stays governed rather than compounding.';
+  } else {
+    // Entropy did not rise (any SH): AI relief / guardrailed improvement.
+    subhead = 'AI speeds the work while this structure keeps entropy in check — the guardrails absorb the injection.';
+  }
 
   return {
     width: CARD_WIDTH,
@@ -152,8 +180,21 @@ export function cardModel(snap) {
     subhead,
     stats,
     latencyDays,
-    before: { sh: snap.beforeSh, series: snap.beforeEntropy, label: `Structural Health ${snap.beforeSh}` },
-    after: { sh: snap.afterSh, series: snap.afterEntropy, label: `Structural Health ${snap.afterSh}` },
+    // Neutral structural descriptors (BINDING non-judgmental register — the SH
+    // number already conveys the pole; the org is never labelled "broken"). The
+    // legend text is computed here so the descriptor lives in exactly one place.
+    before: {
+      sh: snap.beforeSh,
+      series: snap.beforeEntropy,
+      label: `Structural Health ${snap.beforeSh}`,
+      legend: `Structural Health ${snap.beforeSh} (strained)`,
+    },
+    after: {
+      sh: snap.afterSh,
+      series: snap.afterEntropy,
+      label: `Structural Health ${snap.afterSh}`,
+      legend: `Structural Health ${snap.afterSh} (sound)`,
+    },
     yMax,
     framing: 'A thinking aid grounded in research — not a prediction engine.',
     meta: `eigenorg · model v${snap.modelVersion} · seed ${snap.seed}`,
@@ -189,8 +230,8 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 /**
- * Draw the before/after entropy visual: two lines (broken pole = solid accent,
- * healthy pole = dashed muted) on a shared y scale. Not colour-alone — each line
+ * Draw the before/after entropy visual: two lines (strained pole = solid accent,
+ * sound pole = dashed muted) on a shared y scale. Not colour-alone — each line
  * carries a text label + its end value, and the two use different dash patterns.
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} model
@@ -273,7 +314,7 @@ function drawBeforeAfter(ctx, model, x, y, w, h) {
   ctx.lineTo(plotX + 26, legY);
   ctx.stroke();
   ctx.fillStyle = CARD_COLORS.inkMuted;
-  ctx.fillText(`${model.before.label} (broken)`, plotX + 34, legY);
+  ctx.fillText(model.before.legend, plotX + 34, legY);
   // healthy
   const mid = plotX + Math.round(plotW / 2);
   ctx.strokeStyle = CARD_COLORS.inkSubtle;
@@ -283,7 +324,7 @@ function drawBeforeAfter(ctx, model, x, y, w, h) {
   ctx.lineTo(mid + 26, legY);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillText(`${model.after.label} (healthy)`, mid + 34, legY);
+  ctx.fillText(model.after.legend, mid + 34, legY);
 }
 
 /** Rounded-rect path helper.
@@ -393,10 +434,48 @@ export function canvasToPngBlob(canvas) {
   });
 }
 
+// ---- export/share feature detection (pure; the DOM paths are Playwright-covered) ----
+
+/**
+ * Whether the full Web-Share-with-files path is usable (MED-3): navigator.share
+ * AND navigator.canShare must BOTH be functions — canShare alone is not enough,
+ * since checking only canShare can call an absent share() — and File must be
+ * constructible for the image payload. Pure so the detection is node-testable.
+ * @param {any} nav a navigator-like object
+ * @param {any} FileCtor the File constructor (window.File)
+ * @returns {boolean}
+ */
+export function canShareFiles(nav, FileCtor) {
+  return (
+    !!nav &&
+    typeof nav.share === 'function' &&
+    typeof nav.canShare === 'function' &&
+    typeof FileCtor === 'function'
+  );
+}
+
+/**
+ * Whether the `<a download>` attribute is supported (MED-3). When it is not, the
+ * export opens the blob in a new tab so the user can save it manually rather than
+ * silently doing nothing. Pure given a document-like factory.
+ * @param {any} doc a document-like object exposing createElement
+ * @returns {boolean}
+ */
+export function downloadAttributeSupported(doc) {
+  return !!doc && typeof doc.createElement === 'function' && 'download' in doc.createElement('a');
+}
+
 // ---- DOM controller ----------------------------------------------------------
 
 /**
  * Wire the card preview + download + share controls.
+ *
+ * Export/share browser matrix (MED-3 — the fallback ladder never dead-ends):
+ *   • Web Share with files (canShareFiles) → the native share sheet.
+ *   • Share unsupported OR a non-cancel share failure → best available export.
+ *   • Export: `<a download>` supported → direct PNG download; else window.open the
+ *     blob so the user can save it manually (pop-up blocked → an actionable note).
+ *   • A user-cancelled share sheet (AbortError) leaves the card untouched.
  *
  * @param {{
  *   canvas: HTMLCanvasElement,
@@ -412,11 +491,15 @@ export function wireCard(els) {
 
   const filename = 'eigenorg-card.png';
 
-  async function download() {
-    if (!snapshot) return;
-    try {
-      const blob = await canvasToPngBlob(els.canvas);
-      const url = URL.createObjectURL(blob);
+  /**
+   * Best available NON-share export: a direct PNG download when `<a download>` is
+   * supported, otherwise open the blob so the user can save it manually. Returns
+   * the observable status message (never silently no-ops). @returns {Promise<string>}
+   */
+  async function exportCard() {
+    const blob = await canvasToPngBlob(els.canvas);
+    const url = URL.createObjectURL(blob);
+    if (downloadAttributeSupported(document)) {
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
@@ -425,7 +508,21 @@ export function wireCard(els) {
       a.remove();
       // Revoke on the next frame so the click has consumed the URL.
       requestAnimationFrame(() => URL.revokeObjectURL(url));
-      els.statusEl.textContent = 'Card downloaded — 1200×628 PNG, ready to post.';
+      return 'Card downloaded — 1200×628 PNG, ready to post.';
+    }
+    // No download-attribute support (older / embedded webviews): open the PNG so
+    // it can be saved via the browser's own controls.
+    const opened = window.open(url, '_blank');
+    window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+    return opened
+      ? 'Card opened in a new tab — use your browser to save the 1200×628 PNG.'
+      : 'Card ready — allow pop-ups, or long-press the preview, to save the 1200×628 PNG.';
+  }
+
+  async function download() {
+    if (!snapshot) return;
+    try {
+      els.statusEl.textContent = await exportCard();
     } catch (err) {
       els.statusEl.textContent = `Could not export the card: ${err instanceof Error ? err.message : String(err)}`;
     }
@@ -433,28 +530,36 @@ export function wireCard(els) {
 
   async function share() {
     if (!snapshot) return;
-    try {
-      const blob = await canvasToPngBlob(els.canvas);
-      const FileCtor = /** @type {any} */ (window).File;
-      const nav = /** @type {any} */ (navigator);
-      if (FileCtor && nav.canShare) {
+    const nav = /** @type {any} */ (navigator);
+    const FileCtor = /** @type {any} */ (window).File;
+
+    if (canShareFiles(nav, FileCtor)) {
+      try {
+        const blob = await canvasToPngBlob(els.canvas);
         const file = new FileCtor([blob], filename, { type: 'image/png' });
         if (nav.canShare({ files: [file] })) {
           await nav.share({
             files: [file],
             title: 'eigenorg',
-            text: snapshot ? cardHeadline({ latencyDays: Math.round(finalP50(snapshot.decisionLatency)) }) : 'eigenorg',
+            text: cardHeadline({ latencyDays: Math.round(finalP50(snapshot.decisionLatency)) }),
           });
           els.statusEl.textContent = 'Shared.';
           return;
         }
+        // canShare rejected this payload → fall through to the export fallback.
+      } catch (err) {
+        if (/** @type {any} */ (err)?.name === 'AbortError') return; // user cancelled the share sheet
+        // A genuine share failure (not a user cancel) → fall through to export so
+        // the user is NEVER left with a dead "Could not share" and no artifact.
       }
-      // No share target (or no file-share support): fall back to download.
-      els.statusEl.textContent = 'Sharing is not available here — downloading the card instead.';
-      await download();
+    }
+
+    // Unsupported share path OR a non-cancel share failure: fall back to the best
+    // available export — always an observable outcome.
+    try {
+      els.statusEl.textContent = `Couldn't share on this device — ${await exportCard()}`;
     } catch (err) {
-      if (/** @type {any} */ (err)?.name === 'AbortError') return; // user cancelled the share sheet
-      els.statusEl.textContent = `Could not share the card: ${err instanceof Error ? err.message : String(err)}`;
+      els.statusEl.textContent = `Could not export the card: ${err instanceof Error ? err.message : String(err)}`;
     }
   }
 

@@ -10,6 +10,8 @@ import assert from 'node:assert/strict';
 import {
   cardModel,
   cardHeadline,
+  canShareFiles,
+  downloadAttributeSupported,
   CARD_WIDTH,
   CARD_HEIGHT,
   HEADLINE_FONT_PX,
@@ -25,7 +27,7 @@ function series(n, p50Fn) {
   });
 }
 
-/** A Faster-Dysfunction-like snapshot: broken org, active AI at step 15. */
+/** A Faster-Dysfunction-like snapshot: strained org (SH below threshold), active AI at step 15. */
 function fdSnapshot() {
   const N = 50;
   return {
@@ -33,6 +35,7 @@ function fdSnapshot() {
     beforeSh: 3,
     afterSh: 7,
     primarySh: 3,
+    shRiskThreshold: 4, // from resolvedParams: primarySh 3 <= 4 → fragile structure
     beforeEntropy: series(N, (t) => 30 + t),
     afterEntropy: series(N, () => 28),
     decisionLatency: series(N, (t) => 10 + t / 3), // final p50 ≈ 26.3
@@ -45,6 +48,23 @@ function fdSnapshot() {
     aiOffEntropy: series(N, () => 30),
     modelVersion: '2.1.0',
     seed: 42,
+  };
+}
+
+/**
+ * A high-Structural-Health AI run where AI HELPS: SH is above the risk threshold
+ * and entropy does NOT rise after the injection (M9 guardrail + coordination
+ * relief). The subhead must NOT claim faster dysfunction on this run.
+ */
+function highShSnapshot() {
+  const N = 50;
+  return {
+    ...fdSnapshot(),
+    scenarioLabel: 'AI adoption',
+    beforeSh: 3,
+    afterSh: 9,
+    primarySh: 9, // above shRiskThreshold (4) → structure is not fragile
+    entropy: series(N, () => 40), // flat: entropy does NOT rise after AI
   };
 }
 
@@ -105,4 +125,76 @@ test('the framing line is part of the card model (it travels on the PNG — VISI
 
 test('cardHeadline is the single swappable copy string', () => {
   assert.equal(cardHeadline({ latencyDays: 9 }), '9 working days to clear one decision');
+});
+
+// ---- MED-4: the AI subhead is DERIVED from the run (never self-contradicting) ----
+
+test('MED-4: the low-SH Faster-Dysfunction run reads the faster-dysfunction subhead', () => {
+  const m = cardModel(fdSnapshot());
+  assert.match(m.subhead, /faster dysfunction/i);
+  assert.match(m.subhead, /more disordered/i);
+});
+
+test('MED-4: a high-SH AI run does NOT claim "more disordered" when entropy did not rise', () => {
+  const m = cardModel(highShSnapshot());
+  assert.ok(!/more disordered/i.test(m.subhead), `high-SH subhead must not claim more disorder: "${m.subhead}"`);
+  assert.ok(!/faster dysfunction/i.test(m.subhead), `high-SH subhead must not claim faster dysfunction: "${m.subhead}"`);
+  // …and it reads as relief / guardrailed improvement instead.
+  assert.match(m.subhead, /in check|absorb|governed/i);
+});
+
+test('MED-4: the subhead never contradicts the "Entropy after AI" chip sign', () => {
+  const m = cardModel(highShSnapshot());
+  const ent = m.stats.find((/** @type {any} */ s) => s.label === 'Entropy after AI');
+  assert.ok(ent, 'an entropy chip must be present on an AI run');
+  // Flat entropy → chip is not positive, so the subhead must not claim a rise.
+  assert.ok(!/^\+[1-9]/.test(ent.value), `entropy chip should not be positive here: ${ent.value}`);
+  assert.ok(!/more disordered/i.test(m.subhead));
+});
+
+test('MED-4: high SH but entropy rose — names the rise as governed, not dysfunction', () => {
+  // fdSnapshot entropy rises, but primarySh 9 is above the threshold → not fragile.
+  const m = cardModel({ ...fdSnapshot(), primarySh: 9 });
+  assert.ok(!/faster dysfunction/i.test(m.subhead), `not fragile → not dysfunction: "${m.subhead}"`);
+  assert.match(m.subhead, /governed|stays/i);
+});
+
+test('MED-4: shRiskThreshold is read from the run (no hardcoded threshold) — a missing threshold fails safe', () => {
+  // No shRiskThreshold on the snapshot → fragileStructure is false → no over-claim,
+  // even though entropy rose. (The card never invents the boundary.)
+  const { shRiskThreshold, ...noThreshold } = fdSnapshot();
+  void shRiskThreshold;
+  const m = cardModel(noThreshold);
+  assert.ok(!/faster dysfunction/i.test(m.subhead), `missing threshold must not claim dysfunction: "${m.subhead}"`);
+});
+
+// ---- MED-3: export / share feature detection (DOM paths are Playwright-covered) --
+
+test('MED-3: canShareFiles requires share AND canShare to be functions (not canShare alone)', () => {
+  const File = function () {};
+  assert.equal(canShareFiles({ share() {}, canShare() { return true; } }, File), true);
+  // The exact bug: canShare present but share() ABSENT must NOT read as shareable.
+  assert.equal(canShareFiles({ canShare() { return true; } }, File), false);
+  assert.equal(canShareFiles({ share() {} }, File), false); // canShare absent
+  assert.equal(canShareFiles({ share() {}, canShare() {} }, undefined), false); // no File ctor
+  assert.equal(canShareFiles(null, File), false);
+});
+
+test('MED-3: downloadAttributeSupported detects the <a download> attribute', () => {
+  const withDownload = { createElement: () => ({ download: '' }) };
+  const withoutDownload = { createElement: () => ({}) };
+  assert.equal(downloadAttributeSupported(withDownload), true);
+  assert.equal(downloadAttributeSupported(withoutDownload), false); // no download attr → open() fallback
+  assert.equal(downloadAttributeSupported(null), false);
+});
+
+// ---- MED-5: neutral structural descriptors (BINDING non-judgmental register) -----
+
+test('MED-5: the before/after legend uses neutral descriptors (no "broken"/"healthy")', () => {
+  const m = cardModel(fdSnapshot());
+  assert.equal(m.before.legend, 'Structural Health 3 (strained)');
+  assert.equal(m.after.legend, 'Structural Health 7 (sound)');
+  for (const legend of [m.before.legend, m.after.legend]) {
+    assert.ok(!/broken|healthy/i.test(legend), `legend must be non-judgmental: "${legend}"`);
+  }
 });

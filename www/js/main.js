@@ -384,6 +384,10 @@ function paintResults(r) {
     beforeSh: plan.beforeSh,
     afterSh: plan.afterSh,
     primarySh: Number(config.org.structuralHealth),
+    // The fragile/absorbs boundary, read LIVE from this run's resolvedParams
+    // (no hardcoded threshold) so the card's AI subhead can never over-claim
+    // dysfunction on a high-SH run (MED-4).
+    shRiskThreshold: Number(output.resolvedParams?.shRiskThreshold),
     beforeEntropy: beforeRun.output.series.entropy,
     afterEntropy: afterRun.output.series.entropy,
     decisionLatency: output.series.decisionLatency,
