@@ -45,7 +45,8 @@ function elc(tag, cls, text) {
  *   onEnter?: (id: string) => void,
  *   onStartOver?: () => void,
  * }} opts
- * @returns {{ enter: (id: string) => void, showLanding: () => void,
+ * @returns {{ enter: (id: string, opts?: { focus?: boolean }) => void,
+ *             showLanding: (opts?: { focusFirstDoor?: boolean }) => void,
  *             activeDoor: () => string | null }}
  */
 export function createNavShell(opts) {
@@ -119,8 +120,14 @@ export function createNavShell(opts) {
     }
   }
 
-  /** @param {string} id */
-  function enterDoor(id) {
+  /**
+   * @param {string} id
+   * @param {{ focus?: boolean }} [opts2] move focus to the active toggle segment
+   *   on entry — true for a USER-initiated entry (door click / toggle switch),
+   *   false for the boot-time replay entry so nothing steals focus on load.
+   */
+  function enterDoor(id, opts2 = {}) {
+    const { focus = true } = opts2;
     const door = opts.doors.find((d) => d.id === id);
     if (!door) return;
     active = id;
@@ -139,20 +146,27 @@ export function createNavShell(opts) {
     }
     paintToggle(id);
     const seg = segButtons.get(id);
-    if (seg) seg.focus(); // announce the active altitude to keyboard/AT users
+    // Announce the active altitude to keyboard/AT users on a user-initiated
+    // entry; preventScroll so a programmatic focus never yanks the page.
+    if (focus && seg) seg.focus({ preventScroll: true });
     opts.onEnter?.(id);
   }
 
-  function showLanding() {
+  /**
+   * @param {{ focusFirstDoor?: boolean }} [opts2] focus the first door — true
+   *   only for the Start-over click (a user action); false on the boot-time
+   *   fresh-visit call, so the reader lands on the h1 + lede, not a focus ring.
+   */
+  function showLanding(opts2 = {}) {
     active = null;
     opts.shell.hidden = true;
     opts.landing.hidden = false;
     paintToggle(null);
-    if (doorButtons[0]) doorButtons[0].focus();
+    if (opts2.focusFirstDoor && doorButtons[0]) doorButtons[0].focus({ preventScroll: true });
   }
 
   opts.startOver.addEventListener('click', () => {
-    showLanding();
+    showLanding({ focusFirstDoor: true });
     opts.onStartOver?.();
   });
 

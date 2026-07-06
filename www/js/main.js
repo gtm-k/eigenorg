@@ -115,6 +115,10 @@ const state = {
   // A preset pick that lands mid-run sets this so the in-flight plan's unwind
   // auto-runs the picked preset (decision 6). A control edit / Cancel clears it.
   pendingRerun: false,
+  // True once a run has completed and painted (P10a M1). Before the first run
+  // there is nothing to be "out of date", so editing a control must NOT show the
+  // stale badge or dim the (empty) charts. Reset by Start over.
+  hasRun: false,
 };
 
 // Probe hook for the scripted acceptance measurements (Playwright): exposes
@@ -442,11 +446,13 @@ function paintResults(r) {
     primaryConfig: plan.primary,
   };
 
-  // P10a re-run model: the charts now match the setup — reveal the persistent
-  // "Run again" (only meaningful once a run exists), play the one-shot chart
-  // reveal, drop the stale badge and collapse the setup panel to its "Your
-  // setup" chips (markResultsFresh). Idempotent: the CSS reveal animation plays
-  // only the first time the class lands.
+  // P10a re-run model: the charts now match the setup — record that a run has
+  // completed (M1 stale-guard), reveal the persistent "Run again" (only
+  // meaningful once a run exists), play the one-shot chart reveal, drop the
+  // stale badge and collapse the setup panel to its "Your setup" chips
+  // (markResultsFresh). Idempotent: the CSS reveal animation plays only the
+  // first time the class lands.
+  state.hasRun = true;
   el('#run-button-2').hidden = false;
   el('#org-results').classList.add('charts-revealed');
   markResultsFresh();
@@ -659,11 +665,14 @@ function refreshSetupChips() {
   orgStrip.setChips(orgSetupChips(state.config, currentScenarioLabel()));
 }
 
-/** A staged edit: charts no longer match the setup — show the stale badge. */
+/** A staged edit: charts no longer match the setup — show the stale badge.
+ *  Before the first run there are no results to be "out of date" (M1): keep the
+ *  chips fresh but never show the stale badge or dim the empty charts. */
 function markResultsStale() {
+  refreshSetupChips();
+  if (!state.hasRun) return;
   el('#org-results').classList.add('is-stale');
   orgStrip.markStale();
-  refreshSetupChips();
 }
 
 /** A completed run: charts match the setup again — collapse setup to the chips. */
@@ -678,6 +687,57 @@ function markResultsFresh() {
   orgStrip.markFresh();
   const runAgain = /** @type {HTMLButtonElement} */ (el('#run-button-2'));
   if (focusWasInSetup && !runAgain.hidden) runAgain.focus();
+}
+
+/**
+ * "Start over" (spec §6): return Organization Building to a clean slate. Cancels
+ * any in-flight run (no late paint of an abandoned run — C2), clears replay /
+ * share / card state, reloads the default preset, resets the results region +
+ * setup strip to their pre-run state, and restores the boot "ready" status.
+ * Modeled on boot()'s fresh-visit init so the two stay consistent. (Full guided-
+ * flow replay is P10b; P10a just needs a coherent clean re-entry — M4.)
+ */
+function resetToDefault() {
+  // Cancel an in-flight plan the same way the Run/Cancel toggle does, and bump
+  // the generation so any completion still in flight lands STALE and never
+  // paints a run the user abandoned (C2).
+  if (client.busy) {
+    state.pendingRerun = false;
+    state.planCancelled = true;
+    client.cancel();
+  }
+  state.generation += 1;
+
+  // Clear replay, disarm the share/card exports, drop any '#s=' fragment + banner.
+  state.replayPayload = null;
+  state.replayConfig = null;
+  share.disarm();
+  card.disarm();
+  clearShareHash();
+  bannerEl.hidden = true;
+  onboarding.hide(); // dismiss the once-only diagnostic if it was on screen
+
+  // Reload the default preset into the single canonical config.
+  state.presetId = DEFAULT_PRESET_ID;
+  const preset = state.presets.get(DEFAULT_PRESET_ID);
+  const ref = PRESET_REFS.find((p) => p.id === DEFAULT_PRESET_ID);
+  state.config = primaryRunConfig(preset, /** @type {any} */ (ref));
+  picker.setActive(DEFAULT_PRESET_ID);
+  el('#preset-note').textContent = presetNote(preset);
+  configurator.setCompareDefault(false);
+
+  // Reset the results region + setup strip to the pre-run state.
+  state.hasRun = false;
+  el('#org-results').classList.remove('charts-revealed', 'is-stale');
+  el('#run-button-2').hidden = true;
+  orgStrip.markFresh(); // hide the stale badge + collapse …
+  orgStrip.expand(); // … then reopen the controls for a fresh setup
+
+  controls.refresh();
+  configurator.refresh();
+  refreshSetupChips();
+  setRunButtons(false);
+  setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
 }
 
 // The two-altitude nav shell (spec §4). Doors are registered by { id, label,
@@ -712,6 +772,7 @@ const nav = createNavShell({
   onEnter(id) {
     if (id === 'org') resizeCharts(); // charts were sized while the mount was hidden
   },
+  onStartOver: resetToDefault,
 });
 
 for (const b of runButtons) b.addEventListener('click', () => void runAll());
@@ -751,9 +812,15 @@ async function boot() {
   // run, against the engine-stamped modelVersion.
   /** @type {any} */
   let replayBoot = null;
+  // A '#s=' that is present but malformed/unsupported must NOT fail silently:
+  // the decode error status below is kept visible (the "ready…" line is skipped
+  // when this is set) so a broken shared link is observable (C1; pre-existing —
+  // line 786 previously overwrote the error unconditionally).
+  let decodeError = false;
   try {
     replayBoot = await readShareFromHash(window.location.hash, null);
   } catch (err) {
+    decodeError = true;
     setStatus(statusEl, `could not open the shared link: ${err instanceof Error ? err.message : String(err)}`, 'error');
   }
 
@@ -783,15 +850,21 @@ async function boot() {
   setRunButtons(false);
   refreshSetupChips();
   probe.bootReadyMs = performance.now(); // navigation start → Run clickable
-  setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
+  // C1: keep a share-link decode error visible; only announce "ready" when the
+  // link (if any) decoded cleanly, so a broken '#s=' is never silently swallowed.
+  if (!decodeError) {
+    setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
+  }
 
   if (replayBoot) {
     // A shared link is an Organization run: open that door directly (skipping
-    // the landing) and replay without a click.
-    nav.enter('org');
+    // the landing) and replay without a click. No focus-on-load (M2): the entry
+    // is programmatic, not a user action.
+    nav.enter('org', { focus: false });
     void runAll();
   } else {
     // A fresh visit lands on the two doors; the user picks an altitude to enter.
+    // No focus-on-load — the reader sees the h1 + lede first (M2).
     nav.showLanding();
   }
 }
