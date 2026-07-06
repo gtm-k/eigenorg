@@ -14,6 +14,7 @@ import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 
 import {
   floatLiterals,
@@ -23,8 +24,10 @@ import {
   ALLOWED,
 } from './check_no_coefficient_literals.mjs';
 
-const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const here = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(here, '..');
 const wwwJs = join(repoRoot, 'www', 'js');
+const gateScript = join(here, 'check_no_coefficient_literals.mjs');
 
 // ---- scanner accuracy ----------------------------------------------------------
 
@@ -99,4 +102,37 @@ test('the real www/js tree is CLEAN (the committed clean state)', () => {
     [],
     `unexpected coefficient literals in www/js:\n${violations.map((v) => `${v.file}:${v.line} ${v.literal} — ${v.text}`).join('\n')}`,
   );
+});
+
+// ---- CLI exit plumbing (FOLD-A) ------------------------------------------------
+//
+// The tests above exercise scanFile/scanTree; these SPAWN the gate as CI does so
+// the exit-code plumbing itself (process.exit(1) on a violation, exit 0 when
+// clean) is covered — a scanner that finds violations but never fails the process
+// would still let a coefficient through CI.
+
+test('CLI: the gate EXITS NON-ZERO on a planted coefficient tree', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eigenorg-coef-cli-'));
+  try {
+    writeFileSync(join(dir, 'smuggled.js'), 'export const k = 0.073;\n', 'utf8');
+    const res = spawnSync(process.execPath, [gateScript, dir], { encoding: 'utf8' });
+    assert.notEqual(res.status, 0, `expected a non-zero exit; got ${res.status}\n${res.stderr}`);
+    assert.match(res.stderr, /0\.073/, 'the offending literal is named on stderr');
+    assert.match(res.stderr, /FAIL/, 'the failure line is printed');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('CLI: the gate EXITS ZERO on a clean tree (integers are not coefficients)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'eigenorg-coef-cli-'));
+  try {
+    // Bare integers only (the §3.4 SH-mapping's 9/10 shape) → no float violations.
+    writeFileSync(join(dir, 'ok.js'), 'const sh = 1 + Math.round((9 * total) / 10);\n', 'utf8');
+    const res = spawnSync(process.execPath, [gateScript, dir], { encoding: 'utf8' });
+    assert.equal(res.status, 0, `expected exit 0; got ${res.status}\n${res.stderr}`);
+    assert.match(res.stdout, /clean/, 'the clean message is printed');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

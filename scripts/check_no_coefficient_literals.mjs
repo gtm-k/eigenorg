@@ -17,11 +17,21 @@
 // ALLOWED list below (documented structural constants), or the gate fails.
 //
 // String and comment contents are stripped before scanning, so copy prose and
-// rgba() colour alphas never false-match. KNOWN OUT-OF-SCOPE (documented, same
-// bar as the pkg-isolation gate's string-concat note): a coefficient smuggled
-// through string concatenation or arithmetic on integer literals defeats any
-// lexical gate; the derive-from-resolvedParams convention + code review cover
-// that residue. This gate is the structural tripwire against the common case.
+// rgba() colour alphas never false-match.
+//
+// KNOWN OUT-OF-SCOPE (documented, same bar as the pkg-isolation gate's
+// string-concat note):
+//   1. String-concat / integer-arithmetic smuggling: a coefficient assembled
+//      through string concatenation or arithmetic on integer literals defeats any
+//      lexical gate; the derive-from-resolvedParams convention + code review
+//      cover that residue.
+//   2. FLOATS ONLY: this gate flags FLOAT literals; a bare INTEGER is never
+//      treated as a coefficient (array indices, canvas dimensions, step counts —
+//      and integer model constants such as the §3.4 SH-mapping's 9 and 10). Those
+//      integer model constants are covered by code review + the Rust-side
+//      mechanics_lint, NOT by this gate; matching the Rust scanner's float-only
+//      posture keeps the two lints aligned.
+// This gate is the structural tripwire against the common case.
 //
 // Usage: node scripts/check_no_coefficient_literals.mjs [root]
 //   root defaults to www/js (tests point it at a planted throwaway tree).
