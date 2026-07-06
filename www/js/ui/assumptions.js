@@ -16,13 +16,6 @@
 /** The tiers a parameter may carry (MODEL.md §12.7 / §13). Text labels — never color-alone. */
 export const ALLOWED_TIERS = ['peer-reviewed', 'industry-report', 'editorial-heuristic'];
 
-/** Human-readable tier label (the drawer shows the tier as text, not a colour). @type {Record<string, string>} */
-const TIER_LABEL = {
-  'peer-reviewed': 'peer-reviewed',
-  'industry-report': 'industry report',
-  'editorial-heuristic': 'editorial heuristic',
-};
-
 /** Fields a `parameter` item must carry for the drawer (PLAN P8 + §12.7). */
 export const REQUIRED_PARAM_FIELDS = [
   'plainLanguage',
@@ -154,8 +147,11 @@ function renderParameter(p) {
   const entry = make('details', 'assum-item');
   const summary = make('summary', 'assum-summary');
   summary.append(make('span', 'assum-id', p.id));
-  const tier = make('span', 'assum-tier', TIER_LABEL[p.tier] ?? p.tier);
-  tier.dataset.tier = p.tier; // for optional styling; the text IS the signal
+  // Render the tier VERBATIM from assumptions.json — the badge text IS the raw
+  // tier string (the drift moat: no value rewriting; PREMORTEM Story 3). Any
+  // presentational treatment keys off data-tier in CSS, never the text.
+  const tier = make('span', 'assum-tier', p.tier);
+  tier.dataset.tier = p.tier; // CSS styling hook; the verbatim text IS the signal
   summary.appendChild(tier);
   entry.appendChild(summary);
 

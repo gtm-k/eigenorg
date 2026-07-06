@@ -18,6 +18,7 @@ import {
   ALLOWED_TIERS,
   partitionItems,
   validateAssumptions,
+  renderAssumptionsDrawer,
 } from '../ui/assumptions.js';
 
 const assumptionsPath = path.join(
@@ -106,4 +107,103 @@ test('partitionItems preserves document order within each group (parameters then
   );
   assert.ok(lastParamIndex < firstMechanicIndex, 'parameters must all precede mechanics in document order');
   assert.equal(parameters.length + mechanics.length, data.items.length);
+});
+
+// ---- MED-1: the tier badge renders assumptions.json VERBATIM (the drift moat) ----
+//
+// The drawer must render every tier value EXACTLY as the extracted artifact holds
+// it (PREMORTEM Story 3: no value rewriting, or three sources of truth drift). A
+// prior label map rewrote 'industry-report' → 'industry report' in the badge text;
+// these tests pin the badge text to the raw tier string via a minimal DOM stub.
+
+/** A minimal DOM element stub sufficient for assumptions.js `make()` + drawer append. */
+function fakeElement(/** @type {string} */ tag) {
+  return {
+    tagName: tag,
+    className: '',
+    textContent: '',
+    /** @type {Record<string, string>} */ dataset: {},
+    hidden: false,
+    /** @type {any[]} */ children: [],
+    setAttribute() {},
+    appendChild(/** @type {any} */ n) {
+      this.children.push(n);
+      return n;
+    },
+    append(/** @type {any[]} */ ...ns) {
+      for (const n of ns) this.children.push(n);
+    },
+  };
+}
+
+/**
+ * Run `fn(doc)` with a minimal `globalThis.document` installed (assumptions.js
+ * `make()` reads the global), restoring the prior value after. The same stub is
+ * passed to `fn` so callers never reference the browser global directly.
+ * @param {(doc: any) => void} fn
+ */
+function withFakeDom(fn) {
+  const prev = /** @type {any} */ (globalThis).document;
+  const doc = {
+    createElement: (/** @type {string} */ t) => fakeElement(t),
+    createTextNode: (/** @type {string} */ t) => ({ nodeType: 3, textContent: t, children: [] }),
+  };
+  /** @type {any} */ (globalThis).document = doc;
+  try {
+    fn(doc);
+  } finally {
+    /** @type {any} */ (globalThis).document = prev;
+  }
+}
+
+/** Depth-first collect every node whose className === cls. */
+function collectByClass(/** @type {any} */ node, /** @type {string} */ cls, /** @type {any[]} */ out = []) {
+  if (node && node.className === cls) out.push(node);
+  if (node && Array.isArray(node.children)) for (const c of node.children) collectByClass(c, cls, out);
+  return out;
+}
+
+test('MED-1: the tier badge text is the RAW assumptions.json tier string (no rewriting)', () => {
+  // A synthetic parameter whose tier is one the old label map rewrote
+  // ('industry-report' → 'industry report'): the badge must show it verbatim.
+  const data = {
+    modelVersion: '9.9.9',
+    items: [
+      {
+        type: 'parameter',
+        id: 'p_probe',
+        plainLanguage: 'probe',
+        formula: 'x',
+        tier: 'industry-report',
+        limitation: 'x',
+        anchor: 'x',
+        value: 1,
+        range: [0, 2],
+        unit: 'u',
+        distribution: 'point',
+      },
+    ],
+  };
+  withFakeDom((doc) => {
+    const root = doc.createElement('div');
+    renderAssumptionsDrawer(/** @type {any} */ (root), data);
+    const badges = collectByClass(root, 'assum-tier');
+    assert.equal(badges.length, 1);
+    assert.equal(badges[0].textContent, 'industry-report'); // VERBATIM, NOT "industry report"
+    assert.equal(badges[0].dataset.tier, 'industry-report');
+  });
+});
+
+test('MED-1: every rendered tier badge equals its parameter\'s raw tier in the live artifact', () => {
+  const data = liveAssumptions();
+  const { parameters } = partitionItems(data.items);
+  withFakeDom((doc) => {
+    const root = doc.createElement('div');
+    renderAssumptionsDrawer(/** @type {any} */ (root), data);
+    const badges = collectByClass(root, 'assum-tier');
+    assert.equal(badges.length, parameters.length, 'one tier badge per parameter');
+    parameters.forEach((/** @type {any} */ p, /** @type {number} */ i) => {
+      assert.equal(badges[i].textContent, p.tier, `badge ${i} must render the raw tier "${p.tier}" verbatim`);
+    });
+  });
 });
