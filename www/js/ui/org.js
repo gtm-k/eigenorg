@@ -274,11 +274,87 @@ export function renderOrgPrecis(host, config) {
 }
 
 /**
+ * Build the Structural-Health control (P10b §4d/§5): plain-lead heading +
+ * demoted `.tech-label` + `data-term` (so glossary.decorate attaches the ⓘ),
+ * the value as "N of 10", strained/sound anchors (a bare "N" carries no
+ * direction), and — when `structuralHealthHelper` is supplied — the inline
+ * "Answer 5 quick questions" helper mount. `data-term` sits on a NON-label
+ * wrapper so the ⓘ (a <details>) is a sibling of the <label>, never nested
+ * inside it.
+ * @param {HTMLElement} root
+ * @param {ControlDef} def
+ * @param {{ getConfig: () => any, onConfigChange: (config: any) => void,
+ *           structuralHealthHelper?: (mount: HTMLElement) => void }} opts
+ * @param {Array<() => void>} refreshers
+ */
+function buildStructuralHealthField(root, def, opts, refreshers) {
+  const field = document.createElement('div');
+  field.className = 'field field-sh';
+
+  const labelRow = document.createElement('div');
+  labelRow.className = 'field-label-row';
+  const lead = document.createElement('span');
+  lead.className = 'field-lead';
+  lead.dataset.term = 'structuralHealth';
+  const label = document.createElement('label');
+  label.textContent = 'How sound your org’s setup is';
+  label.htmlFor = 'ctl-structuralHealth';
+  const tech = document.createElement('span');
+  tech.className = 'tech-label';
+  tech.textContent = 'Structural Health · 1–10';
+  lead.append(label, tech); // decorate() inserts the ⓘ between the label and .tech-label
+  const valueOut = document.createElement('output');
+  valueOut.className = 'field-value';
+  valueOut.htmlFor.add('ctl-structuralHealth');
+  labelRow.append(lead, valueOut);
+
+  const input = document.createElement('input');
+  input.id = 'ctl-structuralHealth';
+  input.type = 'range';
+  input.min = String(def.min);
+  input.max = String(def.max);
+  input.step = String(def.step);
+  input.addEventListener('input', () => {
+    opts.onConfigChange(applyOrgValue(opts.getConfig(), 'structuralHealth', input.value));
+  });
+
+  // Directional anchors (§5) — non-judgmental (strained / sound, never broken).
+  const anchors = document.createElement('div');
+  anchors.className = 'field-anchors';
+  const strained = document.createElement('span');
+  strained.className = 'field-anchor';
+  strained.textContent = 'strained';
+  const sound = document.createElement('span');
+  sound.className = 'field-anchor';
+  sound.textContent = 'sound';
+  anchors.append(strained, sound);
+
+  const hint = document.createElement('p');
+  hint.className = 'field-hint';
+  hint.textContent = 'Clear ownership, finishing before starting, deciding without a meeting.';
+
+  const helperMount = document.createElement('div');
+  helperMount.className = 'sh-helper';
+
+  refreshers.push(() => {
+    const current = readOrgValues(opts.getConfig()).structuralHealth;
+    input.value = String(current);
+    valueOut.textContent = `${current} of 10`;
+  });
+
+  field.append(labelRow, input, anchors, hint, helperMount);
+  root.appendChild(field);
+
+  if (opts.structuralHealthHelper) opts.structuralHealthHelper(helperMount);
+}
+
+/**
  * Render the control grid into `root`. Controls stay ENABLED during runs
  * (PLAN P5: UI interactive mid-run); changes apply to the next run.
  *
  * @param {HTMLElement} root
- * @param {{ getConfig: () => any, onConfigChange: (config: any) => void }} opts
+ * @param {{ getConfig: () => any, onConfigChange: (config: any) => void,
+ *           structuralHealthHelper?: (mount: HTMLElement) => void }} opts
  * @returns {{ refresh: () => void }}
  */
 export function renderControls(root, opts) {
@@ -302,6 +378,13 @@ export function renderControls(root, opts) {
     // canonical range for clamping, still node-tested) — only the DOM widget
     // moves to ui/prioritization.js.
     if (def.id === 'ownershipLayers') continue;
+
+    // The Structural-Health control gets the plain-language + inline-helper
+    // treatment (§4d/§5) — a bespoke build, not the generic field path.
+    if (def.id === 'structuralHealth') {
+      buildStructuralHealthField(root, def, opts, refreshers);
+      continue;
+    }
 
     const field = document.createElement('div');
     field.className = 'field';

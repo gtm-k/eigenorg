@@ -1432,21 +1432,66 @@ progress {
 /* radio groups (keyboard + screen-reader native); nothing colour-alone.*/
 /* ==================================================================== */
 
-.panel.diagnostic {
-  border-left: 3px solid var(--color-primary);
+/* ==================================================================== */
+/* P10b §5 — optional inline Structural-Health helper (the single         */
+/* SH-configuration surface; the P8 post-result auto-offer is retired).   */
+/* The .diagnostic-* form styles below are REPURPOSED for the expander.   */
+/* ==================================================================== */
+
+/* Plain-lead wrapper carrying data-term (the ⓘ mounts here, before the
+   .tech-label). A flex item in .field-label-row that may shrink. */
+.field-lead {
+  min-width: 0;
 }
 
-.diagnostic-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: -0.4px;
-  margin: 0 0 var(--space-2);
+/* Directional anchors under the SH slider — a bare "N" carries no direction.
+   Non-judgmental (strained / sound). AA at 11px via ink-subtle. */
+.field-anchors {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+  font-size: 0.6875rem;
+  color: var(--color-ink-subtle);
 }
 
-.diagnostic-title:focus-visible {
+.sh-helper {
+  margin-top: var(--space-3);
+}
+
+/* Text-button affordance ("Not sure? …"), 44px tap target, subordinate to the
+   Run CTA — the in-family lavender-hover, not a filled button. */
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-primary-hover);
+  background: none;
+  border: none;
+  text-align: left;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-btn:focus-visible {
   outline: 2px solid var(--color-focus);
-  outline-offset: 4px;
+  outline-offset: 2px;
   border-radius: 4px;
+}
+
+.sh-helper-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+}
+
+.sh-helper-panel[hidden] {
+  display: none;
 }
 
 .diagnostic-intro {

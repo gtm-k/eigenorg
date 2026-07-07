@@ -23,7 +23,7 @@ import {
 } from './ui/runplan.js';
 import { renderControls, applyOrgValue, orgSetupChips, renderOrgPrecis } from './ui/org.js';
 import { renderConfigurator, allHumanTwin, hasNonHumanLayer, approvalStackSummary } from './ui/prioritization.js';
-import { renderOnboarding, readDiagnosticSeen, shouldShowDiagnostic } from './ui/onboarding.js';
+import { createStructuralHealthHelper } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
@@ -446,16 +446,10 @@ function paintResults(r) {
     seed: config.seed,
   });
 
-  // P8 onboarding: shown ONCE, after the FIRST genuine PRESET result — NOT on a
-  // share-URL replay (a share visitor is reproducing a specific run) and NOT on a
-  // custom-authored first run (which must not silently consume the once-only
-  // flag; MED-2, triage default 3). The run source is captured at launch
-  // (r.runPresetId). It appears under the results, never blocking landing (the
-  // user has already seen a full result by now — PREMORTEM A2).
-  if (shouldShowDiagnostic({ replay: Boolean(r.replayPayload), presetId: r.runPresetId, alreadyHandled: diagnosticHandled })) {
-    diagnosticHandled = true;
-    onboarding.show();
-  }
+  // (P10b-2) The P8 post-result diagnostic auto-offer is RETIRED — the single
+  // SH-configuration surface is now the user-initiated inline helper next to the
+  // SH control (decision log "P10b execution — pre-code folds APPLIED"), so
+  // paintResults no longer fires an onboarding interrupt.
 
   // Replay banner: informational, computed against the version the engine
   // actually stamped on this output (decision log round 1).
@@ -578,9 +572,25 @@ function stageAndRefresh(next) {
   setStatus(statusEl, 'configuration changed — run to update the charts', '');
 }
 
+// The optional inline Structural-Health helper (spec §5) — the single
+// SH-configuration surface (the P8 post-result auto-offer is retired). Captured
+// so Start over can collapse it (resetToDefault byte-equivalence). onScore writes
+// the plain slider through the SAME authoring path a control edit uses
+// (stageAndRefresh) so share disarms + replay clears, then prompts a re-run
+// (NO auto-run — the P5/P6 "edits stage, never auto-run" convention).
+/** @type {{ collapse: () => void, isExpanded: () => boolean }} */
+let shHelper = { collapse: () => {}, isExpanded: () => false };
 const controls = renderControls(el('#org-controls'), {
   getConfig: () => state.config,
   onConfigChange: stageAndRefresh,
+  structuralHealthHelper(mount) {
+    shHelper = createStructuralHealthHelper(mount, {
+      onScore(score) {
+        stageAndRefresh(applyOrgValue(state.config, 'structuralHealth', score));
+        setStatus(statusEl, `Structural Health set to ${score} of 10 from your answers — run to see how this structure behaves.`, '');
+      },
+    });
+  },
 });
 
 // P6 configurator — SUBSUMES P5's ownership-layers control (decision 4): the
@@ -606,29 +616,6 @@ const configurator = renderConfigurator(el('#configurator'), {
     card.disarm();
     markResultsStale(); // the pending run shape changed — flag the charts stale
     setStatus(statusEl, 'comparison changed — run to update the all-human comparison', '');
-  },
-});
-
-// P8 onboarding diagnostic — the 5-question Structural-Health check, shown ONCE
-// after the first (non-replay) result, skippable to the plain slider (decision
-// default 2: set the slider + prompt to re-run, NEVER auto-run — matches the
-// P5/P6 "edits stage, never auto-run" convention). readDiagnosticSeen carries
-// the once-only guarantee across sessions (localStorage, try/catch inside).
-let diagnosticHandled = readDiagnosticSeen();
-const onboarding = renderOnboarding(el('#diagnostic'), {
-  onComplete(score) {
-    // Set the plain SH slider through the SAME authoring path a control edit
-    // uses (stageAndRefresh) so share disarms, replay clears and the slider
-    // display updates — then prompt a re-run (no auto-run, decision default 2).
-    stageAndRefresh(applyOrgValue(state.config, 'structuralHealth', score));
-    setStatus(statusEl, `Structural Health set to ${score} from your diagnostic — run to see how this structure behaves.`, '');
-  },
-  onSkip() {
-    // The plain slider remains the standing control; reopen the setup panel in
-    // place (it may be collapsed to the chip summary) and move focus to it.
-    orgStrip.expand();
-    el('#ctl-structuralHealth').focus();
-    setStatus(statusEl, 'Set Structural Health with the slider, then run.', '');
   },
 });
 
@@ -762,7 +749,12 @@ function resetToDefault() {
   card.disarm();
   clearShareHash();
   bannerEl.hidden = true;
-  onboarding.hide(); // dismiss the once-only diagnostic if it was on screen
+  // Reset the plain-language layer's transient DOM so Start over is byte-equivalent
+  // to a fresh boot: collapse the SH helper and close any open inline ⓘ popover.
+  shHelper.collapse();
+  for (const open of el('#org-mount').querySelectorAll('.term-pop[open], .term-pop-more[open]')) {
+    open.removeAttribute('open');
+  }
 
   // Reload the default preset into the single canonical config.
   state.presetId = DEFAULT_PRESET_ID;

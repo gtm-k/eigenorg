@@ -1,6 +1,16 @@
-// P8 onboarding diagnostic — pure logic (scoring, storage flag, verbatim
-// questions). DOM behaviour (once-only, focus, skip) is covered by the
-// Playwright acceptance probe; this pins the model-facing invariants.
+// Structural-Health diagnostic — pure logic (scoring, storage flag, verbatim
+// questions). DOM behaviour is covered by the Playwright acceptance probe; this
+// pins the model-facing invariants.
+//
+// P10b-2 DELIBERATE PIN UPDATE (decision log "P10b execution — pre-code folds
+// APPLIED"): the P8 post-result auto-offer is RETIRED and the §3.4 questions now
+// power a user-initiated inline SH helper (createStructuralHealthHelper). The
+// PURE §3.4 referents (DIAGNOSTIC_QUESTIONS, ANSWER_SCORES, scoreStructuralHealth)
+// are unchanged and still pinned VERBATIM here — the helper reuses them, so these
+// invariants are MORE load-bearing, not less. shouldShowDiagnostic / the storage
+// flag are RETAINED FOR BACKCOMPAT / P7b (no longer wired to any auto-fire path);
+// their tests below now document the retired preset-gating semantics rather than
+// a live code path (see the section header before them).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -100,7 +110,13 @@ test('storage errors (private browsing) never throw — read is false, write is 
   assert.equal(readDiagnosticSeen(s), false);
 });
 
-// ---- MED-2: the diagnostic gates on a GENUINE preset run only ------------------
+// ---- shouldShowDiagnostic — RETAINED FOR BACKCOMPAT / P7b (no longer wired) ----
+//
+// The P10b-2 re-scope RETIRED the auto-fire path (the SH diagnostic is now the
+// user-initiated inline helper). These tests are DELIBERATELY KEPT to pin the
+// retired preset-gating semantics for a future mode that might re-adopt an
+// offered flow — the function stays pure + exported, so its contract stays
+// documented even though main.js no longer calls it.
 
 test('MED-2: a first PRESET result SHOWS the diagnostic', () => {
   assert.equal(shouldShowDiagnostic({ replay: false, presetId: 'fasterDysfunction', alreadyHandled: false }), true);
