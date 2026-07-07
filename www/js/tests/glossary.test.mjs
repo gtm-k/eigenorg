@@ -54,13 +54,45 @@ test('every curated assumptionsId EXISTS in the live assumptions.json (no dangli
   }
 });
 
-test('exactly the §8.5 sourceless terms carry no assumptionsId', () => {
-  // The corrected §8.5 fact: the sourceless retell terms have no model item. In
-  // P10b the wired sourceless term is Structural Health; any curated term with
-  // no assumptionsId must be a deliberate sourceless one (its deep-dive is
-  // curated-only, never a phantom id).
+test('exactly the three §8.5 sourceless terms carry no assumptionsId (F6.1 pin)', () => {
+  // The corrected §8.5 fact: EXACTLY three retell terms have no model item —
+  // Structural Health, Throughput, Faster Dysfunction. This strict pin turns RED
+  // if an assumptionsId is deleted from a term that should have one (the term
+  // would fall into this set) OR if a fourth sourceless term is added without a
+  // link — either is a coverage regression the gate's model-link check misses.
+  const sourceless = CURATED_TERMS.filter((t) => !t.assumptionsId).map((t) => t.id).sort();
+  assert.deepEqual(sourceless, ['fasterDysfunction', 'structuralHealth', 'throughput']);
   for (const t of CURATED_TERMS) {
     if (!t.assumptionsId) assert.ok(t.plain.length > 0, `sourceless term ${t.id} must carry curated plain copy`);
+  }
+});
+
+test('F6.2: each curated term keeps its distinctive plain-language copy (a swap goes RED)', () => {
+  // A distinctive substring per term anchors its exec-voice copy: a copy swap
+  // between two terms, or a term losing its lede, fails HERE before it ships an
+  // ⓘ that describes the wrong concept. Matches plain + why together.
+  /** @type {Record<string, RegExp>} */
+  const anchors = {
+    entropy: /disorder/i,
+    decisionVelocity: /speedometer/i,
+    communicationLoad: /communication lines/i,
+    aiInjectionDelta: /isolates/i,
+    meetingOverhead: /calendars/i,
+    multiLevelHealth: /side by side/i,
+    structuralHealth: /five things/i,
+    approvalStack: /sign-offs/i,
+    coordinationTax: /coordinating|meetings/i,
+    throughput: /finished|output/i,
+    brittleness: /breaks|novel/i,
+    fasterDysfunction: /trap|weak points/i,
+    cohesion: /trust/i,
+    functionCoverage: /essential job|unowned/i,
+  };
+  // Every registered term must have a defined anchor (a new term forces the pin).
+  assert.deepEqual(CURATED_TERMS.map((t) => t.id).sort(), Object.keys(anchors).sort());
+  for (const t of CURATED_TERMS) {
+    const re = anchors[t.id];
+    assert.match(`${t.plain} ${t.why}`, re, `term ${t.id} lost its distinctive copy anchor ${re}`);
   }
 });
 
