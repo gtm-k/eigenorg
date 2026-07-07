@@ -44,6 +44,38 @@ test('JARGON_KNOWN_LIST is EXACTLY the union of every surface (derived, never ha
   assert.deepEqual(JARGON_KNOWN_LIST, expected);
 });
 
+// ---- variable-path data-term markers pin to real ids (round-2 MED fix) ----------
+// The gate's literal regexes CANNOT see markers assigned through a variable
+// (renderStats' `dt.dataset.term = stat.term` in main.js; comparisonRow's
+// `labelEl.dataset.term = opts.term` in prioritization.js) — the ids reach the
+// DOM via `term: '<id>'` object-literal props at the render sites. Mutation-proven
+// gap: a typo'd id there shipped a silent bare label with the gate green. This
+// test IS the enforcement for those sites: it extracts every `term: '<id>'`
+// literal from both files and asserts each resolves in the curated index.
+
+test("every `term: '<id>'` render-site literal (main.js + prioritization.js) names a real curated term", () => {
+  const jsRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const sources = [
+    path.join(jsRoot, 'main.js'),
+    path.join(jsRoot, 'ui', 'prioritization.js'),
+  ];
+  const index = buildTermIndex({ assumptions: liveAssumptions() });
+  let found = 0;
+  for (const file of sources) {
+    const src = readFileSync(file, 'utf8');
+    for (const m of src.matchAll(/\bterm:\s*'([A-Za-z0-9_-]+)'/g)) {
+      found += 1;
+      assert.ok(
+        resolveTerm(index, m[1]),
+        `${path.basename(file)}: render-site term id "${m[1]}" does not resolve in CURATED_TERMS — a bare label would ship with no ⓘ`,
+      );
+    }
+  }
+  // Pin the count so a refactor that moves/renames the render sites (making the
+  // regex miss them) goes RED here instead of silently un-enforcing the check.
+  assert.equal(found, 3, `expected exactly 3 render-site term literals, found ${found}`);
+});
+
 // ---- assumptionsId links resolve against the LIVE artifact (drift guard) --------
 
 test('every curated assumptionsId EXISTS in the live assumptions.json (no dangling model link)', () => {

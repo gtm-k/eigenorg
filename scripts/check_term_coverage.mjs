@@ -50,12 +50,19 @@
 //   2. RUNTIME-BUILT term labels (the pane-stat <dt> "Coordination tax" /
 //      "Throughput", the legibility "Novel-task brittleness" row, the SH control
 //      label, the Faster-Dysfunction preset note): these are NOT in static
-//      index.html, so the heading-text sweep cannot see them.
-//      Their coverage is instead enforced STRUCTURALLY — the data-term VALIDITY
-//      check reads their markers from www/js/main.js + www/js/ui/*.js (their id
-//      must be real) and the totality check keeps their surfaces resolvable. Same
-//      scope trade the coefficient gate makes: catch the common structural case
-//      by marker, document the residue. (The approval-stack term IS static in
+//      index.html, so the heading-text sweep cannot see them. Enforcement is
+//      SPLIT, and honestly labeled (round-2 fix — the earlier comment over-claimed):
+//        - LITERAL-SCANNED (check 2b regexes): direct-literal markers —
+//          `dataset.term = 'structuralHealth'` (org.js) and
+//          `note.dataset.term = 'fasterDysfunction'` (main.js).
+//        - TEST-PINNED (www/js/tests/glossary.test.mjs "render-site literal" test):
+//          markers assigned through a VARIABLE (`dt.dataset.term = stat.term`,
+//          `labelEl.dataset.term = opts.term`) whose ids live in `term: '<id>'`
+//          object props the regexes cannot attribute — the test extracts those
+//          literals from main.js + prioritization.js and asserts each resolves,
+//          pinning the count (3) so a refactor can't silently un-enforce it.
+//      Same scope trade the coefficient gate makes: catch the common structural
+//      case by marker, document the residue. (The approval-stack term IS static in
 //      index.html: data-term="approvalStack" sits on the drawer <summary>; a
 //      <details> i-popover can't nest in a <summary>, so glossary.decorate mounts
 //      the i on the summary's `.approval-shell` sibling instead — the data-term
@@ -73,6 +80,12 @@
 //         visible heading above each chart is the decorated surface.
 //      d. MODE-INTRO / placeholder prose: plain-language by construction (P10b
 //         copy pass); jargon-swept at the phase-gate walkthrough, not by regex.
+//      e. SETUP CHIPS (the collapsed "Your setup" digest, org.js orgSetupChips):
+//         the "Structural Health" chip label and the scenario chip value
+//         ("Faster Dysfunction") echo config the reader authored; reader path =
+//         Edit setup reopens the panel where the decorated SH control and the
+//         preset-note i live — the chips are value echoes of surfaces decorated
+//         at their authoring location.
 //
 // Usage: node scripts/check_term_coverage.mjs
 //   (paths are resolved relative to the repo root; no args.)
