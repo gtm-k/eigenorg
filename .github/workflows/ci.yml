@@ -165,7 +165,7 @@ jobs:
           set -o pipefail
           node scripts/check_no_coefficient_literals.mjs
 
-      - name: Term-coverage gate — §8.5 spec terms all registered, every data-term marker names a real term, every model link is live (PLAN P10b)
+      - name: Term-coverage gate - sec 8.5 spec terms all registered, every data-term marker names a real term, every model link is live (PLAN P10b)
         run: |
           set -o pipefail
           node scripts/check_term_coverage.mjs

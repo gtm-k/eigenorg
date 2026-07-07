@@ -49,13 +49,28 @@
 //      aria-labels, or preset chips.
 //   2. RUNTIME-BUILT term labels (the pane-stat <dt> "Coordination tax" /
 //      "Throughput", the legibility "Novel-task brittleness" row, the SH control
-//      label, the approval <summary>, the Faster-Dysfunction preset note): these
-//      are NOT in static index.html, so the heading-text sweep cannot see them.
+//      label, the Faster-Dysfunction preset note): these are NOT in static
+//      index.html, so the heading-text sweep cannot see them.
 //      Their coverage is instead enforced STRUCTURALLY — the data-term VALIDITY
 //      check reads their markers from www/js/main.js + www/js/ui/*.js (their id
 //      must be real) and the totality check keeps their surfaces resolvable. Same
 //      scope trade the coefficient gate makes: catch the common structural case
-//      by marker, document the residue.
+//      by marker, document the residue. (The approval-stack term is STATIC: it
+//      lives in the drawer BODY as `.drawer-tech[data-term]` — a <summary> can
+//      never host a working i-popover, so summaries carry NO technical terms.)
+//   3. SURFACE INVENTORY — remaining term-bearing surfaces, each with its
+//      reader-path justification (reviewed at the P10b gate):
+//      a. PRESET CHIP labels ("Faster Dysfunction", ...): reader path = the
+//         preset note directly under the chips carries data-term=fasterDysfunction
+//         and its inline i (wired at P10b repair F1/F2); other chip labels are
+//         neutral scenario names (binding delta 7).
+//      b. CARD CANVAS labels (www/js/share/card.js): canvas-rendered strings in
+//         a FROZEN file (byte-identical share-card replay contract, P8-reviewed);
+//         every term on the card mirrors an on-screen decorated pane surface.
+//      c. CHART aria-labels: spoken descriptions for AT, not visual labels; the
+//         visible heading above each chart is the decorated surface.
+//      d. MODE-INTRO / placeholder prose: plain-language by construction (P10b
+//         copy pass); jargon-swept at the phase-gate walkthrough, not by regex.
 //
 // Usage: node scripts/check_term_coverage.mjs
 //   (paths are resolved relative to the repo root; no args.)
