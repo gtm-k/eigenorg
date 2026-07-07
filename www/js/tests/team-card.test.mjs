@@ -10,9 +10,22 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 import { teamCardModel } from '../ui/team-card.js';
+import { encodeShare, ShareUrlError } from '../url-codec.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.join(here, '..', '..', '..');
 const bhOut = JSON.parse(readFileSync(path.join(here, 'fixtures/team.balancedHybrid.output.json'), 'utf8'));
+const params = JSON.parse(readFileSync(path.join(repoRoot, 'model', 'params.json'), 'utf8'));
+const teamCfg = JSON.parse(readFileSync(path.join(repoRoot, 'www', 'presets', 'team', 'balancedHybrid.json'), 'utf8')).runs.main;
+
+/** The full effective coefficient set (mirrors the engine's resolvedParams). @param {any} config */
+function fullResolvedParams(config) {
+  /** @type {Record<string, number | number[]>} */
+  const resolved = {};
+  for (const p of params.parameters) resolved[p.id] = p.value;
+  Object.assign(resolved, config.paramOverrides ?? {});
+  return resolved;
+}
 
 test('teamCardModel builds a 1200×628 card whose headline leads with coverage (human units)', () => {
   const model = teamCardModel({ scenarioLabel: 'Balanced hybrid', output: bhOut });
@@ -49,6 +62,22 @@ test('INT-1: the team card model carries no share-link / url field (card is the 
   for (const forbidden of ['shareUrl', 'url', 'link', 'replay', 'fragment']) {
     assert.ok(!keys.includes(forbidden), `team card model must not carry "${forbidden}" (INT-1)`);
   }
+});
+
+test('INT-1 round-trip: a team share LINK overflows the URL budget → ShareUrlError("budget")', async () => {
+  // The team-scoped round-trip that does NOT inherit the org <2000 assertion: a
+  // real team preset config + its FULL resolvedParams (the replay contract
+  // requires resolvedParams embedded in full, so compression cannot help) exceeds
+  // the 2000-char fragment budget, so a team link cannot be minted — which is the
+  // empirical basis for "team = card, org = card + link" (INT-1).
+  await assert.rejects(
+    encodeShare({ config: teamCfg, resolvedParams: fullResolvedParams(teamCfg) }),
+    (/** @type {any} */ err) => {
+      assert.ok(err instanceof ShareUrlError, 'a budget overflow is a typed ShareUrlError');
+      assert.equal(err.code, 'budget');
+      return true;
+    },
+  );
 });
 
 test('a full-coverage output reads "7 of 7" with the makeup-holds subhead', () => {

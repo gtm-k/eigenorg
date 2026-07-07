@@ -478,7 +478,19 @@ export function applyTeamField(config, field, value) {
   if (field === 'structuralHealth') {
     next.team.structuralHealth = Math.max(1, Math.min(10, Math.round(Number(value))));
   } else if (field === 'reviewCapacityPerStep') {
-    next.team.reviewCapacityPerStep = value === null ? null : Math.max(1, Math.round(Number(value)));
+    if (value === null) {
+      next.team.reviewCapacityPerStep = null;
+    } else {
+      // A non-finite entry (e.g. the number input accepts '1e999' → Infinity)
+      // must NOT silently become UNBOUNDED: JSON.stringify(Infinity) === null,
+      // which the engine reads as "no review limit" — the exact inverse of a
+      // user-entered cap. Keep the previous finite cap (or 1) instead.
+      const n = Math.round(Number(value));
+      const prev = Math.round(Number(config?.team?.reviewCapacityPerStep));
+      next.team.reviewCapacityPerStep = Number.isFinite(n)
+        ? Math.max(1, n)
+        : (Number.isFinite(prev) ? Math.max(1, prev) : 1);
+    }
   } else if (field === 'modality') {
     const v = String(value);
     if (TEAM_MODALITIES.some((m) => m.value === v)) next.team.modality = v;

@@ -152,8 +152,14 @@ export function renderTeamComposer(container, coordinator) {
       for (const entity of members) {
         const li = elc('li', 'tc-card');
         const label = archetypeLabel(entity.archetype);
+        const kindWord = entity.kind === 'ai' ? 'AI' : 'human';
         const name = elc('span', 'tc-card-name', label);
-        const kind = elc('span', `tc-kind tc-kind-${entity.kind}`, entity.kind === 'ai' ? 'AI' : 'human');
+        // The human/AI distinction is the composer's core who-does-the-work
+        // framing (binding delta 3), so expose it to screen readers too — the
+        // visual badge stays aria-hidden, an sr-only span carries the kind so a
+        // roster card reads e.g. "Engineer, human" (palette chips already do).
+        const srKind = elc('span', 'sr-only', `, ${kindWord}`);
+        const kind = elc('span', `tc-kind tc-kind-${entity.kind}`, kindWord);
         kind.setAttribute('aria-hidden', 'true');
         const remove = /** @type {HTMLButtonElement} */ (elc('button', 'tc-remove', '×'));
         remove.type = 'button';
@@ -172,7 +178,7 @@ export function renderTeamComposer(container, coordinator) {
           const firstAdd = /** @type {HTMLElement | null} */ (palette.querySelector('button'));
           if (firstAdd) firstAdd.focus();
         });
-        li.append(name, kind, remove);
+        li.append(name, srKind, kind, remove);
         listEl.append(li);
       }
       col.append(listEl);
@@ -260,11 +266,15 @@ export function renderTeamComposer(container, coordinator) {
 
   // Review capacity (No limit ↔ a per-step integer cap; M20).
   const capField = elc('div', 'field');
-  capField.append(elc('label', undefined, 'How much review the team can do'));
+  const capLabel = elc('label', undefined, 'How much review the team can do');
+  capLabel.id = 'tc-cap-label';
+  capField.append(capLabel);
   const capControls = elc('div', 'tc-cap');
   const capToggle = elc('div', 'segmented');
   capToggle.setAttribute('role', 'group');
-  capToggle.setAttribute('aria-label', 'Review capacity');
+  // Point the group at its VISIBLE label (WCAG 2.5.3 label-in-name) instead of a
+  // divergent aria-label string that voice-control users can't say.
+  capToggle.setAttribute('aria-labelledby', 'tc-cap-label');
   const capUnbounded = /** @type {HTMLButtonElement} */ (elc('button', undefined, 'No limit'));
   capUnbounded.type = 'button';
   const capLimited = /** @type {HTMLButtonElement} */ (elc('button', undefined, 'Limited'));
@@ -291,10 +301,12 @@ export function renderTeamComposer(container, coordinator) {
 
   // Coordination modality (segmented string).
   const modField = elc('div', 'field');
-  modField.append(elc('label', undefined, 'How the team coordinates'));
+  const modLabel = elc('label', undefined, 'How the team coordinates');
+  modLabel.id = 'tc-mod-label';
+  modField.append(modLabel);
   const modSeg = elc('div', 'segmented');
   modSeg.setAttribute('role', 'group');
-  modSeg.setAttribute('aria-label', 'Coordination modality');
+  modSeg.setAttribute('aria-labelledby', 'tc-mod-label');
   /** @type {HTMLButtonElement[]} */
   const modButtons = [];
   for (const m of TEAM_MODALITIES) {

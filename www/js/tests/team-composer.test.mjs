@@ -152,6 +152,19 @@ test('applyTeamField sets review capacity (null or integer ≥1) and stays valid
   assertValid(bounded, 'bounded review validates');
 });
 
+test('applyTeamField reviewCapacityPerStep never lets a non-finite entry become UNBOUNDED', () => {
+  // The number input accepts '1e999' → Infinity; JSON.stringify(Infinity) === null,
+  // which the engine reads as "no limit" — the inverse of a user-entered cap. The
+  // guard keeps the previous finite cap instead (never silently unbounded).
+  const bounded = applyTeamField(bh, 'reviewCapacityPerStep', 3);
+  const guarded = applyTeamField(bounded, 'reviewCapacityPerStep', '1e999');
+  assert.notEqual(guarded.team.reviewCapacityPerStep, null, 'Infinity must not become unbounded');
+  assert.equal(guarded.team.reviewCapacityPerStep, 3, 'falls back to the previous finite cap');
+  // And it serializes to a real number, not null.
+  assert.equal(typeof JSON.parse(JSON.stringify(guarded)).team.reviewCapacityPerStep, 'number');
+  assertValid(guarded, 'the guarded cap validates');
+});
+
 test('applyTeamField switches modality within the enum and ignores off-enum values', () => {
   const meeting = applyTeamField(bh, 'modality', 'meetingHeavy');
   assert.equal(meeting.team.modality, 'meetingHeavy');

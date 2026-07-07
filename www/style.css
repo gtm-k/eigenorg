@@ -2451,6 +2451,9 @@ progress {
   .charts-revealed .charts-grid .reveal-item:nth-child(4) { animation-delay: 465ms; }
   .charts-revealed .charts-grid .reveal-item:nth-child(5) { animation-delay: 520ms; }
   .charts-revealed .charts-grid .reveal-item:nth-child(6) { animation-delay: 575ms; }
+  /* The team charts-grid has 7 panels (org has 6); keep the left-to-right cadence
+     on the 7th (review-queue) chart instead of letting it fall back to 300ms. */
+  .charts-revealed .charts-grid .reveal-item:nth-child(7) { animation-delay: 630ms; }
 
   /* §6.5 — micro-interactions (the phone audience's only tactile feedback). */
   .door { transition: transform var(--dur-hover) var(--ease-standard), box-shadow var(--dur-hover) var(--ease-standard); }
@@ -2641,7 +2644,6 @@ progress {
   font: inherit;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: border-color var(--dur-hover) var(--ease-standard), background var(--dur-hover) var(--ease-standard);
 }
 .tc-add-chip:hover { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-2)); }
 .tc-add-chip:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
@@ -2664,9 +2666,15 @@ progress {
   padding: var(--space-3);
   border: 1px dashed var(--color-hairline);
   border-radius: var(--radius-lg);
-  transition: border-color var(--dur-hover) var(--ease-standard), background var(--dur-hover) var(--ease-standard);
 }
 .tc-drop-active { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+
+/* Composer hover transitions live behind the reduced-motion guard (P10b §6.5
+   convention — even colour-only transitions stay inside the guard). */
+@media (prefers-reduced-motion: no-preference) {
+  .tc-add-chip { transition: border-color var(--dur-hover) var(--ease-standard), background var(--dur-hover) var(--ease-standard); }
+  .tc-roster { transition: border-color var(--dur-hover) var(--ease-standard), background var(--dur-hover) var(--ease-standard); }
+}
 .tc-role-head {
   font-size: 0.75rem;
   letter-spacing: 0.04em;

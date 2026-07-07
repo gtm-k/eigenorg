@@ -1395,7 +1395,73 @@ for (const b of runButtons) b.addEventListener('click', () => void runAll());
 
 // ---- boot ---------------------------------------------------------------------------
 
+/**
+ * Fetch the committed team manifest (INT-2) + every referenced team preset.
+ * Rejections are CAPTURED into a tagged result (never thrown) so the promise can
+ * be fired early in boot() and awaited later without an unhandled rejection if it
+ * fails while nothing is awaiting it.
+ * @returns {Promise<{ ok: true, defaultId: string, refs: any[], presets: Map<string, any> } | { ok: false, error: unknown }>}
+ */
+async function loadTeamData() {
+  try {
+    const { defaultId, refs } = await fetchTeamManifest();
+    const files = await Promise.all(refs.map((ref) => fetchTeamPreset(ref.id)));
+    /** @type {Map<string, any>} */
+    const presets = new Map();
+    refs.forEach((ref, i) => presets.set(ref.id, files[i]));
+    return { ok: true, defaultId, refs, presets };
+  } catch (error) {
+    return { ok: false, error };
+  }
+}
+
+/**
+ * Render the Team door from loaded preset data (or surface the load failure on
+ * the team status line — never blocking the org flow). Builds the picker + the
+ * composer's add-a-seat catalog and loads the default team into the canonical
+ * team config so entering the Team door is one tap to Run.
+ * @param {Awaited<ReturnType<typeof loadTeamData>>} result
+ */
+function renderTeamFromData(result) {
+  if (!result.ok) {
+    const { error } = result;
+    setStatus(teamStatusEl, `Could not load the team presets: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    return;
+  }
+  const { defaultId, refs, presets } = result;
+  teamState.refs = refs;
+  teamState.defaultId = defaultId;
+  for (const [id, preset] of presets) teamState.presets.set(id, preset);
+  teamPicker = renderTeamPresetPicker(el('#team-preset-picker'), { refs, onPick: pickTeamPreset });
+  // The composer's add-a-seat catalog: one entity template per archetype, drawn
+  // from every surfaced preset's primary run — so every number a composed team
+  // carries comes from committed preset JSON, never a JS literal.
+  const catalog = buildCatalog(refs.map((ref) => teamPrimaryRunConfig(teamState.presets.get(ref.id), ref)));
+  teamComposer = renderTeamComposer(el('#team-composer'), {
+    getConfig: () => teamState.config,
+    onConfigChange: stageTeamEdit,
+    catalog,
+  });
+  const defRef = refs.find((/** @type {any} */ rr) => rr.id === defaultId) ?? refs[0];
+  if (defRef) {
+    const preset = teamState.presets.get(defRef.id);
+    teamState.presetId = defRef.id;
+    teamState.config = teamPrimaryRunConfig(preset, defRef);
+    teamPicker.setActive(defRef.id);
+    setTeamPresetNote(preset);
+    refreshTeamSetup();
+    teamComposer.refresh();
+    setTeamRunButtons(false); // enable the (HTML-disabled) team Run once a config is loaded
+  }
+}
+
 async function boot() {
+  // Fire the team preset fetches in PARALLEL with the org fetches, and await them
+  // only AFTER the landing / org replay is dispatched (below). An org-only
+  // share-link replay (INT-1: team is never in a share link) must never wait on
+  // team HTTP, and a never-settling team fetch must never block the landing.
+  const teamBootData = loadTeamData();
+
   // Fetch all preset files up front (labels for the picker; configs cached
   // for instant switching). Relative fetches — subpath-safe.
   const files = await Promise.all(PRESET_REFS.map((ref) => fetchPreset(ref.id)));
@@ -1469,41 +1535,6 @@ async function boot() {
   setRunButtons(false);
   refreshSetupChips();
 
-  // Team Building (P7b): fetch the committed manifest (INT-2) + each team preset,
-  // build the picker, and load the default team into the canonical team config so
-  // entering the Team door is one tap to Run. A team fetch failure is surfaced on
-  // the team status line and never blocks the org flow.
-  try {
-    const { defaultId, refs } = await fetchTeamManifest();
-    teamState.refs = refs;
-    teamState.defaultId = defaultId;
-    const teamFiles = await Promise.all(refs.map((ref) => fetchTeamPreset(ref.id)));
-    refs.forEach((ref, i) => teamState.presets.set(ref.id, teamFiles[i]));
-    teamPicker = renderTeamPresetPicker(el('#team-preset-picker'), { refs, onPick: pickTeamPreset });
-    // The composer's add-a-seat catalog: one entity template per archetype, drawn
-    // from every surfaced preset's primary run — so every number a composed team
-    // carries comes from committed preset JSON, never a JS literal.
-    const catalog = buildCatalog(refs.map((ref) => teamPrimaryRunConfig(teamState.presets.get(ref.id), ref)));
-    teamComposer = renderTeamComposer(el('#team-composer'), {
-      getConfig: () => teamState.config,
-      onConfigChange: stageTeamEdit,
-      catalog,
-    });
-    const defRef = refs.find((rr) => rr.id === defaultId) ?? refs[0];
-    if (defRef) {
-      const preset = teamState.presets.get(defRef.id);
-      teamState.presetId = defRef.id;
-      teamState.config = teamPrimaryRunConfig(preset, defRef);
-      teamPicker.setActive(defRef.id);
-      setTeamPresetNote(preset);
-      refreshTeamSetup();
-      teamComposer.refresh();
-      setTeamRunButtons(false); // enable the (HTML-disabled) team Run once a config is loaded
-    }
-  } catch (err) {
-    setStatus(teamStatusEl, `Could not load the team presets: ${err instanceof Error ? err.message : String(err)}`, 'error');
-  }
-
   probe.bootReadyMs = performance.now(); // navigation start → Run clickable
   // The shell's own status is always "ready" — a broken shared link is surfaced
   // on the LANDING notice (BLOCKER B), not in the hidden shell, so entering a
@@ -1527,6 +1558,12 @@ async function boot() {
     }
     nav.showLanding();
   }
+
+  // Team Building (P7b): the fetches fired in parallel at the top of boot(); await
+  // + render the Team door now, AFTER the landing / org replay dispatch above, so
+  // team HTTP (or a hung team fetch) can never gate the landing or an org-only
+  // share replay. A failure surfaces on the team status line, never the org flow.
+  renderTeamFromData(await teamBootData);
 }
 
 boot().catch((err) => {
@@ -1572,6 +1609,13 @@ async function mountAssumptionsAndGlossary() {
   // dynamically-rendered [data-term] labels after a paint.
   glossary = createGlossary({ assumptions: data ?? { items: [] } });
   glossary.decorate(el('#org-mount'));
+  // Decorate the team mount too, the moment the glossary loads — so a user who
+  // enters the Team door and runs BEFORE the (large) assumptions fetch resolves
+  // still gets the inline ⓘ on the painted team [data-term] headings, instead of
+  // waiting for a door re-entry or another run. Org self-heals at load; team now
+  // does too (the door onEnter + post-paint decorate calls stay as idempotent
+  // top-ups). Idempotent — decorate attaches at most one ⓘ per host.
+  glossary.decorate(el('#team-mount'));
 }
 
 void mountAssumptionsAndGlossary();
