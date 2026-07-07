@@ -668,7 +668,9 @@ progress {
 .field-hint {
   margin: var(--space-1) 0 0;
   font-size: 0.75rem;
-  color: var(--color-ink-tertiary);
+  /* AA fix (P10b-2 repair-1 F8): ink-tertiary was ~3.3:1 on surface; ink-subtle
+     clears AA for this small body text, matching the .eyebrow precedent. */
+  color: var(--color-ink-subtle);
 }
 
 .field input[type='number'] {
