@@ -195,7 +195,7 @@ mod tests {
 
     #[test]
     fn params_json_parses_and_declares_v2() {
-        assert_eq!(model_version(), "2.1.0");
+        assert_eq!(model_version(), "2.2.0");
         let d = Params::defaults();
         // A few spot values against MODEL.md §9.
         assert_eq!(d.p("channelCostFraction"), 0.036);
