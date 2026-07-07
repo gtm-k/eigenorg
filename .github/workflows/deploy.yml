@@ -2,10 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   workflow_dispatch:
-  # Push trigger stays disabled until launch; restored at P9 alongside the
-  # publish step below (Pages does not serve private repos on the Free plan).
-  # push:
-  #   branches: [main]
+  push:
+    branches: [main]
 
 permissions:
   contents: write
@@ -16,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build www/ artifact (publish inert until P9)
+    name: Build www/ artifact + publish to gh-pages
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -66,14 +64,11 @@ jobs:
           path: www/
           include-hidden-files: true # .nojekyll must ship
 
-      # ENABLE AT P9 FLIP
-      # The publish step below stays commented until the user flips the repo
-      # public at P9 (>=3 days before the launch post). Enabling it earlier
-      # does nothing useful: GitHub Pages does not serve private repos on the
-      # Free plan (PLAN decision log, round 1).
-      # - name: Deploy to gh-pages
-      #   uses: peaceiris/actions-gh-pages@v4
-      #   with:
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     publish_dir: ./www
-      #     publish_branch: gh-pages
+      # Publishes the BUILT www/ (with wasm) to the gh-pages branch root.
+      # Pages serves that branch — the repo is public, so Pages is active.
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./www
+          publish_branch: gh-pages
