@@ -1,15 +1,18 @@
 /* eigenorg — visual pass (P5b) on the DESIGN.md Linear system.
    Near-black canvas, hairline-bordered charcoal panels, ONE lavender accent,
-   Inter (600 display / 400 body / 500 buttons) with negative tracking on
-   display sizes, mono reserved for run metadata (the reproducibility
-   readout — this page's status/ID tokens). Nothing signals by color alone:
-   states pair color with text, dashes or shape. */
+   a split system font stack (--font-display / --font-text, no webfont) with
+   negative tracking on display sizes, mono reserved for run metadata (the
+   reproducibility readout — this page's status/ID tokens). Nothing signals by
+   color alone: states pair color with text, dashes or shape. */
 
 :root {
   /* DESIGN.md colors */
   --color-primary: #5e6ad2;
   --color-primary-hover: #828fff;
   --color-primary-focus: #5e69d1;
+  /* Focus ring (P10b §6.6): a brighter in-family lavender that clears contrast on
+     the darker surface-2 setup/pane cards. In-family, no new hue. */
+  --color-focus: var(--color-primary-hover);
   --color-ink: #f7f8f8;
   --color-ink-muted: #d0d6e0;
   --color-ink-subtle: #8a8f98;
@@ -45,11 +48,31 @@
   --radius-xl: 16px;
   --shadow-lift: 0 18px 48px -24px rgba(1, 1, 2, 0.9);
   --shadow-door: 0 24px 64px -32px rgba(1, 1, 2, 0.95);
-  /* Subtle indigo radial glow behind the landing hero (spec §8 warmth blend —
-     single hue, static, honours reduced motion; the one sanctioned exception to
-     DESIGN.md's no-atmospheric-gradient rule). */
-  --glow-hero: radial-gradient(60% 55% at 50% 12%, rgba(94, 106, 210, 0.16), rgba(94, 106, 210, 0.04) 45%, transparent 72%);
 
+  /* P10b §2d — depth that reads on OLED: light on the panel, not shadow under it.
+     The lit top edge DESIGN.md called for but never shipped; a top-lit surface
+     fill; and a key-panel elevation (edge highlight + honest minimal ambient).
+     (--glow-hero + .landing::before are retired — atmosphere now localizes to the
+     signature's seed glow, spec §2a.) */
+  --edge-top: inset 0 1px 0 0 rgba(184, 192, 235, 0.09);
+  --surface-door: linear-gradient(180deg, #18191a 0%, #0f1011 60%);
+  --elev-key: var(--edge-top), 0 16px 40px -24px rgba(0, 0, 0, 0.55);
+  --shadow-door-hover: 0 30px 72px -30px rgba(1, 1, 2, 0.98);
+
+  /* P10b §2e — motion easing + durations (calm, ~40% faster than P10a). */
+  --ease-out: cubic-bezier(0.16, 0.84, 0.44, 1); /* calm decel for entrances */
+  --ease-emphasis: cubic-bezier(0.22, 1, 0.36, 1); /* the one signature settle */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1); /* hover/press/color state */
+  --dur-fade: 260ms;
+  --dur-hover: 130ms;
+  --dur-press: 90ms;
+
+  /* P10b §2b — Font Option A: split system stacks (the phantom `Inter` lead is
+     dropped — no font file was ever vendored). On Apple, -apple-system auto-picks
+     SF Pro Display vs Text by size; Segoe UI Variable Display/Text gives Windows
+     the same optical split. Tracking lives in `em` so it is correct on every face. */
+  --font-display: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-text: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, system-ui, sans-serif;
   --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -67,10 +90,10 @@
 
 body {
   margin: 0;
-  font-family: Inter, "SF Pro Display", -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-text);
   line-height: 1.5;
   font-size: 16px;
-  letter-spacing: -0.05px;
+  letter-spacing: -0.003em;
   color: var(--color-ink);
   background: var(--color-canvas);
 }
@@ -88,9 +111,10 @@ main {
 }
 
 h1 {
+  font-family: var(--font-display);
   font-size: 2rem;
   font-weight: 600;
-  letter-spacing: -1px;
+  letter-spacing: -0.03em;
   line-height: 1.1;
   margin: 0 0 var(--space-2);
 }
@@ -123,20 +147,198 @@ h1 {
   margin-bottom: var(--space-4);
 }
 
+/* P10b §2b — eyebrow AA fix: w600 / ink-subtle (~6.2:1, was ink-tertiary ~3.4:1)
+   + em tracking. Makes the taxonomy layer visible and clears AA contrast. */
 .eyebrow {
   margin: 0 0 var(--space-1);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  letter-spacing: 0.4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle);
 }
 
+/* P10b §2b/C3 — panel headings 20 → 22px, em tracking: opens a real gap above
+   the 17px subhead so the setup/results wall separates into levels. */
 .panel h2 {
-  font-size: 1.25rem;
+  font-family: var(--font-display);
+  font-size: 1.375rem;
   font-weight: 600;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.018em;
+  line-height: 1.2;
   margin: 0 0 var(--space-3);
+}
+
+/* ==================================================================== */
+/* P10b §4d — plain-language layer: demoted .tech-label + inline ⓘ.      */
+/* The plain lead is the h2; the technical term demotes below it; a      */
+/* native-<details> ⓘ (the why-eigen idiom — keyboard + tap, never       */
+/* hover-only) carries the curated blurb + an opt-in model deep-dive.    */
+/* ==================================================================== */
+
+/* The flow wrapper carrying data-term: the plain-lead <h2> + the ⓘ share line 1
+   (baseline-aligned), the demoted .tech-label wraps to line 2 (flex-basis:100%).
+   A flow element so the inserted <details> ⓘ is valid (it can't nest in an h2). */
+.panel-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0 0 var(--space-3);
+}
+
+.panel-title > h2 {
+  margin: 0;
+}
+
+.panel-title > .tech-label {
+  flex-basis: 100%;
+}
+
+/* The technical term, demoted below the plain lead (§2b): not uppercase,
+   ink-subtle, block so it sits on its own line under the heading. */
+.tech-label {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-text);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--color-ink-subtle);
+}
+
+/* The inline ⓘ: a CSS-drawn serif "i" in a hairline circle (NOT an emoji —
+   emoji picks up a system colour and breaks the single accent). */
+.term-pop {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.35em;
+}
+
+.term-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: 50%;
+  font: italic 600 0.75rem/1 Georgia, 'Times New Roman', serif;
+  color: var(--color-ink-subtle);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.term-info::-webkit-details-marker {
+  display: none;
+}
+
+/* 44px tap target without disturbing inline layout (tap + keyboard). */
+.term-info::after {
+  content: '';
+  position: absolute;
+  inset: -13px;
+}
+
+.term-info:hover {
+  color: var(--color-ink);
+  border-color: var(--color-primary-hover);
+}
+
+.term-info:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.term-pop[open] > .term-info {
+  color: var(--color-ink);
+  border-color: var(--color-primary-hover);
+}
+
+/* Popover card — surface-2 hairline, mirrors .why-eigen-pop. Resets the
+   heading's weight/casing/tracking so body copy reads as prose. */
+.term-pop-body {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  display: block;
+  width: max-content;
+  max-width: min(24rem, 82vw);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-text);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-key);
+  white-space: normal;
+}
+
+.term-pop-plain {
+  display: block;
+  color: var(--color-ink);
+}
+
+.term-pop-why {
+  display: block;
+  margin-top: var(--space-2);
+}
+
+.term-pop-why strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* Opt-in quantitative layer — the drift-gated model plainLanguage. */
+.term-pop-more {
+  margin-top: var(--space-3);
+}
+
+.term-pop-more-summary {
+  font-size: 0.75rem;
+  color: var(--color-primary-hover);
+  cursor: pointer;
+  list-style: none;
+}
+
+.term-pop-more-summary::-webkit-details-marker {
+  display: none;
+}
+
+.term-pop-more-summary::before {
+  content: '▸ ';
+}
+
+.term-pop-more[open] > .term-pop-more-summary::before {
+  content: '▾ ';
+}
+
+.term-pop-more-summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.term-pop-more-body {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-ink-subtle);
+}
+
+/* The approval-stack drawer-title carries its tech-label INLINE (the summary is
+   a flex row; a block tech-label would break its baseline). */
+.drawer-title .tech-label {
+  display: inline;
+  margin-left: 0.5em;
 }
 
 .panel-header {
@@ -202,13 +404,17 @@ h1 {
   margin-bottom: var(--space-3);
 }
 
+/* Default button = neutral ghost (§2a accent budget): full-strength lavender is
+   reserved for the run CTAs, active/selected states, and the signature order
+   line, so ordinary commands (Copy share link, Download card, Set Structural
+   Health) sit at a quieter weight. Geometry unchanged from the P5b button. */
 button {
   font: inherit;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #ffffff;
-  background: var(--color-primary);
-  border: 1px solid transparent;
+  color: var(--color-ink);
+  background: transparent;
+  border: 1px solid var(--color-hairline-strong);
   border-radius: 8px;
   padding: 0.625rem 1.25rem;
   min-height: 44px; /* tappable target (PLAN P5 mobile acceptance) */
@@ -217,11 +423,27 @@ button {
 }
 
 button:hover:not(:disabled) {
+  background: var(--color-surface-2); /* brighten the surface, not a lavender fill */
+}
+
+/* The run CTAs are the ONE full-strength lavender in the app shell (§2a). The
+   primary #run-button carries .cta; #run-button-2 ("Run again", in .run-strip)
+   shares the fill though it is not sized as a .cta. */
+.cta,
+#run-button-2 {
+  color: #ffffff;
+  background: var(--color-primary);
+  border-color: transparent;
+}
+
+.cta:hover:not(:disabled),
+#run-button-2:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  border-color: transparent;
 }
 
 button:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -244,7 +466,10 @@ button.ghost:hover:not(:disabled) {
 progress {
   flex: 1 1 10rem;
   height: 8px;
-  accent-color: var(--color-primary);
+  /* Filled track = low-alpha lavender (§2a), dialed back from the solid Run CTA
+     so it is no longer a full-strength competitor. The live status text carries
+     the run state in words, so the bar is never a colour-alone signal. */
+  accent-color: rgba(94, 106, 210, 0.5);
 }
 
 .status {
@@ -310,6 +535,15 @@ progress {
   background: rgba(94, 106, 210, 0.12);
   color: var(--color-ink);
   font-weight: 500;
+}
+
+.chip.active:hover:not(:disabled) {
+  /* Class-completion (mirrors the R2-2 segmented fold): .chip:hover (0-3-1)
+     out-specifies .chip.active (0-2-0), so an active preset chip loses its
+     lavender fill on hover — re-assert the resting active tint. */
+  border-color: var(--color-primary);
+  background: rgba(94, 106, 210, 0.12);
+  color: var(--color-ink);
 }
 
 /* Active state is border + weight + background — plus aria-pressed. */
@@ -415,7 +649,7 @@ progress {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-2);
 }
 
 .field label {
@@ -434,7 +668,9 @@ progress {
 .field-hint {
   margin: var(--space-1) 0 0;
   font-size: 0.75rem;
-  color: var(--color-ink-tertiary);
+  /* AA fix (P10b-2 repair-1 F8): ink-tertiary was ~3.3:1 on surface; ink-subtle
+     clears AA for this small body text, matching the .eyebrow precedent. */
+  color: var(--color-ink-subtle);
 }
 
 .field input[type='number'] {
@@ -451,7 +687,7 @@ progress {
 }
 
 .field input[type='number']:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 1px;
 }
 
@@ -467,7 +703,7 @@ progress {
 }
 
 .field input[type='range']:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
   border-radius: 8px;
 }
@@ -518,6 +754,7 @@ progress {
 
 .segmented button {
   background: transparent;
+  border: 1px solid transparent; /* R2-1: base button border must not leak into the segmented track (mirrors .altitude-seg) */
   border-radius: 6px;
   color: var(--color-ink-subtle);
   font-weight: 400;
@@ -534,6 +771,14 @@ progress {
   background: var(--color-primary);
   color: #ffffff;
   font-weight: 500;
+}
+
+.segmented button.active:hover:not(:disabled) {
+  /* R2-2 class-completion (pre-existing on base): .segmented button:hover (0-3-1)
+     out-specifies .active (0-2-1) — re-assert the RESTING fill + color on hover
+     (primary-hover #828fff fails AA at 2.7:1 under 14px white; primary = 4.7:1). */
+  background: var(--color-primary);
+  color: #ffffff;
 }
 
 /* ---- charts ---------------------------------------------------------------------- */
@@ -610,12 +855,7 @@ progress {
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  button,
-  .chip {
-    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
-  }
-}
+/* (button/.chip transitions are defined in the P10b §6.5 motion block below.) */
 
 /* ==================================================================== */
 /* P6 — Prioritization Layer Configurator (signature feature)          */
@@ -689,7 +929,7 @@ progress {
 }
 
 .cfg-compare input[type='checkbox']:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -776,8 +1016,16 @@ progress {
   font-weight: 600;
 }
 
+.cfg-type.active:hover:not(:disabled) {
+  /* Class-completion (mirrors R2-2): .cfg-type:hover (0-3-1) out-specifies
+     .cfg-type.active (0-2-0) — re-assert the active seat tint on hover. */
+  border-color: var(--color-primary);
+  background: rgba(94, 106, 210, 0.16);
+  color: var(--color-ink);
+}
+
 .cfg-type:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -887,7 +1135,7 @@ progress {
 }
 
 .cfg-flow-seat {
-  font-family: Inter, sans-serif;
+  font-family: var(--font-text);
 }
 
 .cfg-flow-busiest {
@@ -901,7 +1149,7 @@ progress {
 .cfg-busiest-badge {
   display: inline-block;
   margin-left: var(--space-2);
-  font-family: Inter, sans-serif;
+  font-family: var(--font-text);
   font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.3px;
@@ -928,7 +1176,10 @@ progress {
   right: var(--space-3);
   bottom: 4px;
   height: 3px;
-  background: var(--color-primary);
+  /* Utilization is pure data-viz, not one of §2a's sanctioned lavender
+     surfaces, so the bar is neutral ink — the accent stays on the busiest-row
+     cue. The .cfg-util-num readout carries the value (never colour-alone). */
+  background: var(--color-ink-subtle);
   border-radius: 2px;
   max-width: calc(100% - var(--space-6));
 }
@@ -1026,12 +1277,14 @@ progress {
 
 .drawer > summary.drawer-summary::before {
   content: '▸';
+  content: '▸' / ''; /* empty alt text: decorative marker, kept out of the summary's accessible name */
   color: var(--color-ink-subtle);
   margin-right: var(--space-1);
 }
 
 .drawer[open] > summary.drawer-summary::before {
   content: '▾';
+  content: '▾' / '';
 }
 
 .drawer > summary.drawer-summary:hover {
@@ -1039,7 +1292,7 @@ progress {
 }
 
 .drawer > summary.drawer-summary:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: -2px;
 }
 
@@ -1099,6 +1352,7 @@ progress {
 
 .assum-summary::before {
   content: '+';
+  content: '+' / ''; /* R2-3: decorative — keep out of the summary's accessible name (same class as .cta/.drawer-summary) */
   color: var(--color-ink-tertiary);
   font-family: var(--font-mono);
   width: 1rem;
@@ -1106,6 +1360,7 @@ progress {
 
 .assum-item[open] > .assum-summary::before {
   content: '−';
+  content: '−' / '';
 }
 
 .assum-summary:hover {
@@ -1113,7 +1368,7 @@ progress {
 }
 
 .assum-summary:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: -2px;
   border-radius: 4px;
 }
@@ -1214,21 +1469,74 @@ progress {
 /* radio groups (keyboard + screen-reader native); nothing colour-alone.*/
 /* ==================================================================== */
 
-.panel.diagnostic {
-  border-left: 3px solid var(--color-primary);
+/* ==================================================================== */
+/* P10b §5 — optional inline Structural-Health helper (the single         */
+/* SH-configuration surface; the P8 post-result auto-offer is retired).   */
+/* The .diagnostic-* form styles below are REPURPOSED for the expander.   */
+/* ==================================================================== */
+
+/* Plain-lead wrapper carrying data-term (the ⓘ mounts here, before the
+   .tech-label). A flow div so the inline ⓘ <details> is valid; flow-flex so the
+   label + ⓘ share line 1 and the demoted .tech-label wraps to line 2. */
+.field-lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  min-width: 0;
 }
 
-.diagnostic-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  letter-spacing: -0.4px;
-  margin: 0 0 var(--space-2);
+.field-lead > .tech-label {
+  flex-basis: 100%;
 }
 
-.diagnostic-title:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
-  outline-offset: 4px;
+/* Directional anchors under the SH slider — a bare "N" carries no direction.
+   Non-judgmental (strained / sound). AA at 11px via ink-subtle. */
+.field-anchors {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+  font-size: 0.6875rem;
+  color: var(--color-ink-subtle);
+}
+
+.sh-helper {
+  margin-top: var(--space-3);
+}
+
+/* Text-button affordance ("Not sure? …"), 44px tap target, subordinate to the
+   Run CTA — the in-family lavender-hover, not a filled button. */
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--color-primary-hover);
+  background: none;
+  border: none;
+  text-align: left;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.link-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
   border-radius: 4px;
+}
+
+.sh-helper-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+}
+
+.sh-helper-panel[hidden] {
+  display: none;
 }
 
 .diagnostic-intro {
@@ -1314,7 +1622,7 @@ progress {
 }
 
 .diagnostic-option input[type='radio']:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -1362,81 +1670,243 @@ progress {
 /* non-colour cue). All motion honours prefers-reduced-motion.          */
 /* ==================================================================== */
 
-/* ---- soft depth on KEY panels only (doors/setup/story; spec section 8) ---- */
+/* ---- soft depth on KEY panels only (setup/story; spec §2d) — top-lit surface
+   + key elevation. Dense chart panels stay flat surface-1 (restraint). ---- */
 .panel-lift {
+  background: var(--surface-door);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lift);
+  box-shadow: var(--elev-key);
 }
 
-/* ---- landing: two doors (the signature moment, spec section 4) ---- */
+/* ---- landing: anchored hero + signature + two doors (spec §4a) ---- */
+/* A slim rail gives the page a top edge; the signature gives the composition
+   horizontal mass — together they kill the centered "float". No page-level glow:
+   atmosphere now localizes to the signature's seed (--glow-hero retired). */
 .landing {
   position: relative;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: var(--space-10) var(--space-4) var(--space-8);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-8) var(--space-4) var(--space-10);
   overflow: hidden;
-}
-
-/* Subtle indigo radial glow behind the hero — static, single-hue warmth. */
-.landing::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--glow-hero);
-  pointer-events: none;
 }
 
 .landing-inner {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 54rem;
-  text-align: center;
+  max-width: 66rem;
+  margin: 0 auto;
+  text-align: left;
+}
+
+/* Rail — anchors the top edge: wordmark left, in-browser reassurance right. */
+.landing-rail {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-10);
 }
 
 .brand-mark {
-  margin: 0 0 var(--space-6);
-  font-size: 0.9375rem;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
   font-weight: 600;
-  letter-spacing: -0.2px;
+  letter-spacing: -0.01em;
+  color: var(--color-ink);
+}
+
+.brand-mid {
+  margin: 0 0.05em;
   color: var(--color-ink-subtle);
 }
 
+/* Decorative lavender on "org" — grayscale-safe (meaning carried by the descriptor). */
+.brand-org {
+  color: var(--color-primary);
+}
+
+.landing-stat {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+  /* ink-subtle (~6.2:1), not the spec's ink-tertiary (~3.4:1) — clears AA for this
+     12px reassurance text, consistent with the eyebrow AA fix (§2b). */
+  color: var(--color-ink-subtle);
+}
+
+/* Hero: asymmetric split — copy left, signature right (≥960px); stacked below. */
+.hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+  align-items: center;
+}
+
+@media (min-width: 960px) {
+  .hero-grid {
+    grid-template-columns: minmax(0, 30rem) minmax(0, 1fr);
+    gap: var(--space-10);
+  }
+}
+
+.hero-copy {
+  min-width: 0;
+}
+
+.hero-descriptor {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.hero-descriptor-text {
+  font-size: clamp(1rem, 0.5vw + 0.9rem, 1.125rem);
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+  color: var(--color-ink-muted);
+}
+
+/* "why eigen?" — a self-contained native <details> popover (tap / keyboard). */
+.why-eigen {
+  position: relative;
+  display: inline-block;
+}
+
+.why-eigen-summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.8125rem;
+  color: var(--color-primary-hover);
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.why-eigen-summary::-webkit-details-marker {
+  display: none;
+}
+
+.why-eigen-summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.why-eigen-pop {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  display: block;
+  width: max-content;
+  max-width: min(22rem, 80vw);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-key);
+}
+
 .landing-title {
-  margin: 0 auto var(--space-4);
-  max-width: 22ch;
-  font-size: clamp(2.25rem, 5vw + 1rem, 3.5rem);
+  margin: 0 0 var(--space-4);
+  max-width: 16ch;
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 3.6vw + 1.4rem, 4rem);
   font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: -1.8px;
+  line-height: 1.04;
+  letter-spacing: -0.032em;
   color: var(--color-ink);
 }
 
 .landing-lede {
-  margin: 0 auto var(--space-8);
-  max-width: 40rem;
-  font-size: 1.0625rem;
-  line-height: 1.6;
+  margin: 0;
+  max-width: 34rem;
+  font-size: clamp(1rem, 0.5vw + 0.9rem, 1.125rem);
+  line-height: 1.55;
+  letter-spacing: -0.006em;
   color: var(--color-ink-muted);
 }
 
+/* The Divergence signature. Base state fully drawn (reduced-motion safe); the
+   one-time draw lives in the motion section (§6.2). The bands + medians ARE the
+   spec (order settles low/narrow lavender; disorder frays up/wide grey). */
+.hero-signature {
+  min-width: 0;
+}
+
+.hero-divergence {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 56 / 34;
+}
+
+.median {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.median-ord {
+  stroke: var(--color-primary);
+  stroke-width: 2.25;
+  opacity: 0.92;
+}
+
+.median-dis {
+  stroke: var(--color-ink-subtle);
+  stroke-width: 1.5;
+  opacity: 0.5;
+}
+
+.band-ord {
+  fill: rgba(94, 106, 210, 0.1);
+}
+
+.band-dis {
+  fill: rgba(247, 248, 248, 0.05);
+}
+
+.seed {
+  fill: var(--color-primary);
+}
+
+/* Connective line above the doors. */
+.landing-connective {
+  margin: var(--space-12) 0 var(--space-6);
+  max-width: 46rem;
+  font-size: 0.9375rem;
+  color: var(--color-ink-subtle);
+}
+
 .landing-foot {
-  margin: var(--space-8) auto 0;
-  max-width: 40rem;
-  text-align: center;
+  margin: var(--space-10) 0 0;
+  max-width: 46rem;
+  text-align: left;
 }
 
 /* Broken-shared-link notice on the landing (BLOCKER B). Amber FUNCTIONAL status
-   colour + icon + text — never colour alone; centered via inline-flex + auto
-   margins on the text-centered landing. */
+   colour + icon + text — never colour alone. Left-aligned block on the anchored
+   (no longer centered) landing. */
 .landing-notice {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: 0 auto var(--space-6);
+  margin: 0 0 var(--space-6);
   padding: var(--space-3) var(--space-4);
-  max-width: 40rem;
+  max-width: 46rem;
   font-size: 0.9375rem;
   text-align: left;
   color: var(--color-stale);
@@ -1467,31 +1937,34 @@ progress {
 
 /* A door is a big tappable card that doubles as the explainer. Full override of
    the primary-button base (transparent surface, not the accent fill). */
+/* P10b §2d — top-lit door material (reads on OLED) + warm accent hairline (the
+   same lavender at low alpha — no second hue) + key elevation (edge highlight +
+   honest minimal ambient). */
 .door {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
   min-height: 0;
-  padding: var(--space-6);
+  padding: var(--space-8);
   text-align: left;
   color: var(--color-ink);
-  background: var(--color-surface-1);
-  border: 1px solid var(--color-hairline);
+  background: var(--surface-door);
+  border: 1px solid rgba(94, 106, 210, 0.16);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-door);
+  box-shadow: var(--elev-key);
   cursor: pointer;
 }
 
 .door:hover:not(:disabled) {
-  background: var(--color-surface-2);
+  background: var(--surface-door); /* LOW fold: re-assert the top-lit gradient — base button:hover would flatten it to surface-2 */
   border-color: var(--color-primary);
-  /* The hover LIFT (transform) is motion — it lives in the reduced-motion guard
-     below (F1); colour/border changes stay here (eased by the button rule). */
+  /* The hover LIFT (transform) + deeper shadow are motion — they live in the
+     reduced-motion guard below (§6.5); the border warm-up stays here. */
 }
 
 .door:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 3px;
 }
 
@@ -1504,15 +1977,16 @@ progress {
 .door-label {
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-primary-hover);
 }
 
 .door-question {
+  font-family: var(--font-display);
   font-size: 1.375rem;
   font-weight: 600;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.018em;
   line-height: 1.2;
   color: var(--color-ink);
 }
@@ -1595,8 +2069,15 @@ progress {
   box-shadow: inset 0 -2px 0 0 rgba(255, 255, 255, 0.5); /* underline cue, not colour-alone */
 }
 
+.altitude-seg.active:hover:not(:disabled) {
+  /* R2-2: keep the selected fill on hover — the neutral base button:hover (0-2-1)
+     would otherwise out-specify .altitude-seg.active and flicker it dark. Resting
+     primary, not primary-hover: #828fff fails AA (2.87:1) under the white label. */
+  background: var(--color-primary);
+}
+
 .altitude-seg:focus-visible {
-  outline: 2px solid var(--color-primary-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -1613,30 +2094,33 @@ progress {
   display: none;
 }
 
+/* P10b §2c — chunked rhythm: more air below the intro before the setup wall. */
 .mode-intro {
-  margin: var(--space-6) 0 var(--space-6);
+  margin: var(--space-8) 0 var(--space-10);
 }
 
 .mode-title {
   margin: var(--space-1) 0 var(--space-3);
-  font-size: clamp(1.75rem, 3vw + 1rem, 2.25rem);
+  font-family: var(--font-display);
+  font-size: clamp(1.75rem, 2.5vw + 1rem, 2.25rem);
   font-weight: 600;
-  letter-spacing: -1px;
-  line-height: 1.1;
+  letter-spacing: -0.022em;
+  line-height: 1.08;
   color: var(--color-ink);
 }
 
 .mode-sub {
   margin: 0;
-  max-width: 46rem;
-  font-size: 1.0625rem;
-  line-height: 1.6;
+  max-width: 34rem;
+  font-size: clamp(1rem, 0.5vw + 0.9rem, 1.125rem);
+  line-height: 1.55;
+  letter-spacing: -0.006em;
   color: var(--color-ink-muted);
 }
 
 /* ---- setup panel (collapses to the "Your setup" chips, spec section 6) ---- */
 .setup {
-  padding: var(--space-6);
+  padding: var(--space-8);
 }
 
 .setup-summary-head {
@@ -1676,50 +2160,133 @@ progress {
   display: none;
 }
 
-.setup-title {
-  margin: 0 0 var(--space-3);
-}
-
+/* P10b §2c — chunked rhythm: loose between sub-groups (32 margin + 24 pad-top). */
 .setup-group {
-  margin-top: var(--space-6);
+  margin-top: var(--space-8);
   padding-top: var(--space-6);
   border-top: 1px solid var(--color-hairline);
 }
 
-.setup-subhead {
-  margin: 0 0 var(--space-1);
-  font-size: 1.0625rem;
+/* Primary CTA: larger tap target + a quiet breathing focus halo (spec §6.6). */
+.cta {
+  font-size: 1rem;
   font-weight: 600;
-  letter-spacing: -0.2px;
+  padding: 0.875rem 1.75rem;
+  min-height: 52px;
+}
+
+/* ---- P10b §4b: setup précis + run dock + progressive disclosure ---- */
+.org-precis {
+  margin: var(--space-4) 0;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+  max-width: 46rem;
+}
+
+/* Editable values in the précis: bold ink — NOT lavender (the accent stays
+   reserved for the Run CTA + the signature order-line, §C6). */
+.org-precis strong {
+  font-weight: 600;
   color: var(--color-ink);
 }
 
-.setup-subhead-note {
+/* Run dock (M4): the promoted #run-button, framed top+bottom by a hairline.
+   Desktop in-flow; mobile sticky-bottom (see the ≤560px block). */
+.setup-run-dock {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin: var(--space-6) 0;
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-hairline);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+/* Play glyph — survives main.js's textContent / data-run-label swap. The '/ '''
+   alternative-text form keeps it out of the CTA's accessible name (engines
+   without the '/' syntax fall back to the first, glyph-only declaration). */
+.setup-run-dock .cta::before {
+  content: '\25B6';
+  content: '\25B6' / '';
+  margin-right: 0.5em;
+  font-size: 0.85em;
+}
+
+.run-dock-caption {
   font-size: 0.8125rem;
-  font-weight: 400;
   color: var(--color-ink-subtle);
 }
 
-.setup-subhead-note::before {
-  content: '\2014\00a0';
+/* "Tune your org · optional" — the eyebrow is uppercase; the optional tag resets. */
+.optional-tag {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-ink-subtle);
 }
 
-.setup-run {
-  margin-top: var(--space-6);
-  margin-bottom: 0;
+/* Approval-stack drawer: live value + optional tag in the summary (M5). */
+.drawer-value {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-ink-subtle);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Primary CTA: larger tap target + a quiet breathing focus halo (spec section 8). */
-.cta {
-  font-size: 0.9375rem;
-  padding: 0.75rem 1.5rem;
+.drawer-optional {
+  margin-left: auto;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-subtle); /* AA at 11px: ink-subtle 5.63:1, matching .optional-tag (was ink-tertiary 3.17:1) */
+}
+
+.approval-drawer .drawer-body {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* F9 — the approval-stack ⓘ. glossary.decorate mounts it as a sibling of the
+   drawer <details> inside this relative shell (a <details> ⓘ can't nest in a
+   <summary>, and content after the summary is hidden while the drawer is closed),
+   so it stays visible open or closed. It floats into the summary row's top-right;
+   the summary reserves padding-right so it never overlaps the "optional" tag
+   (which is pushed right by margin-left:auto). */
+.approval-shell {
+  position: relative;
+}
+
+.approval-drawer > summary.drawer-summary {
+  /* reserve a lane on the right for the absolutely-positioned ⓘ */
+  padding-right: calc(var(--space-4) + 1.75rem);
+}
+
+.approval-shell > .term-pop {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-4);
+  z-index: 5;
+}
+
+/* Right-edge ⓘ → open its popover leftward so it can't overflow the viewport. */
+.approval-shell > .term-pop > .term-pop-body {
+  left: auto;
+  right: 0;
+}
+
+/* Gate the results-shaped blocks (Prioritization flow, AI-seat-vs-all-human) on
+   hasRun (main.js toggles .pre-run) so they never sit empty in the setup. */
+.approval-drawer.pre-run .cfg-flow,
+.approval-drawer.pre-run .cfg-legibility {
+  display: none;
 }
 
 /* ---- run strip (always visible) + gated results (spec section 6, BLOCKER A) ---- */
 /* The run feedback + persistent actions live in .run-strip, OUTSIDE #org-results,
    so first-run progress/status show while #org-results stays gated on hasRun. */
 .run-strip {
-  margin: var(--space-8) 0 var(--space-6);
+  margin: var(--space-10) 0 var(--space-8);
 }
 
 .results {
@@ -1794,54 +2361,116 @@ progress {
 }
 
 /* ==================================================================== */
-/* P10a — quiet motion. ALL of it lives behind prefers-reduced-motion    */
-/* (spec section 8): staggered fade-ups, a breathing CTA halo, and a     */
-/* chart-container fade-up (CSS on the container — NOT stroke-dashoffset; */
-/* charts are Chart.js on canvas with per-frame animation deliberately   */
-/* off). No per-frame JS animation anywhere.                             */
+/* P10b §6 — motion system (CSS + WAAPI, NO GSAP). ALL of it lives behind  */
+/* prefers-reduced-motion: no-preference; transform / opacity / box-shadow */
+/* / stroke-dashoffset (SVG-only) only — no per-frame JS, Chart.js         */
+/* animation stays OFF, canvas inert. Base state is fully-drawn / opacity 1 */
+/* / no curtain, so reduced-motion degrades to instant with no flash.      */
 /* ==================================================================== */
 
 @keyframes eig-fade-up {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: none; }
+}
+
+@keyframes eig-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes eig-fade {
+  to { opacity: 1; }
+}
+
+@keyframes eig-wipe {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+@keyframes eig-settle-ring {
+  0% { box-shadow: 0 0 0 0 rgba(94, 106, 210, 0); }
+  35% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.5), 0 0 22px 2px rgba(94, 106, 210, 0.22); }
+  100% { box-shadow: 0 0 0 0 rgba(94, 106, 210, 0); }
 }
 
 @keyframes eig-breathe {
   0%, 100% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.35); }
-  50% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.55), 0 0 18px 1px rgba(94, 106, 210, 0.22); }
+  50% { box-shadow: 0 0 0 1px rgba(94, 106, 210, 0.45), 0 0 16px 1px rgba(94, 106, 210, 0.2); }
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* Landing: header -> doors (staggered) -> framing line. */
-  .landing-header { animation: eig-fade-up 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .door { animation: eig-fade-up 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .door:nth-child(1) { animation-delay: 140ms; }
-  .door:nth-child(2) { animation-delay: 230ms; }
-  .landing-foot { animation: eig-fade-up 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 340ms; }
+  /* §6.2 — The Divergence draws in once (the calm order line resolves first).
+     stroke-dasharray/offset live ONLY here, so the base state is fully drawn
+     (reduced-motion = instant). pathLength="100" ⇒ no JS measurement. */
+  .median { stroke-dasharray: 100; stroke-dashoffset: 100; animation: eig-draw 760ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+  .median-ord { animation-delay: 160ms; }
+  .median-dis { animation-delay: 300ms; }
+  .band, .seed { opacity: 0; animation: eig-fade 420ms ease forwards; }
+  .band-ord { animation-delay: 620ms; }
+  .band-dis { animation-delay: 700ms; }
+  .seed { animation-delay: 120ms; }
 
-  /* Entering a door: the intro + setup panel fade up once. */
-  .mode-content.entered .mode-intro { animation: eig-fade-up 440ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .mode-content.entered > .setup { animation: eig-fade-up 440ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 70ms; }
-  .mode-content.entered .placeholder { animation: eig-fade-up 460ms cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 70ms; }
+  /* §6.4 — entrances (calm, ~40% faster than P10a). */
+  .landing-rail { animation: eig-fade-up 240ms var(--ease-out) both; }
+  .hero-copy { animation: eig-fade-up 260ms var(--ease-out) both; animation-delay: 60ms; }
+  .hero-signature { animation: eig-fade-up 260ms var(--ease-out) both; animation-delay: 120ms; }
+  .landing-connective { animation: eig-fade-up 240ms var(--ease-out) both; animation-delay: 200ms; }
+  .door { animation: eig-fade-up 300ms var(--ease-out) backwards; } /* backwards, NOT both — fixes the hover/press lift (M8) */
+  .door:nth-child(1) { animation-delay: 90ms; }
+  .door:nth-child(2) { animation-delay: 165ms; }
+  .landing-foot { animation: eig-fade-up 240ms var(--ease-out) both; animation-delay: 250ms; }
 
-  /* First data: the chart containers + story cards fade up (light stagger). */
-  .charts-revealed .reveal-item { animation: eig-fade-up 500ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(2) { animation-delay: 50ms; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(3) { animation-delay: 85ms; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(4) { animation-delay: 120ms; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(5) { animation-delay: 155ms; }
-  .charts-revealed .charts-grid .reveal-item:nth-child(6) { animation-delay: 190ms; }
+  .mode-content.entered .mode-intro { animation: eig-fade-up 240ms var(--ease-out) both; }
+  .mode-content.entered > .setup { animation: eig-fade-up 260ms var(--ease-out) both; animation-delay: 60ms; }
+  .mode-content.entered .placeholder { animation: eig-fade-up 260ms var(--ease-out) both; animation-delay: 60ms; }
 
-  /* Primary CTA: a quiet breathing ring while it holds keyboard focus
-     (spec §8 "breathing focus ring"; F2 — scoped to :focus-visible, not always-on). */
-  .cta:focus-visible { animation: eig-breathe 3600ms ease-in-out infinite; }
+  /* §6.3 — results climax: the before/after pane charts sweep in on simulation
+     time (a surface-2 curtain collapsing to the right edge), "after" trailing
+     "before"; then the six explore charts arrive as a second wave. The curtain
+     uses `both` so it holds scaleX(1) during the 180ms lead-in AND scaleX(0)
+     after (its base ::after would otherwise re-cover on any repaint). */
+  .charts-revealed > .reveal-item:first-of-type { animation: eig-fade-up 280ms var(--ease-out) both; }
+  .charts-revealed .pane-card .chart-box { overflow: hidden; }
+  .charts-revealed .pane-card .chart-box::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--color-surface-2);
+    transform-origin: right center;
+    animation: eig-wipe 640ms cubic-bezier(0.2, 0, 0.1, 1) both;
+    animation-delay: 180ms;
+    pointer-events: none;
+  }
+  .charts-revealed .pane-card:nth-child(2) .chart-box::after { animation-delay: 340ms; }
+  /* one lavender settle-pulse on the user's own org (the tagged pane card). */
+  .charts-revealed .pane-card:has(.tag:not([hidden])) { animation: eig-settle-ring 900ms var(--ease-emphasis) 860ms both; }
 
-  /* Door hover LIFT (F1): motion-guarded + eased, so reduced-motion users get
-     no movement and everyone else gets a smooth lift. */
-  .door { transition: transform 160ms ease; }
-  .door:hover:not(:disabled) { transform: translateY(-2px); }
+  /* second wave: the six explore charts fade up AFTER the payoff registers. */
+  .charts-revealed .charts-grid .reveal-item { animation: eig-fade-up var(--dur-fade) var(--ease-out) both; animation-delay: 300ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(2) { animation-delay: 355ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(3) { animation-delay: 410ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(4) { animation-delay: 465ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(5) { animation-delay: 520ms; }
+  .charts-revealed .charts-grid .reveal-item:nth-child(6) { animation-delay: 575ms; }
 
-  /* Smooth stale -> fresh. */
+  /* §6.5 — micro-interactions (the phone audience's only tactile feedback). */
+  .door { transition: transform var(--dur-hover) var(--ease-standard), box-shadow var(--dur-hover) var(--ease-standard); }
+  .door:hover:not(:disabled) { transform: translateY(-3px); box-shadow: var(--shadow-door-hover); }
+  .door:active:not(:disabled) { transform: translateY(-1px) scale(0.995); }
+  button, .chip {
+    transition: background-color var(--dur-hover) var(--ease-standard),
+      color var(--dur-hover) var(--ease-standard),
+      border-color var(--dur-hover) var(--ease-standard),
+      transform var(--dur-press) var(--ease-standard);
+  }
+  button:active:not(:disabled), .chip:active:not(:disabled),
+  .cfg-type:active, .segmented button:active { transform: translateY(1px); }
+  .altitude-seg { transition: box-shadow var(--dur-hover) var(--ease-standard); }
+  .altitude-seg:active { transform: translateY(1px); }
+
+  /* §6.6 — a quiet breathing ring while the CTA holds keyboard focus. */
+  .cta:focus-visible { animation: eig-breathe 3200ms var(--ease-standard) infinite; }
+
+  /* Smooth stale -> fresh (P10a). */
   .results .charts-grid,
   .results .pane-grid { transition: opacity 240ms ease; }
 }
@@ -1865,5 +2494,27 @@ progress {
 
   .door {
     padding: var(--space-4);
+  }
+
+  /* Run dock → sticky bottom, always reachable (§4b.3). It hides with the
+     setup-body after the first run, handing off to the run-strip's "Run again". */
+  .setup-run-dock {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    margin-inline: calc(-1 * var(--space-4));
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--color-hairline);
+    border-bottom: none;
+    background: color-mix(in srgb, var(--color-canvas) 92%, transparent);
+    backdrop-filter: blur(8px);
+  }
+
+  .setup-run-dock .cta {
+    width: 100%;
+  }
+
+  .setup-body {
+    padding-bottom: var(--space-4);
   }
 }

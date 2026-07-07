@@ -269,7 +269,7 @@ test('health meaning switches on the sign and size of the final health gap', () 
   const mk = (/** @type {number} */ gap) => ({
     series: { healthGap: [{ t: 0, p50: gap }] },
   });
-  assert.match(meaningFor('health', { config, output: mk(15) }), /healthy-teams-sick-org/);
+  assert.match(meaningFor('health', { config, output: mk(15) }), /sound-teams-strained-org/);
   assert.match(meaningFor('health', { config, output: mk(-15) }), /teams inside are eroding/);
   assert.match(meaningFor('health', { config, output: mk(2) }), /roughly agree/);
 });

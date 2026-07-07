@@ -156,6 +156,24 @@ export function hasNonHumanLayer(config) {
 }
 
 /**
+ * A one-line summary of the approval stack for the collapsed <details> drawer
+ * (spec §4b.4, actor-observability: the value is legible without expanding).
+ * Pure (node-tested); reads only the stack, authors no model number.
+ * @param {any} config
+ * @returns {string} e.g. "1 layer · Human PM" or "3 layers · Human PM, AI Prioritization Agent"
+ */
+export function approvalStackSummary(config) {
+  const stack = stackFromConfig(config);
+  const L = stack.length;
+  /** @type {string[]} */
+  const seen = [];
+  for (const t of stack) if (!seen.includes(t)) seen.push(t);
+  const labels = seen.map((t) => typeMeta(t).label);
+  const composition = labels.length <= 2 ? labels.join(', ') : `${labels.length} seat types`;
+  return `${L} layer${L === 1 ? '' : 's'} · ${composition}`;
+}
+
+/**
  * Write a stack back onto a config (the single P6 config writer). Authoring
  * semantics, mirroring P5's ui/org.js pattern exactly:
  *   - strips replay/paramOverrides (a stack edit is AUTHORING — CONTRACTS §4;
@@ -687,7 +705,10 @@ export function renderConfigurator(container, coordinator) {
       const s = legibilitySummary(primaryOutput, twinOutput);
       legBody.append(
         comparisonRow('Settled decision latency', fmtDays(s.primary.latency), fmtDays(s.twin && s.twin.latency)),
-        comparisonRow('Novel-task brittleness (events)', fmtEvents(s.primary.brittleness), fmtEvents(s.twin && s.twin.brittleness)),
+        comparisonRow('How easily work breaks', fmtEvents(s.primary.brittleness), fmtEvents(s.twin && s.twin.brittleness), {
+          term: 'brittleness',
+          tech: 'Novel-task brittleness (events)',
+        }),
       );
     } else if (primaryOutput) {
       const stack = stackFromConfig(config);
@@ -704,14 +725,26 @@ export function renderConfigurator(container, coordinator) {
     legSentence.textContent = whatThisMeans(config, primaryOutput, twinOutput);
   };
 
-  /** @param {string} label @param {string} primary @param {string} twin */
-  const comparisonRow = (label, primary, twin) => {
+  /**
+   * @param {string} label @param {string} primary @param {string} twin
+   * @param {{ term?: string, tech?: string }} [opts] when a curated `term` is
+   *   supplied, the label leads with the plain English and demotes the technical
+   *   term to a `.tech-label`, on a FLOW <div> carrying the `data-term` so
+   *   glossary.decorate() can insert its inline ⓘ (a <details> — never valid
+   *   inside the plain <span> label).
+   */
+  const comparisonRow = (label, primary, twin, opts = {}) => {
     const row = elc('div', 'cfg-cmp-row');
-    row.append(
-      elc('span', 'cfg-cmp-label', label),
-      pill('This stack', primary, 'ai'),
-      pill('All-human', twin, 'human'),
-    );
+    let labelEl;
+    if (opts.term && opts.tech) {
+      labelEl = elc('div', 'cfg-cmp-label');
+      labelEl.dataset.term = opts.term;
+      labelEl.appendChild(document.createTextNode(label));
+      labelEl.appendChild(elc('span', 'tech-label', opts.tech));
+    } else {
+      labelEl = elc('span', 'cfg-cmp-label', label);
+    }
+    row.append(labelEl, pill('This stack', primary, 'ai'), pill('All-human', twin, 'human'));
     return row;
   };
   /** @param {string} tag @param {string} value @param {string} kind */

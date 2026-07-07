@@ -12,7 +12,7 @@ import { deepCopy } from './runplan.js';
  * @typedef {{ id: string, label: string, kind: 'range' | 'number' | 'segmented',
  *             min?: number, max?: number, step?: number,
  *             options?: Array<{ value: string, label: string }>,
- *             hint?: string }} ControlDef
+ *             anchors?: { min: string, max: string }, hint?: string }} ControlDef
  */
 
 /** MODEL.md §3.3 input ranges. @type {ControlDef[]} */
@@ -24,7 +24,7 @@ export const CONTROL_DEFS = [
     min: 4,
     max: 500,
     step: 1,
-    hint: 'people at step 0 (4–500)',
+    hint: 'starting people (4–500)',
   },
   {
     id: 'headcountGrowthPerStep',
@@ -42,6 +42,9 @@ export const CONTROL_DEFS = [
     min: 1,
     max: 6,
     step: 1,
+    // Directional anchors (same pattern as the SH control): a bare "3" carries
+    // no sense of which way is which.
+    anchors: { min: 'flat', max: 'deep' },
   },
   {
     id: 'ownershipLayers',
@@ -183,6 +186,14 @@ const TOPOLOGY_LABELS = {
   federated: 'Federated',
 };
 
+/** Topology nouns for the plain-English précis ("wired as …"). @type {Record<string, string>} */
+const TOPOLOGY_PRECIS = {
+  flat: 'a flat org',
+  hierarchical: 'a hierarchy',
+  pods: 'pods',
+  federated: 'a federation',
+};
+
 /**
  * The "Your setup" chip summary (spec §6): a compact, human-readable digest of
  * the current org configuration, shown at the top of the results while the setup
@@ -210,14 +221,146 @@ export function orgSetupChips(config, scenarioLabel) {
   ];
 }
 
+/**
+ * The plain-English setup précis (spec §4b.2) as an array of segments. A segment
+ * with `value:true` is an editable value the renderer emphasizes (bold ink — the
+ * accent stays reserved for Run, §C6). Pure (node-tested); reads only the fields
+ * `orgSetupChips()` reads (people / topology / modality / ownershipLayers /
+ * aiInjection) and authors NO model number — every value is a plain input the
+ * user set. (No scenarioLabel arg: the scenario is already the eyebrow + first
+ * chip; the sentence describes the configuration, not its preset name.)
+ * @param {any} config the current org config
+ * @returns {Array<{ text: string, value?: boolean }>}
+ */
+export function orgPrecisSentence(config) {
+  const org = config?.org ?? {};
+  const people = String(org.headcountStart ?? '—');
+  const topology = TOPOLOGY_PRECIS[org.topology] ?? 'a custom shape';
+  const modality = org.modality === 'meetingHeavy' ? 'meeting-heavy' : 'async-first';
+  const layers = Number(org.ownershipLayers);
+  const layerText = Number.isFinite(layers) ? `${layers}-layer approval chain` : 'a custom approval chain';
+  const aiOn =
+    Boolean(org.aiInjection?.enabled) && Number(org.aiInjection?.atStep) < Number(config?.horizon ?? 0);
+  /** @type {Array<{ text: string, value?: boolean }>} */
+  const parts = [
+    { text: "You're testing a " },
+    { text: `${people}-person`, value: true },
+    { text: ' org wired as ' },
+    { text: topology, value: true },
+    { text: ', ' },
+    { text: modality, value: true },
+    { text: ', cleared by a ' },
+    { text: layerText, value: true },
+  ];
+  if (aiOn) parts.push({ text: ', with ' }, { text: 'AI injected partway', value: true });
+  parts.push({ text: '.' });
+  return parts;
+}
+
 // ---- DOM rendering (browser only) --------------------------------------------
+
+/**
+ * Render the org précis into `host`, emphasizing the editable values (bold ink).
+ * Text-node only (no innerHTML). @param {HTMLElement} host @param {any} config
+ */
+export function renderOrgPrecis(host, config) {
+  host.textContent = '';
+  for (const seg of orgPrecisSentence(config)) {
+    if (seg.value) {
+      const strong = document.createElement('strong');
+      strong.textContent = seg.text;
+      host.appendChild(strong);
+    } else {
+      host.appendChild(document.createTextNode(seg.text));
+    }
+  }
+}
+
+/**
+ * Build the Structural-Health control (P10b §4d/§5): plain-lead heading +
+ * demoted `.tech-label` + `data-term` (so glossary.decorate attaches the ⓘ),
+ * the value as "N of 10", strained/sound anchors (a bare "N" carries no
+ * direction), and — when `structuralHealthHelper` is supplied — the inline
+ * "Answer 5 quick questions" helper mount. `data-term` sits on a NON-label
+ * wrapper so the ⓘ (a <details>) is a sibling of the <label>, never nested
+ * inside it.
+ * @param {HTMLElement} root
+ * @param {ControlDef} def
+ * @param {{ getConfig: () => any, onConfigChange: (config: any) => void,
+ *           structuralHealthHelper?: (mount: HTMLElement) => void }} opts
+ * @param {Array<() => void>} refreshers
+ */
+function buildStructuralHealthField(root, def, opts, refreshers) {
+  const field = document.createElement('div');
+  field.className = 'field field-sh';
+
+  const labelRow = document.createElement('div');
+  labelRow.className = 'field-label-row';
+  // A flow element (div, not span) so the inline ⓘ (a <details>) decorate inserts
+  // here is valid HTML. Carries data-term; the ⓘ lands between the label and the
+  // demoted .tech-label.
+  const lead = document.createElement('div');
+  lead.className = 'field-lead';
+  lead.dataset.term = 'structuralHealth';
+  const label = document.createElement('label');
+  label.textContent = 'How sound your org’s setup is';
+  label.htmlFor = 'ctl-structuralHealth';
+  const tech = document.createElement('span');
+  tech.className = 'tech-label';
+  tech.textContent = 'Structural Health · 1–10';
+  lead.append(label, tech); // decorate() inserts the ⓘ between the label and .tech-label
+  const valueOut = document.createElement('output');
+  valueOut.className = 'field-value';
+  valueOut.htmlFor.add('ctl-structuralHealth');
+  labelRow.append(lead, valueOut);
+
+  const input = document.createElement('input');
+  input.id = 'ctl-structuralHealth';
+  input.type = 'range';
+  input.min = String(def.min);
+  input.max = String(def.max);
+  input.step = String(def.step);
+  input.addEventListener('input', () => {
+    opts.onConfigChange(applyOrgValue(opts.getConfig(), 'structuralHealth', input.value));
+  });
+
+  // Directional anchors (§5) — non-judgmental (strained / sound, never broken).
+  const anchors = document.createElement('div');
+  anchors.className = 'field-anchors';
+  const strained = document.createElement('span');
+  strained.className = 'field-anchor';
+  strained.textContent = 'strained';
+  const sound = document.createElement('span');
+  sound.className = 'field-anchor';
+  sound.textContent = 'sound';
+  anchors.append(strained, sound);
+
+  const hint = document.createElement('p');
+  hint.className = 'field-hint';
+  hint.textContent = 'Clear ownership, finishing before starting, deciding without a meeting.';
+
+  const helperMount = document.createElement('div');
+  helperMount.className = 'sh-helper';
+
+  refreshers.push(() => {
+    const current = readOrgValues(opts.getConfig()).structuralHealth;
+    input.value = String(current);
+    valueOut.textContent = `${current} of 10`;
+  });
+
+  field.append(labelRow, input, anchors, hint, helperMount);
+  root.appendChild(field);
+
+  if (opts.structuralHealthHelper) opts.structuralHealthHelper(helperMount);
+}
 
 /**
  * Render the control grid into `root`. Controls stay ENABLED during runs
  * (PLAN P5: UI interactive mid-run); changes apply to the next run.
  *
  * @param {HTMLElement} root
- * @param {{ getConfig: () => any, onConfigChange: (config: any) => void }} opts
+ * @param {{ getConfig: () => any, onConfigChange: (config: any) => void,
+ *           structuralHealthHelper?: (mount: HTMLElement) => void }} opts
  * @returns {{ refresh: () => void }}
  */
 export function renderControls(root, opts) {
@@ -241,6 +384,13 @@ export function renderControls(root, opts) {
     // canonical range for clamping, still node-tested) — only the DOM widget
     // moves to ui/prioritization.js.
     if (def.id === 'ownershipLayers') continue;
+
+    // The Structural-Health control gets the plain-language + inline-helper
+    // treatment (§4d/§5) — a bespoke build, not the generic field path.
+    if (def.id === 'structuralHealth') {
+      buildStructuralHealthField(root, def, opts, refreshers);
+      continue;
+    }
 
     const field = document.createElement('div');
     field.className = 'field';
@@ -302,6 +452,20 @@ export function renderControls(root, opts) {
       });
       field.appendChild(labelRow);
       field.appendChild(input);
+      // Directional anchors under a range (SH-control pattern, §5) — a bare value
+      // carries no direction. Rendered only when the def opts in.
+      if (def.kind === 'range' && def.anchors) {
+        const anchors = document.createElement('div');
+        anchors.className = 'field-anchors';
+        const lo = document.createElement('span');
+        lo.className = 'field-anchor';
+        lo.textContent = def.anchors.min;
+        const hi = document.createElement('span');
+        hi.className = 'field-anchor';
+        hi.textContent = def.anchors.max;
+        anchors.append(lo, hi);
+        field.appendChild(anchors);
+      }
     }
 
     if (def.hint) {

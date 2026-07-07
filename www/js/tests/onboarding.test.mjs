@@ -1,6 +1,16 @@
-// P8 onboarding diagnostic — pure logic (scoring, storage flag, verbatim
-// questions). DOM behaviour (once-only, focus, skip) is covered by the
-// Playwright acceptance probe; this pins the model-facing invariants.
+// Structural-Health diagnostic — pure logic (scoring, storage flag, verbatim
+// questions). DOM behaviour is covered by the Playwright acceptance probe; this
+// pins the model-facing invariants.
+//
+// P10b-2 DELIBERATE PIN UPDATE (decision log "P10b execution — pre-code folds
+// APPLIED"): the P8 post-result auto-offer is RETIRED and the §3.4 questions now
+// power a user-initiated inline SH helper (createStructuralHealthHelper). The
+// PURE §3.4 referents (DIAGNOSTIC_QUESTIONS, ANSWER_SCORES, scoreStructuralHealth)
+// are unchanged and still pinned VERBATIM here — the helper reuses them, so these
+// invariants are MORE load-bearing, not less. shouldShowDiagnostic / the storage
+// flag are RETAINED FOR BACKCOMPAT / P7b (no longer wired to any auto-fire path);
+// their tests below now document the retired preset-gating semantics rather than
+// a live code path (see the section header before them).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +26,7 @@ import {
   markDiagnosticSeen,
   shouldShowDiagnostic,
   STORAGE_KEY,
+  createStructuralHealthHelper,
 } from '../ui/onboarding.js';
 
 const modelPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'MODEL.md');
@@ -100,7 +111,13 @@ test('storage errors (private browsing) never throw — read is false, write is 
   assert.equal(readDiagnosticSeen(s), false);
 });
 
-// ---- MED-2: the diagnostic gates on a GENUINE preset run only ------------------
+// ---- shouldShowDiagnostic — RETAINED FOR BACKCOMPAT / P7b (no longer wired) ----
+//
+// The P10b-2 re-scope RETIRED the auto-fire path (the SH diagnostic is now the
+// user-initiated inline helper). These tests are DELIBERATELY KEPT to pin the
+// retired preset-gating semantics for a future mode that might re-adopt an
+// offered flow — the function stays pure + exported, so its contract stays
+// documented even though main.js no longer calls it.
 
 test('MED-2: a first PRESET result SHOWS the diagnostic', () => {
   assert.equal(shouldShowDiagnostic({ replay: false, presetId: 'fasterDysfunction', alreadyHandled: false }), true);
@@ -119,4 +136,116 @@ test('MED-2: a share-link replay never shows the diagnostic (even for a non-empt
 
 test('MED-2: once handled (this session or a prior one), it never shows again', () => {
   assert.equal(shouldShowDiagnostic({ replay: false, presetId: 'fasterDysfunction', alreadyHandled: true }), false);
+});
+
+// ---- inline SH helper: Start-over reset (DOM-level) ----------------------------
+//
+// F5 (P10b-2 repair-1): the helper's collapse() — the ONLY external caller is
+// resetToDefault (Start over) — must reset the radios to their defaultChecked
+// neutrals, so a fresh boot and a post-Start-over boot present identical answers.
+// (An in-session Close/Apply keeps answers; those call setExpanded directly.)
+
+/** A minimal DOM node supporting exactly what the SH helper + form.reset() touch. */
+class El {
+  /** @param {string} tag */
+  constructor(tag) {
+    this.tagName = String(tag).toLowerCase();
+    this.className = '';
+    this.textContent = '';
+    this.id = '';
+    this.type = '';
+    this.name = '';
+    this.value = '';
+    this.checked = false;
+    this._defaultChecked = false;
+    this.hidden = false;
+    this.htmlFor = '';
+    /** @type {Record<string, string>} */ this.attributes = {};
+    /** @type {any[]} */ this.children = [];
+  }
+  // Real DOM: setting defaultChecked (the `checked` content attribute) also sets
+  // the initial checkedness, until the user (or reset()) changes it.
+  get defaultChecked() {
+    return this._defaultChecked;
+  }
+  set defaultChecked(/** @type {boolean} */ v) {
+    this._defaultChecked = v;
+    this.checked = v;
+  }
+  setAttribute(/** @type {string} */ k, /** @type {string} */ v) {
+    this.attributes[k] = String(v);
+  }
+  appendChild(/** @type {any} */ n) {
+    this.children.push(n);
+    return n;
+  }
+  append(/** @type {any[]} */ ...ns) {
+    for (const n of ns) this.children.push(n);
+  }
+  addEventListener() {}
+  focus() {}
+  /** HTMLFormElement.reset(): restore controls to their defaults (radios → defaultChecked). */
+  reset() {
+    for (const input of this.querySelectorAll('input')) input.checked = Boolean(input.defaultChecked);
+  }
+  /** @param {string} sel supports 'input' and 'input[type="radio"]' */
+  querySelectorAll(sel) {
+    const m = /^(\w+)(?:\[type="(\w+)"\])?$/.exec(sel);
+    const tag = m ? m[1] : sel;
+    const type = m ? m[2] : undefined;
+    /** @type {any[]} */ const out = [];
+    /** @param {any} node */
+    const walk = (node) => {
+      for (const c of node.children) {
+        if (c && c.tagName === tag && (!type || c.type === type)) out.push(c);
+        if (c && Array.isArray(c.children)) walk(c);
+      }
+    };
+    walk(this);
+    return out;
+  }
+  /** @param {string} sel */
+  querySelector(sel) {
+    const all = this.querySelectorAll(sel);
+    return all.length ? all[0] : null;
+  }
+}
+
+/** Run `fn` with an El-backed globalThis.document. @param {() => void} fn */
+function withDom(fn) {
+  const prev = /** @type {any} */ (globalThis).document;
+  /** @type {any} */ (globalThis).document = { createElement: (/** @type {string} */ t) => new El(t) };
+  try {
+    fn();
+  } finally {
+    /** @type {any} */ (globalThis).document = prev;
+  }
+}
+
+test('F5: SH helper collapse() (Start over) resets the diagnostic answers to their fresh-boot defaults', () => {
+  withDom(() => {
+    const mount = new El('div');
+    const helper = createStructuralHealthHelper(/** @type {any} */ (mount), { onScore: () => {} });
+
+    const radios = mount.querySelectorAll('input[type="radio"]');
+    assert.equal(radios.length, DIAGNOSTIC_QUESTIONS.length * ANSWER_SCORES.length, 'three options per question');
+
+    // Fresh boot: exactly the neutral (defaultChecked) mid option of each question.
+    const freshChecked = radios.map((/** @type {any} */ r) => r.checked);
+    assert.equal(freshChecked.filter(Boolean).length, DIAGNOSTIC_QUESTIONS.length, 'one default per question');
+
+    // Simulate answering Q1 with a non-default option (radio-group semantics:
+    // uncheck its default mid, check its high). radios[1] is Q1 mid (oi===1).
+    radios[1].checked = false;
+    radios[2].checked = true;
+    assert.notDeepEqual(radios.map((/** @type {any} */ r) => r.checked), freshChecked, 'the answer changed from fresh');
+
+    // Start over collapses the helper → must reset the form to its defaults.
+    helper.collapse();
+    assert.deepEqual(
+      radios.map((/** @type {any} */ r) => r.checked),
+      freshChecked,
+      'post-Start-over answers equal fresh boot',
+    );
+  });
 });

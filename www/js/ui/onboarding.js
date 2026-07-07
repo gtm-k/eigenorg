@@ -1,17 +1,26 @@
-// eigenorg Structural-Health onboarding diagnostic (PLAN P8; binding delta 4;
-// VISION §9 "Onboarding (locked)").
+// eigenorg Structural-Health diagnostic (PLAN P8 → re-scoped P10b-2; binding
+// delta 4; VISION §9 "Onboarding (locked)").
 //
 // Five questions VERBATIM from MODEL.md §3.4 — the questions ARE the referents
 // (PREMORTEM A6: real-world units, no toy framing). Each is answered 0 (left
 // phrase) / 1 (somewhere between) / 2 (right phrase); the score maps to the
 // 1–10 Structural Health slider by the PINNED §3.4 formula (do NOT invent a
-// different mapping). Shown ONCE after the first result, skippable to the plain
-// slider (which stays the standing control), never blocking landing (A2). It is
-// gated on the FIRST genuine PRESET result (shouldShowDiagnostic), never a
-// custom-authored first run or a share-link replay (triage default 3).
+// different mapping).
+//
+// P10b-2 RE-SCOPE (decision log "P10b execution — pre-code folds APPLIED"): the
+// guided stepper was dropped and the R1 SH-diagnostic decouple resolved by
+// RETIRING the P8 post-result auto-offer. The §3.4 questions now power a single,
+// USER-INITIATED inline helper next to the SH control (createStructuralHealthHelper
+// / DESIGN-ELEVATION §5) — available unconditionally, re-openable on demand, so
+// the `presetId=''`-on-edit strand cannot occur and double-onboarding is gone.
+// The pure §3.4 referents (DIAGNOSTIC_QUESTIONS, ANSWER_SCORES,
+// scoreStructuralHealth) are reused VERBATIM. shouldShowDiagnostic /
+// markDiagnosticSeen / STORAGE_KEY are RETAINED FOR BACKCOMPAT / P7b but no
+// longer wired to any auto-fire path (a once-only lock would wrongly disable a
+// user-initiated control).
 //
 // Result feedback is non-judgmental and referent-based (global rule): the score
-// is reported through #run-status (main.js onComplete), never saying an org is
+// is reported through #run-status (main.js onScore), never saying an org is
 // "broken".
 
 /**
@@ -120,12 +129,16 @@ export function markDiagnosticSeen(storage) {
 }
 
 /**
+ * RETAINED FOR BACKCOMPAT / P7b (no longer wired — the auto-fire path is retired
+ * in P10b-2; the SH diagnostic is now the user-initiated inline helper). Kept
+ * pure + node-tested so the retired preset-gating semantics stay documented for a
+ * future mode that might re-adopt an offered flow.
+ *
  * Gate for the once-only Structural-Health diagnostic (triage default 3): it
  * shows after the FIRST genuine PRESET result only. A replay arrival reproduces a
  * specific shared run (an onboarding interrupt mid-replay is intrusive), and a
  * CUSTOM-authored first run must NOT trigger OR consume the once-only flag — only
  * a non-empty preset id (a real preset selection the user did not edit) qualifies.
- * Pure so the run-source gate is node-tested, not just wired in main.js.
  * @param {{ replay: boolean, presetId: string, alreadyHandled: boolean }} ctx
  *   `replay` — this paint is a shared-link replay; `presetId` — the preset id
  *   captured at RUN LAUNCH ('' for a custom-authored run); `alreadyHandled` —
@@ -149,35 +162,17 @@ function make(tag, cls, text) {
 }
 
 /**
- * Build the diagnostic UI into `root` (kept hidden until show()). Radio groups
- * live in fieldset/legend for keyboard + screen-reader operability; nothing
- * signals by colour alone.
- *
- * @param {HTMLElement} root the mount (a <section>, initially hidden)
- * @param {{ onComplete: (score: number) => void, onSkip: () => void,
- *           storage?: Storage }} opts
- * @returns {{ show: () => void, hide: () => void, isShown: () => boolean }}
+ * Build the five VERBATIM §3.4 question fieldsets into `form` (radio groups in
+ * fieldset/legend for keyboard + screen-reader operability; nothing signals by
+ * colour alone). Returns one answer reader per question. Shared by the inline
+ * SH helper (and reusable by any future offered flow).
+ * @param {HTMLElement} form
+ * @returns {Array<() => number>}
  */
-export function renderOnboarding(root, opts) {
-  root.textContent = '';
-  root.classList.add('diagnostic');
-
-  const heading = make('h2', 'diagnostic-title', 'Two-minute Structural Health check');
-  heading.id = 'diagnostic-title';
-  heading.tabIndex = -1; // focus target on show (announced, not focus-trapped)
-  root.setAttribute('aria-labelledby', 'diagnostic-title');
-
-  const intro = make(
-    'p',
-    'diagnostic-intro',
-    'Five observable questions define Structural Health. Answer them to set the slider — or skip and use the slider directly. This appears once.',
-  );
-
-  const form = make('form', 'diagnostic-form');
+function renderQuestionFieldsets(form) {
   /** @type {Array<() => number>} */
   const readers = [];
-
-  DIAGNOSTIC_QUESTIONS.forEach((q, qi) => {
+  DIAGNOSTIC_QUESTIONS.forEach((q) => {
     const fs = make('fieldset', 'diagnostic-q');
     const legend = make('legend', 'diagnostic-legend');
     legend.append(make('span', 'diagnostic-dim', q.dimension), make('span', 'diagnostic-question', q.question));
@@ -213,52 +208,95 @@ export function renderOnboarding(root, opts) {
       const chosen = inputs.find((inp) => inp.checked);
       return chosen ? Number(chosen.value) : ANSWER_SCORES[1];
     });
-
-    if (qi === 0) fs.dataset.first = 'true';
   });
+  return readers;
+}
+
+/**
+ * The optional inline Structural-Health helper (spec §5; DESIGN-ELEVATION §5) —
+ * the single SH-configuration surface after the P8 auto-offer's retirement. A
+ * "Not sure? Answer 5 quick questions" button that expands the SAME verbatim
+ * §3.4 questions INLINE below the SH control; Apply scores via
+ * scoreStructuralHealth and hands the score to `opts.onScore` (which writes the
+ * plain slider through the standard authoring path — NO auto-run). This is a
+ * USER-INITIATED control, so it carries NO once-only lock: it is re-openable on
+ * demand (a lock would wrongly disable it after one use).
+ *
+ * @param {HTMLElement} mount the container under the SH control
+ * @param {{ onScore: (score: number) => void }} opts
+ * @returns {{ collapse: () => void, isExpanded: () => boolean }}
+ */
+export function createStructuralHealthHelper(mount, opts) {
+  mount.textContent = '';
+  const panelId = 'sh-helper-panel';
+
+  const toggle = /** @type {HTMLButtonElement} */ (make('button', 'link-btn sh-helper-toggle', 'Not sure? Answer 5 quick questions'));
+  toggle.type = 'button';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', panelId);
+
+  const panel = make('div', 'sh-helper-panel');
+  panel.id = panelId;
+  panel.hidden = true;
+
+  const intro = make(
+    'p',
+    'diagnostic-intro',
+    'Five observable questions define Structural Health. Answer them to set the slider — or close this and use the slider directly.',
+  );
+  const form = /** @type {HTMLFormElement} */ (make('form', 'diagnostic-form'));
+  const readers = renderQuestionFieldsets(form);
 
   const actions = make('div', 'diagnostic-actions');
   const applyBtn = /** @type {HTMLButtonElement} */ (make('button', undefined, 'Set my Structural Health'));
   applyBtn.type = 'submit';
-  const skipBtn = /** @type {HTMLButtonElement} */ (make('button', 'ghost', 'Skip — use the slider'));
-  skipBtn.type = 'button';
-  actions.append(applyBtn, skipBtn);
+  const closeBtn = /** @type {HTMLButtonElement} */ (make('button', 'ghost', 'Close'));
+  closeBtn.type = 'button';
+  actions.append(applyBtn, closeBtn);
+  form.appendChild(actions);
+  panel.append(intro, form);
+  mount.append(toggle, panel);
+
+  let expanded = false;
+  /** @param {boolean} on */
+  function setExpanded(on) {
+    expanded = on;
+    panel.hidden = !on;
+    toggle.setAttribute('aria-expanded', String(on));
+  }
+
+  toggle.addEventListener('click', () => {
+    setExpanded(!expanded);
+    if (expanded) {
+      const first = /** @type {HTMLElement | null} */ (form.querySelector('input[type="radio"]'));
+      if (first) first.focus();
+    } else {
+      toggle.focus();
+    }
+  });
 
   form.addEventListener('submit', (ev) => {
     ev.preventDefault();
-    const answers = readers.map((r) => r());
-    const score = scoreStructuralHealth(answers);
-    // Result feedback flows through #run-status (main.js onComplete): the panel
-    // hides in the same tick, so an in-panel result line would never render or
-    // announce (FOLD-B — dead code removed; #run-status is the live region).
-    markDiagnosticSeen(opts.storage);
-    opts.onComplete(score);
-    hide();
+    const score = scoreStructuralHealth(readers.map((r) => r()));
+    opts.onScore(score); // writes the plain slider; NO auto-run (main.js prompts a re-run)
+    setExpanded(false);
+    toggle.focus();
   });
 
-  skipBtn.addEventListener('click', () => {
-    markDiagnosticSeen(opts.storage);
-    opts.onSkip();
-    hide();
+  closeBtn.addEventListener('click', () => {
+    setExpanded(false);
+    toggle.focus();
   });
 
-  form.appendChild(actions);
-  root.append(heading, intro, form);
-  root.hidden = true;
-
-  let shown = false;
-  function show() {
-    root.hidden = false;
-    shown = true;
-    markDiagnosticSeen(opts.storage); // once it has appeared, it has been "shown"
-    // Announce + move focus to the panel heading (a response to the user's Run
-    // click — not a focus trap; Tab still leaves freely, so landing is never
-    // blocked).
-    heading.focus();
-  }
-  function hide() {
-    root.hidden = true;
-    shown = false;
-  }
-  return { show, hide, isShown: () => shown };
+  return {
+    // Start over (resetToDefault → shHelper.collapse) must return the diagnostic
+    // to a fresh-boot state, so it resets the radios to their defaultChecked
+    // neutrals as well as collapsing. An in-session Close/Apply keeps the user's
+    // answers — those paths call setExpanded(false) directly, never this.
+    collapse: () => {
+      form.reset();
+      setExpanded(false);
+    },
+    isExpanded: () => expanded,
+  };
 }

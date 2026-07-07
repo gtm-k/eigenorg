@@ -21,9 +21,9 @@ import {
   autoRunsOnInteraction,
   stagesGeneration,
 } from './ui/runplan.js';
-import { renderControls, applyOrgValue, orgSetupChips } from './ui/org.js';
-import { renderConfigurator, allHumanTwin, hasNonHumanLayer } from './ui/prioritization.js';
-import { renderOnboarding, readDiagnosticSeen, shouldShowDiagnostic } from './ui/onboarding.js';
+import { renderControls, applyOrgValue, orgSetupChips, renderOrgPrecis } from './ui/org.js';
+import { renderConfigurator, allHumanTwin, hasNonHumanLayer, approvalStackSummary } from './ui/prioritization.js';
+import { createStructuralHealthHelper } from './ui/onboarding.js';
 import { PRESET_REFS, DEFAULT_PRESET_ID, fetchPreset, primaryRunConfig, renderPresetPicker } from './ui/presets.js';
 import { meaningFor, paneHeading } from './ui/meaning.js';
 import { readShareFromHash, wireShareButton } from './ui/share.js';
@@ -31,6 +31,7 @@ import { wireCard } from './share/card.js';
 import { fetchAssumptions, renderAssumptionsDrawer } from './ui/assumptions.js';
 import { modelVersionBanner, extractShareFragment } from './url-codec.js';
 import { createNavShell, createSetupStrip } from './ui/nav.js';
+import { createGlossary } from './ui/glossary.js';
 
 /** @param {string} sel @returns {HTMLElement} */
 function el(sel) {
@@ -132,6 +133,16 @@ const state = {
 const probe = { lastPlan: null, shareFragment: null, bootReadyMs: null };
 /** @type {any} */ (window).__eigenorg = probe;
 
+// The plain-language glossary, hoisted to module scope (real instance mounts in
+// mountAssumptionsAndGlossary once assumptions load). Held here — not local to
+// that async fn — so the run flow can RE-decorate dynamically-rendered
+// [data-term] hosts (pane stat labels, the legibility comparison row, the
+// fasterDysfunction preset note) after a paint, and so a future mode's onEnter
+// can reach decorate(). A no-op placeholder keeps every caller safe before the
+// fetch resolves (same pattern as shHelper below).
+/** @type {{ decorate: (root: HTMLElement) => void }} */
+let glossary = { decorate: () => {} };
+
 /** @param {string} id @param {string} text */
 function setMeaning(id, text) {
   el(`#meaning-${id}`).textContent = text;
@@ -148,20 +159,50 @@ function setRunButtons(running) {
   }
 }
 
-/** @param {any} run @param {HTMLElement} dl render the pane card stat row */
+/**
+ * Render the pane card stat row. The two §8.5 metric labels lead with the plain
+ * English and demote the technical term to a `.tech-label`, carrying the
+ * `data-term` glossary.decorate() turns into the inline ⓘ (§4d); paintResults
+ * re-decorates the mount after building these (the boot decorate ran before any
+ * stat existed). Decision latency stays a plain readout label — it is not one of
+ * the ten §8.5 curated terms, so it gets no ⓘ.
+ * @param {any} run @param {HTMLElement} dl
+ */
 function renderStats(dl, run) {
+  /** @type {Array<{ plain: string, tech?: string, term?: string, value: string }>} */
   const stats = [
-    ['Decision latency', `${finalP50(run.output.series.decisionLatency).toFixed(1)} days`],
-    ['Coordination tax', `${Math.round(finalP50(run.output.series.coordinationTax) * 100)}%`],
-    ['Throughput', `${finalP50(run.output.series.throughput).toFixed(1)}/step`],
+    { plain: 'Decision latency', value: `${finalP50(run.output.series.decisionLatency).toFixed(1)} days` },
+    {
+      plain: 'Time lost coordinating',
+      tech: 'Coordination tax',
+      term: 'coordinationTax',
+      value: `${Math.round(finalP50(run.output.series.coordinationTax) * 100)}%`,
+    },
+    {
+      plain: 'Work getting done',
+      tech: 'Throughput',
+      term: 'throughput',
+      value: `${finalP50(run.output.series.throughput).toFixed(1)}/step`,
+    },
   ];
   dl.textContent = '';
-  for (const [label, value] of stats) {
+  for (const stat of stats) {
     const div = document.createElement('div');
     const dt = document.createElement('dt');
-    dt.textContent = label;
+    if (stat.term && stat.tech) {
+      // Plain lead as a text node; the ⓘ (a <details>) decorate inserts before
+      // the .tech-label is valid flow content inside a <dt>.
+      dt.dataset.term = stat.term;
+      dt.appendChild(document.createTextNode(stat.plain));
+      const tech = document.createElement('span');
+      tech.className = 'tech-label';
+      tech.textContent = stat.tech;
+      dt.appendChild(tech);
+    } else {
+      dt.textContent = stat.plain;
+    }
     const dd = document.createElement('dd');
-    dd.textContent = value;
+    dd.textContent = stat.value;
     div.append(dt, dd);
     dl.appendChild(div);
   }
@@ -395,10 +436,14 @@ function paintResults(r) {
   el('#ro-seed').textContent = `seed ${config.seed}`;
   el('#ro-iters').textContent = `${output.iterations} iterations × ${r.totalRuns} runs`;
   el('#ro-elapsed').textContent = `${(r.primaryElapsedMs / 1000).toFixed(2)} s/run · ${(r.planElapsedMs / 1000).toFixed(2)} s total`;
+  // Success line (P10b §4c copy): plain "runs · simulations" + "disorder settles
+  // around N". Every number is run-derived (never hardcoded): totalSims is the
+  // plan's run count × iterations, N is this run's settled entropy p50.
   const replayNote = r.replayPayload ? 'replayed from the shared link — ' : '';
+  const totalSims = r.totalRuns * output.iterations;
   setStatus(
     statusEl,
-    `${replayNote}${r.totalRuns} runs × ${output.iterations} iterations in ${(r.planElapsedMs / 1000).toFixed(2)} s — entropy p50 ends at ${finalP50(output.series.entropy).toFixed(1)}`,
+    `${replayNote}${r.totalRuns} runs · ${totalSims.toLocaleString('en-US')} simulations in ${(r.planElapsedMs / 1000).toFixed(1)} s — disorder settles around ${Math.round(finalP50(output.series.entropy))}.`,
     'ok',
   );
 
@@ -441,16 +486,10 @@ function paintResults(r) {
     seed: config.seed,
   });
 
-  // P8 onboarding: shown ONCE, after the FIRST genuine PRESET result — NOT on a
-  // share-URL replay (a share visitor is reproducing a specific run) and NOT on a
-  // custom-authored first run (which must not silently consume the once-only
-  // flag; MED-2, triage default 3). The run source is captured at launch
-  // (r.runPresetId). It appears under the results, never blocking landing (the
-  // user has already seen a full result by now — PREMORTEM A2).
-  if (shouldShowDiagnostic({ replay: Boolean(r.replayPayload), presetId: r.runPresetId, alreadyHandled: diagnosticHandled })) {
-    diagnosticHandled = true;
-    onboarding.show();
-  }
+  // (P10b-2) The P8 post-result diagnostic auto-offer is RETIRED — the single
+  // SH-configuration surface is now the user-initiated inline helper next to the
+  // SH control (decision log "P10b execution — pre-code folds APPLIED"), so
+  // paintResults no longer fires an onboarding interrupt.
 
   // Replay banner: informational, computed against the version the engine
   // actually stamped on this output (decision log round 1).
@@ -479,6 +518,12 @@ function paintResults(r) {
   // was already revealed + the chart-reveal played at the top of paintResults.
   state.hasRun = true;
   el('#run-button-2').hidden = false;
+  el('#approval-drawer').classList.remove('pre-run'); // reveal the now-populated flow/legibility blocks
+  // Attach the inline ⓘ to the [data-term] labels this paint just rendered (the
+  // before/after pane stat labels + the legibility "Novel-task brittleness" row).
+  // The boot decorate ran before any of these DOM nodes existed; decorate is
+  // idempotent, so re-walking the whole mount only touches the new hosts.
+  glossary.decorate(el('#org-mount'));
   markResultsFresh();
 }
 
@@ -566,15 +611,33 @@ function stageAndRefresh(next) {
   // so the once-only diagnostic won't fire/consume on a custom first run and the
   // card scenario label reads "Custom configuration".
   picker.setActive('');
-  el('#preset-note').textContent = 'Custom configuration — changes apply on the next run.';
+  const noteEl = el('#preset-note');
+  noteEl.textContent = 'Custom configuration — changes apply on the next run.'; // clears any prior ⓘ child
+  delete noteEl.dataset.term; // and drop the Faster-Dysfunction marker so a later decorate can't re-attach it
   controls.refresh();
   configurator.refresh();
   setStatus(statusEl, 'configuration changed — run to update the charts', '');
 }
 
+// The optional inline Structural-Health helper (spec §5) — the single
+// SH-configuration surface (the P8 post-result auto-offer is retired). Captured
+// so Start over can collapse it (resetToDefault byte-equivalence). onScore writes
+// the plain slider through the SAME authoring path a control edit uses
+// (stageAndRefresh) so share disarms + replay clears, then prompts a re-run
+// (NO auto-run — the P5/P6 "edits stage, never auto-run" convention).
+/** @type {{ collapse: () => void, isExpanded: () => boolean }} */
+let shHelper = { collapse: () => {}, isExpanded: () => false };
 const controls = renderControls(el('#org-controls'), {
   getConfig: () => state.config,
   onConfigChange: stageAndRefresh,
+  structuralHealthHelper(mount) {
+    shHelper = createStructuralHealthHelper(mount, {
+      onScore(score) {
+        stageAndRefresh(applyOrgValue(state.config, 'structuralHealth', score));
+        setStatus(statusEl, `Structural Health set to ${score} of 10 from your answers — run to see how this structure behaves.`, '');
+      },
+    });
+  },
 });
 
 // P6 configurator — SUBSUMES P5's ownership-layers control (decision 4): the
@@ -603,32 +666,38 @@ const configurator = renderConfigurator(el('#configurator'), {
   },
 });
 
-// P8 onboarding diagnostic — the 5-question Structural-Health check, shown ONCE
-// after the first (non-replay) result, skippable to the plain slider (decision
-// default 2: set the slider + prompt to re-run, NEVER auto-run — matches the
-// P5/P6 "edits stage, never auto-run" convention). readDiagnosticSeen carries
-// the once-only guarantee across sessions (localStorage, try/catch inside).
-let diagnosticHandled = readDiagnosticSeen();
-const onboarding = renderOnboarding(el('#diagnostic'), {
-  onComplete(score) {
-    // Set the plain SH slider through the SAME authoring path a control edit
-    // uses (stageAndRefresh) so share disarms, replay clears and the slider
-    // display updates — then prompt a re-run (no auto-run, decision default 2).
-    stageAndRefresh(applyOrgValue(state.config, 'structuralHealth', score));
-    setStatus(statusEl, `Structural Health set to ${score} from your diagnostic — run to see how this structure behaves.`, '');
-  },
-  onSkip() {
-    // The plain slider remains the standing control; reopen the setup panel in
-    // place (it may be collapsed to the chip summary) and move focus to it.
-    orgStrip.expand();
-    el('#ctl-structuralHealth').focus();
-    setStatus(statusEl, 'Set Structural Health with the slider, then run.', '');
-  },
-});
+/**
+ * The preset-note copy (§4d). The Faster Dysfunction default gets the approved
+ * plain-language line; every other preset gets a plain one-liner derived from its
+ * label. Neither cites the model source — the "MODEL.md §10.3" provenance now
+ * rides in the Faster Dysfunction ⓘ deep-dive copy (glossary-terms.js), not here.
+ * @param {any} preset @param {string} id
+ */
+function presetNote(preset, id) {
+  if (id === 'fasterDysfunction') {
+    return 'A small, healthy-looking org where adding AI speeds up the wrong things. Change anything below to make it yours.';
+  }
+  return `${preset.label} — a preset starting point. Change anything below to make it yours.`;
+}
 
-/** @param {any} preset */
-function presetNote(preset) {
-  return `${preset.label} — materialized verbatim from ${String(preset.source).replace(' (normative scenario config, materialized verbatim)', '')}.`;
+/**
+ * Set the preset-note copy AND, on the Faster Dysfunction default, attach the
+ * inline ⓘ for that scenario retell term (§8.5 / F1): the note <div> carries
+ * data-term="fasterDysfunction" and glossary.decorate inserts the ⓘ (a
+ * <details>). Any other preset clears both — setting textContent drops the prior
+ * ⓘ child, and removing the marker keeps a later decorate from re-attaching it —
+ * so a stale Faster-Dysfunction ⓘ never lingers on another scenario's note.
+ * @param {any} preset @param {string} id
+ */
+function setPresetNote(preset, id) {
+  const note = el('#preset-note');
+  note.textContent = presetNote(preset, id); // clears children, incl. any prior ⓘ
+  if (id === 'fasterDysfunction') {
+    note.dataset.term = 'fasterDysfunction';
+    if (note.parentElement) glossary.decorate(note.parentElement);
+  } else {
+    delete note.dataset.term;
+  }
 }
 
 const share = wireShareButton(shareButton, shareStatusEl, {
@@ -696,10 +765,13 @@ const orgStrip = createSetupStrip({
     /** @type {HTMLElement | null} */ (document.querySelector('#org-setup-body button, #org-setup-body input')),
 });
 
-/** Refresh the "Your setup" chips from the current (possibly pending) config. */
+/** Refresh the "Your setup" chips, the plain-English précis, and the approval
+ *  drawer's live value from the current (possibly pending) config. */
 function refreshSetupChips() {
   if (!state.config) return;
   orgStrip.setChips(orgSetupChips(state.config, currentScenarioLabel()));
+  renderOrgPrecis(el('#org-precis'), state.config);
+  el('#approval-drawer-value').textContent = approvalStackSummary(state.config);
 }
 
 /** A staged edit: charts no longer match the setup — show the stale badge.
@@ -753,7 +825,12 @@ function resetToDefault() {
   card.disarm();
   clearShareHash();
   bannerEl.hidden = true;
-  onboarding.hide(); // dismiss the once-only diagnostic if it was on screen
+  // Reset the plain-language layer's transient DOM so Start over is byte-equivalent
+  // to a fresh boot: collapse the SH helper and close any open inline ⓘ popover.
+  shHelper.collapse();
+  for (const open of el('#org-mount').querySelectorAll('.term-pop[open], .term-pop-more[open]')) {
+    open.removeAttribute('open');
+  }
 
   // Reload the default preset into the single canonical config.
   state.presetId = DEFAULT_PRESET_ID;
@@ -761,7 +838,7 @@ function resetToDefault() {
   const ref = PRESET_REFS.find((p) => p.id === DEFAULT_PRESET_ID);
   state.config = primaryRunConfig(preset, /** @type {any} */ (ref));
   picker.setActive(DEFAULT_PRESET_ID);
-  el('#preset-note').textContent = presetNote(preset);
+  setPresetNote(preset, DEFAULT_PRESET_ID);
   configurator.setCompareDefault(false);
 
   // Reset the results region + setup strip to the pre-run state. Re-hiding
@@ -772,6 +849,11 @@ function resetToDefault() {
   el('#org-results').hidden = true;
   el('#org-results').classList.remove('charts-revealed', 'is-stale');
   el('#run-button-2').hidden = true;
+  // BLOCKER A: the approval <details> must be COLLAPSED after Start over, exactly
+  // as on a fresh boot, and its run-derived flow/legibility re-gated on hasRun.
+  const approvalDrawer = el('#approval-drawer');
+  approvalDrawer.removeAttribute('open'); // collapse (details is open iff the attribute is present)
+  approvalDrawer.classList.add('pre-run');
   // Clear run-derived CONTENT too. The configurator's flow/recovery/legibility
   // panels live in the (always-visible) setup, so they MUST be cleared
   // (setPending) — gating #org-results would not hide them. The gated results'
@@ -791,8 +873,24 @@ function resetToDefault() {
   configurator.refresh();
   refreshSetupChips();
   setRunButtons(false);
-  setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
+  setStatus(statusEl, 'Ready — 500 simulations, in your browser.', '');
 }
+
+// Mode registry (C5): per-door onEnter / reset behaviour, dispatched by the
+// active door id, so P7b adds the Team lens as ONE entry (modes.team) instead of
+// branching the shell callbacks. nav nulls its active door BEFORE onStartOver
+// fires, so the active mode is tracked here (set on entry) to route reset to the
+// right mode — "Start over" in Team mode must run the team reset, not the org one.
+let activeMode = 'org';
+/** @type {Record<string, { onEnter?: () => void, reset: () => void }>} */
+const modes = {
+  org: {
+    onEnter() {
+      resizeCharts(); // charts were sized while the mount was hidden
+    },
+    reset: resetToDefault,
+  },
+};
 
 // The two-altitude nav shell (spec §4). Doors are registered by { id, label,
 // question, desc, icon, mount }; the shell drives the landing cards + the
@@ -805,29 +903,35 @@ const nav = createNavShell({
   shell: el('#shell'),
   toggle: el('#altitude-toggle'),
   startOver: /** @type {HTMLButtonElement} */ (el('#start-over')),
+  // Door copy = the FINAL hero lockup (DESIGN-ELEVATION-spec §0). The short
+  // labels ("Organization" / "One team") also drive the altitude toggle, which
+  // coheres with the connective line "the whole org, or a single team".
   doors: [
     {
       id: 'org',
-      label: 'Organization Building',
-      question: "Is my org's structure sound?",
-      desc: 'Shape a whole organization and see how its structure drives disorder, decision speed and coordination cost.',
+      label: 'Organization',
+      question: "Is your org's structure sound?",
+      desc: "Set its size, how it's wired, and who signs off — then run it.",
       icon: '🏢',
       mount: el('#org-mount'),
     },
     {
       id: 'team',
-      label: 'Team Building',
+      label: 'One team',
       question: "Will this team's makeup work?",
-      desc: 'Compose one team of humans and AI and see throughput, quality, cohesion and where coverage gaps open up.',
+      desc: 'Choose who does the work and who checks it — then run it.',
       icon: '👥',
       mount: el('#team-mount'),
     },
   ],
   onEnter(id) {
     el('#landing-notice').hidden = true; // clear any broken-link notice on entry (BLOCKER B)
-    if (id === 'org') resizeCharts(); // charts were sized while the mount was hidden
+    activeMode = id;
+    modes[id]?.onEnter?.();
   },
-  onStartOver: resetToDefault,
+  onStartOver() {
+    (modes[activeMode] ?? modes.org).reset();
+  },
 });
 
 for (const b of runButtons) b.addEventListener('click', () => void runAll());
@@ -851,7 +955,7 @@ async function boot() {
       state.config = primaryRunConfig(preset, ref);
       stageConfigChange('preset');
       picker.setActive(ref.id);
-      el('#preset-note').textContent = presetNote(preset);
+      setPresetNote(preset, ref.id);
       controls.refresh();
       // Compare defaults ON for the layerConfigurator preset (mirrors the §10.6
       // aiMiddle/allHuman pair), OFF for the others — decision 3.
@@ -898,7 +1002,7 @@ async function boot() {
     const ref = PRESET_REFS.find((p) => p.id === DEFAULT_PRESET_ID);
     state.config = primaryRunConfig(preset, /** @type {any} */ (ref));
     picker.setActive(DEFAULT_PRESET_ID);
-    el('#preset-note').textContent = presetNote(preset);
+    setPresetNote(preset, DEFAULT_PRESET_ID);
     // The landing default is fasterDysfunction (all-human) → single-run view;
     // compare defaults on only for the layerConfigurator preset (decision 3).
     configurator.setCompareDefault(false);
@@ -911,7 +1015,7 @@ async function boot() {
   // The shell's own status is always "ready" — a broken shared link is surfaced
   // on the LANDING notice (BLOCKER B), not in the hidden shell, so entering a
   // door later lands on a coherent fresh "ready" state.
-  setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
+  setStatus(statusEl, 'Ready — 500 simulations, in your browser.', '');
 
   if (replayBoot) {
     // A shared link is an Organization run: open that door directly (skipping
@@ -936,19 +1040,28 @@ boot().catch((err) => {
   setStatus(statusEl, `failed to start: ${err instanceof Error ? err.message : String(err)}`, 'error');
 });
 
-// ---- model assumptions drawer (independent of the run flow) ------------------------
+// ---- model assumptions drawer + glossary (independent of the run flow) --------------
 
 /**
- * Fetch www/assumptions.json and render the transparency drawer. Independent of
- * the engine run flow, so a drawer failure never blocks the simulator. The
- * drawer renders the artifact VERBATIM (PREMORTEM Story 3) — no coefficient is
- * authored here.
+ * Fetch www/assumptions.json ONCE and use it for BOTH the transparency drawer
+ * AND the plain-language glossary's deep-dive (integration point 5: no double
+ * fetch / race). Independent of the engine run flow, so a fetch failure never
+ * blocks the simulator: the drawer surfaces the error, and the glossary still
+ * decorates every heading — the curated ⓘ lede is self-contained, only the
+ * opt-in "Show the numbers" model reveal is omitted.
+ *
+ * The drawer renders the artifact VERBATIM (PREMORTEM Story 3) — no coefficient
+ * is authored here. The glossary decorates the org mount's [data-term] headings
+ * + the SH control; it is entirely data-term-driven, so P7b calls the same
+ * decorate on its team mount (mode-agnostic — §2b).
  */
-async function mountAssumptionsDrawer() {
+async function mountAssumptionsAndGlossary() {
   const mount = el('#assumptions-mount');
   const status = el('#assumptions-status');
+  /** @type {any} */
+  let data = null;
   try {
-    const data = await fetchAssumptions();
+    data = await fetchAssumptions();
     const { problems } = renderAssumptionsDrawer(mount, data);
     if (problems.length > 0) {
       // Shape drift in the extracted artifact — surface it rather than render a
@@ -960,6 +1073,12 @@ async function mountAssumptionsDrawer() {
     status.textContent = `Could not load the model assumptions: ${err instanceof Error ? err.message : String(err)}`;
     status.hidden = false;
   }
+  // Build the glossary from the shared assumptions (or an empty stand-in when the
+  // fetch failed) and attach the inline ⓘ to every data-term host in the org mount.
+  // Assigns the module-scope instance so the run flow can re-decorate the
+  // dynamically-rendered [data-term] labels after a paint.
+  glossary = createGlossary({ assumptions: data ?? { items: [] } });
+  glossary.decorate(el('#org-mount'));
 }
 
-void mountAssumptionsDrawer();
+void mountAssumptionsAndGlossary();

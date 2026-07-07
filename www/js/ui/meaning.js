@@ -46,7 +46,7 @@ const RULES = {
     const shSpan = `Structural Health ${ctx.beforeSh} vs ${ctx.afterSh}`;
     const ends =
       ctx.beforeFinal !== undefined && ctx.afterFinal !== undefined
-        ? ` entropy ends at ${fmt(/** @type {number} */ (ctx.beforeFinal))} vs ${fmt(/** @type {number} */ (ctx.afterFinal))}.`
+        ? ` Disorder ends at ${fmt(/** @type {number} */ (ctx.beforeFinal))} versus ${fmt(/** @type {number} */ (ctx.afterFinal))}.`
         : '';
     if (aiActive(config)) {
       return (
@@ -126,10 +126,10 @@ const RULES = {
 
   health(ctx) {
     const { output } = ctx;
-    if (!output) return `Team cohesion vs org-level health: when the lines diverge, healthy teams are living inside a sick org.`;
+    if (!output) return `Team cohesion vs org-level health: when the lines diverge, sound teams are living inside a strained org.`;
     const gap = output.series.healthGap.at(-1).p50;
     if (gap > 10) {
-      return `Teams end ${fmt(gap)} points healthier than the org around them — the healthy-teams-sick-org gap. Local morale is masking structural drag.`;
+      return `Teams end ${fmt(gap)} points above the org around them — the sound-teams-strained-org gap. Local morale is masking structural drag.`;
     }
     if (gap < -10) {
       return `The org level ends ${fmt(-gap)} points above its teams — structural metrics look fine while the teams inside are eroding.`;
