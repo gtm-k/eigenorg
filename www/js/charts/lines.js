@@ -39,6 +39,7 @@ export function createDeltaChart(canvas) {
         {
           label: 'entropy Δ (AI − no AI), index points',
           data: [],
+          pointStyle: 'line',
           borderColor: COLORS.accent,
           borderWidth: 2,
           pointRadius: 0,
@@ -48,6 +49,7 @@ export function createDeltaChart(canvas) {
         {
           label: 'throughput Δ (AI − no AI), items/step — dashed',
           data: [],
+          pointStyle: 'line',
           borderColor: COLORS.contrast,
           borderWidth: 1.5,
           borderDash: [6, 4],
@@ -82,7 +84,7 @@ export function createDeltaChart(canvas) {
         },
       },
       plugins: {
-        legend: { labels: { color: COLORS.tick, font: { size: 12 } } },
+        legend: { labels: { color: COLORS.tick, font: { size: 12 }, usePointStyle: true } },
         tooltip: { enabled: true },
       },
     },
@@ -118,6 +120,7 @@ export function createHealthChart(canvas) {
         {
           label: 'org health — typical run',
           data: [],
+          pointStyle: 'line',
           borderColor: COLORS.accent,
           borderWidth: 2,
           pointRadius: 0,
@@ -126,6 +129,7 @@ export function createHealthChart(canvas) {
         {
           label: 'team cohesion — typical run (dashed)',
           data: [],
+          pointStyle: 'line',
           borderColor: COLORS.contrast,
           borderWidth: 1.5,
           borderDash: [6, 4],
@@ -153,7 +157,7 @@ export function createHealthChart(canvas) {
         },
       },
       plugins: {
-        legend: { labels: { color: COLORS.tick, font: { size: 12 } } },
+        legend: { labels: { color: COLORS.tick, font: { size: 12 }, usePointStyle: true } },
         tooltip: { enabled: true },
       },
     },

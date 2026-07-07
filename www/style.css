@@ -2392,24 +2392,40 @@ progress {
   to { opacity: 1; transform: none; }
 }
 
-@keyframes eig-draw {
-  to { stroke-dashoffset: 0; }
+/* The looping Divergence (beta feedback 2026-07-07, full sequence): the story
+   replays on a shared 10s clock — seed dot → glow blooms → the two paths draw
+   → their outcome bands settle → hold → everything dissolves → repeat. Resets
+   happen at opacity 0 (and, for strokes, at offset 100 where nothing is
+   visible), so the cycle is seamless. */
+@keyframes eig-loop-seed {
+  0% { opacity: 0; }
+  3% { opacity: 1; }
+  86% { opacity: 1; }
+  92% { opacity: 0; }
+  100% { opacity: 0; }
 }
-
-/* The looping Divergence (beta feedback 2026-07-07): draw in over the first
-   ~12%, hold drawn until ~86%, dissolve, then reset invisibly (at offset 100
-   the stroke has zero visible length, so opacity can return to 1 unseen). */
+@keyframes eig-loop-glow {
+  0%, 4% { opacity: 0; }
+  10% { opacity: 1; }
+  86% { opacity: 1; }
+  92% { opacity: 0; }
+  100% { opacity: 0; }
+}
 @keyframes eig-draw-loop {
   0% { stroke-dashoffset: 100; opacity: 1; }
-  12% { stroke-dashoffset: 0; }
+  8% { stroke-dashoffset: 100; }
+  20% { stroke-dashoffset: 0; }
   86% { stroke-dashoffset: 0; opacity: 1; }
-  93% { stroke-dashoffset: 0; opacity: 0; }
-  94% { stroke-dashoffset: 100; opacity: 0; }
+  92% { stroke-dashoffset: 0; opacity: 0; }
+  93% { stroke-dashoffset: 100; opacity: 0; }
   100% { stroke-dashoffset: 100; opacity: 1; }
 }
-
-@keyframes eig-fade {
-  to { opacity: 1; }
+@keyframes eig-loop-band {
+  0%, 20% { opacity: 0; }
+  28% { opacity: 1; }
+  86% { opacity: 1; }
+  92% { opacity: 0; }
+  100% { opacity: 0; }
 }
 
 @keyframes eig-wipe {
@@ -2429,17 +2445,19 @@ progress {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* §6.2 amended (beta feedback 2026-07-07): The Divergence LOOPS — draw in,
-     hold, dissolve, reset unseen (~10s cycle; the calm order line still leads
-     via its shorter delay). stroke-dasharray/offset live ONLY here, so the
-     base state stays fully drawn (reduced-motion = instant, static). */
+  /* §6.2 amended (beta feedback 2026-07-07): the FULL Divergence sequence loops
+     on one shared 10s clock — seed dot, then the glow, then the two paths draw
+     (the calm order line still leads via its small delay), then the outcome
+     bands settle; hold; dissolve; repeat. dasharray/offset + the opacity-0
+     starts live ONLY here, so the base state stays fully drawn and static
+     under reduced-motion. */
   .median { stroke-dasharray: 100; stroke-dashoffset: 100; animation: eig-draw-loop 10s cubic-bezier(0.2, 0.7, 0.2, 1) infinite; }
   .median-ord { animation-delay: 160ms; }
   .median-dis { animation-delay: 300ms; }
-  .band, .seed { opacity: 0; animation: eig-fade 420ms ease forwards; }
-  .band-ord { animation-delay: 620ms; }
-  .band-dis { animation-delay: 700ms; }
-  .seed { animation-delay: 120ms; }
+  .seed { opacity: 0; animation: eig-loop-seed 10s ease infinite; }
+  .glow { opacity: 0; animation: eig-loop-glow 10s ease infinite; }
+  .band { opacity: 0; animation: eig-loop-band 10s ease infinite; }
+  .band-dis { animation-delay: 150ms; }
 
   /* §6.4 — entrances (calm, ~40% faster than P10a). */
   .landing-rail { animation: eig-fade-up 240ms var(--ease-out) both; }

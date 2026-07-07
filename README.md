@@ -1,26 +1,38 @@
 <!-- Pre-publish check: once the repo is public, confirm https://gtm-k.github.io/eigenorg/ resolves and the CI badge renders. -->
 
+<div align="center">
+
 # eigenorg
 
 ### Structure, not headcount.
 
-Test whether your org holds together — before you build it.
+**Test whether your org holds together — before you build it.**
+
+[![CI](https://github.com/gtm-k/eigenorg/actions/workflows/ci.yml/badge.svg)](https://github.com/gtm-k/eigenorg/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-5e6ad2.svg)](LICENSE)
+![Rust](https://img.shields.io/badge/engine-Rust%20%E2%86%92%20WebAssembly-8a8f98.svg)
+![Runs in your browser](https://img.shields.io/badge/runs-100%25%20in%20your%20browser-5e6ad2.svg)
+![No tracking](https://img.shields.io/badge/tracking-none-3fb950.svg)
+
+<a href="https://gtm-k.github.io/eigenorg/"><b>Try it live</b></a> ·
+<a href="#-what-you-can-do">What you can do</a> ·
+<a href="#-how-it-works">How it works</a> ·
+<a href="#-the-model-is-open">The open model</a> ·
+<a href="#-quickstart">Quickstart</a>
+
+</div>
 
 <p align="center">
   <img src="docs/readme/landing-1280.png" alt="eigenorg landing page: the headline 'Structure, not headcount.' beside a diverging-trajectory graphic, above two doors — 'Is your org's structure sound?' and 'Will this team's makeup work?'" width="100%">
 </p>
 
-[![CI](https://github.com/gtm-k/eigenorg/actions/workflows/ci.yml/badge.svg)](https://github.com/gtm-k/eigenorg/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-5e6ad2.svg)](LICENSE)
-![No tracking](https://img.shields.io/badge/tracking-none-3fb950.svg)
-
 Two orgs can hire the same people and still end up worlds apart — one holds together as it grows, the other slowly slides into disorder. The difference isn't who they hired; it's how they're wired. **eigenorg** lets you shape an org, or a single team, run 500 simulations right in your browser, and see whether the structure holds — before you build it.
 
-> A thinking aid grounded in research — not a prediction engine.
+> 🧭 **A thinking aid grounded in research — not a prediction engine.**
 
 ---
 
-## What you can do
+## 🏢 What you can do
 
 One question, two zoom levels — the whole org, or a single team.
 
@@ -50,7 +62,7 @@ Every run returns the story as probability ranges across 500 simulations: a befo
 
 ---
 
-## How it works
+## ⚙️ How it works
 
 - **500 Monte Carlo runs, in your browser.** The simulation engine is written in Rust and compiled to WebAssembly. A full 500-run scenario finishes in about a second — no server, no queue.
 - **Nothing leaves the page.** Zero uploads, zero external requests, no analytics, no tracking, no backend. Everything runs on your machine.
@@ -92,7 +104,7 @@ Change a coefficient in `MODEL.md` and CI fails until the extracted artifacts, t
 
 ---
 
-## The model is open
+## 📖 The model is open
 
 The transparency isn't a footnote — it's the point.
 
@@ -107,13 +119,20 @@ The transparency isn't a footnote — it's the point.
 
 ---
 
-## Quickstart
+## 🚀 Quickstart
 
 **Try it:** open **https://gtm-k.github.io/eigenorg/** and pick a door.
 
 **Run it locally:**
 
-Prerequisites — [Rust](https://rustup.rs) (the pinned toolchain and `wasm32-unknown-unknown` target are picked up automatically), `wasm-pack` (`cargo install --locked wasm-pack`), and Node.js 22+ (`npm install` — dev tooling only; nothing npm-installed ships to the site).
+<details>
+<summary><b>Prerequisites</b> (Rust, wasm-pack, Node 22+)</summary>
+
+- [Rust](https://rustup.rs) — the pinned toolchain and `wasm32-unknown-unknown` target are picked up automatically
+- `wasm-pack` — `cargo install --locked wasm-pack`
+- Node.js 22+ — `npm install` (dev tooling only; nothing npm-installed ships to the site)
+
+</details>
 
 ```sh
 bash scripts/build.sh        # Rust -> WebAssembly, and vendor Chart.js into www/
@@ -124,7 +143,7 @@ Then open <http://localhost:8080/eigenorg/>.
 
 ---
 
-## Is this a prediction engine?
+## ❓ Is this a prediction engine?
 
 No. eigenorg is **a thinking aid grounded in research — not a prediction engine.**
 
@@ -134,6 +153,17 @@ Use it to pressure-test a structural decision before you commit to it — not to
 
 ---
 
-## License
+## 📄 License
 
 MIT © 2026 Gowtham Kethineedi. See [LICENSE](LICENSE).
+
+---
+
+<div align="center">
+
+**Built in the open.** The model, the coefficients, and every assumption are in [`MODEL.md`](MODEL.md) —
+if you disagree with a number, you can see exactly where it came from and turn the dial yourself.
+
+*Structure, not headcount.*
+
+</div>

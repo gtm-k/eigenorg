@@ -91,6 +91,7 @@ export function createPercentileChart(canvas, opts = {}) {
           data: [],
           borderWidth: 0,
           pointRadius: 0,
+          pointStyle: 'rect', // legend swatch: a filled area
           backgroundColor: COLORS.band,
           fill: '-1', // fills down to the p10 dataset → the percentile band
         },
@@ -100,6 +101,7 @@ export function createPercentileChart(canvas, opts = {}) {
           borderColor: COLORS.line,
           borderWidth: 2,
           pointRadius: 0,
+          pointStyle: 'line', // legend swatch: a line, not a box
           fill: false,
         },
       ],
@@ -129,6 +131,10 @@ export function createPercentileChart(canvas, opts = {}) {
           labels: {
             color: COLORS.tick,
             font: { size: 12 },
+            // Swatches match what they describe (beta feedback: a box swatch on
+            // the median line read as another band): the band keeps a filled
+            // rect, the typical-run line shows as a LINE.
+            usePointStyle: true,
             // The p10 helper dataset exists only to anchor the band fill.
             filter: (/** @type {any} */ item) => !String(item.text).endsWith('p10'),
           },
