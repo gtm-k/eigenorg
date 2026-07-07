@@ -161,16 +161,19 @@
                  Its results-shaped blocks (flow, all-human) are gated on hasRun via
                  the .pre-run class so they never sit empty in the setup. -->
             <details id="approval-drawer" class="drawer approval-drawer pre-run">
-              <!-- Plain-lead title + demoted tech-label + data-term (P10b §4d). No
-                   inline ⓘ here: nesting a <details> in a <summary> is invalid, and
-                   the drawer IS its own disclosure — opening it is the affordance.
-                   data-term is present for the coverage gate + glossary lookup. -->
-              <summary class="drawer-summary" data-term="approvalStack">
-                <span class="drawer-title">Who has to sign off <span class="tech-label">Approval stack</span></span>
+              <!-- Plain-lead-only summary (R9/Codex round-1 #3): a <details> cannot
+                   nest in a <summary> AND a closed <details> hides non-summary
+                   children — so the CLOSED drawer shows NO technical term at all
+                   (plain language only), and the tech term + its inline ⓘ live at
+                   the top of the drawer body, where the term first becomes visible.
+                   The reader path: jargon appears → its ⓘ is beside it. -->
+              <summary class="drawer-summary">
+                <span class="drawer-title">Who has to sign off</span>
                 <span class="drawer-value" id="approval-drawer-value"></span>
                 <span class="drawer-optional">optional</span>
               </summary>
               <div class="drawer-body">
+                <p class="drawer-tech" data-term="approvalStack">Approval stack</p>
                 <p class="note">Build the chain of sign-offs a decision clears — 1 to 5 seats, each a person, committee, or AI agent. Tap a seat to set it. This is what sets your decision-latency number.</p>
                 <div id="configurator" class="configurator"></div>
               </div>
@@ -356,7 +359,7 @@
         <header class="mode-intro">
           <p class="eyebrow">Team Building</p>
           <h2 class="mode-title">Will this team's makeup work?</h2>
-          <p class="mode-sub">Compose one team — who does the work, humans and AI, and who reviews it — then see throughput, quality, cohesion and where coverage gaps open up.</p>
+          <p class="mode-sub">Compose one team — who does the work, humans and AI, and who reviews it — then see how much gets done, the quality it ships at, how the team holds together, and where essential work goes uncovered.</p>
         </header>
         <section class="panel panel-lift placeholder">
           <p class="placeholder-icon" aria-hidden="true">👥</p>

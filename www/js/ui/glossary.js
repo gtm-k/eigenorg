@@ -175,10 +175,12 @@ export function createGlossary(opts = {}) {
   /**
    * Walk `root` for `[data-term]` hosts and attach a ⓘ to each. Idempotent (a
    * re-decorate skips hosts already carrying a `.term-pop`). A host inside a
-   * <summary> is SKIPPED: nesting <details> inside <summary> is invalid HTML,
-   * and such a host (the approval-stack disclosure) already IS its own reveal —
-   * its plain-lead title + tech-label carry the plain language, and opening the
-   * drawer is the affordance.
+   * <summary> is SKIPPED as a defensive guard — nesting <details> inside
+   * <summary> is invalid HTML AND a closed <details> hides non-summary children,
+   * so a summary can never host a working ⓘ. The shipped pattern therefore puts
+   * NO technical term in any summary: the term + its data-term host live in the
+   * drawer BODY (see index.html `.drawer-tech`), where decorate() reaches them.
+   * Do not add data-term to a <summary>; relocate the term to the body instead.
    * @param {HTMLElement} root
    */
   function decorate(root) {

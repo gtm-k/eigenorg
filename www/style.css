@@ -283,6 +283,17 @@ h1 {
   white-space: normal;
 }
 
+/* The relocated technical term at the top of a drawer body (the summary stays
+   plain-language-only — a closed <details> can't host a visible ⓘ). Mirrors
+   .tech-label's register at drawer-body scale. */
+.drawer-tech {
+  margin: 0 0 var(--space-2);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  color: var(--color-ink-subtle);
+}
+
 .term-pop-plain {
   display: block;
   color: var(--color-ink);
