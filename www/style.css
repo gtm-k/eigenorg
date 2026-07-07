@@ -592,8 +592,10 @@ progress {
 
 .segmented button.active:hover:not(:disabled) {
   /* R2-2 class-completion (pre-existing on base): .segmented button:hover (0-3-1)
-     out-specifies .active (0-2-1) — keep the selected fill in-family on hover. */
-  background: var(--color-primary-hover);
+     out-specifies .active (0-2-1) — re-assert the RESTING fill + color on hover
+     (primary-hover #828fff fails AA at 2.7:1 under 14px white; primary = 4.7:1). */
+  background: var(--color-primary);
+  color: #ffffff;
 }
 
 /* ---- charts ---------------------------------------------------------------------- */
@@ -1824,9 +1826,10 @@ progress {
 }
 
 .altitude-seg.active:hover:not(:disabled) {
-  /* R2-2: keep the selected fill in-family on hover — the neutral base button:hover
-     (0-2-1) would otherwise out-specify .altitude-seg.active and flicker it dark. */
-  background: var(--color-primary-hover);
+  /* R2-2: keep the selected fill on hover — the neutral base button:hover (0-2-1)
+     would otherwise out-specify .altitude-seg.active and flicker it dark. Resting
+     primary, not primary-hover: #828fff fails AA (2.87:1) under the white label. */
+  background: var(--color-primary);
 }
 
 .altitude-seg:focus-visible {
