@@ -151,6 +151,130 @@ function findByClass(node, cls) {
   return null;
 }
 
+// ---- decorate(): ⓘ insertion point + summary skip + idempotency (DOM-level) ----
+//
+// Browser verification (Playwright) was UNAVAILABLE this session (no browser MCP
+// tools); this DOM-level test stands in for it on the load-bearing decorate
+// wiring — mirroring the inverted `.panel-title` / `.field-lead` structure the
+// page ships.
+
+/** A minimal DOM node supporting exactly what glossary.decorate() queries. */
+class Node {
+  /** @param {string} tag */
+  constructor(tag) {
+    this.tagName = tag;
+    this.className = '';
+    /** @type {Record<string, string>} */ this.dataset = {};
+    /** @type {Record<string, string>} */ this.attributes = {};
+    /** @type {any[]} */ this.children = [];
+    /** @type {any} */ this.parentNode = null;
+    this.textContent = '';
+  }
+  setAttribute(/** @type {string} */ k, /** @type {string} */ v) {
+    this.attributes[k] = v;
+  }
+  appendChild(/** @type {any} */ n) {
+    if (n && typeof n === 'object') n.parentNode = this;
+    this.children.push(n);
+    return n;
+  }
+  append(/** @type {any[]} */ ...ns) {
+    for (const n of ns) this.appendChild(n);
+  }
+  insertBefore(/** @type {any} */ n, /** @type {any} */ ref) {
+    if (n && typeof n === 'object') n.parentNode = this;
+    const i = this.children.indexOf(ref);
+    if (i < 0) this.children.push(n);
+    else this.children.splice(i, 0, n);
+    return n;
+  }
+  /** @param {string} sel */
+  _matches(sel) {
+    if (sel === '[data-term]') return this.dataset.term !== undefined;
+    if (sel.startsWith('.')) return String(this.className).split(' ').includes(sel.slice(1));
+    return false;
+  }
+  /** @param {string} sel */
+  closest(sel) {
+    /** @type {any} */ let cur = this;
+    while (cur) {
+      if (cur.tagName === sel) return cur;
+      cur = cur.parentNode;
+    }
+    return null;
+  }
+  /** @param {string} sel — supports ':scope > .cls' */
+  querySelector(sel) {
+    const m = /^:scope > (.+)$/.exec(sel);
+    const target = m ? m[1] : sel;
+    for (const c of this.children) if (c && c._matches && c._matches(target)) return c;
+    return null;
+  }
+  /** @param {string} sel — supports '[data-term]', recursive */
+  querySelectorAll(sel) {
+    /** @type {any[]} */ const out = [];
+    /** @param {any} node */
+    const walk = (node) => {
+      for (const c of node.children) {
+        if (c && c._matches && c._matches(sel)) out.push(c);
+        if (c && Array.isArray(c.children)) walk(c);
+      }
+    };
+    walk(this);
+    return out;
+  }
+}
+
+/** Run `fn` with a Node-backed globalThis.document installed. @param {(g: any) => void} fn */
+function withNodeDom(fn) {
+  const prev = /** @type {any} */ (globalThis).document;
+  /** @type {any} */ (globalThis).document = {
+    createElement: (/** @type {string} */ t) => new Node(t),
+    createTextNode: (/** @type {string} */ t) => ({ nodeType: 3, textContent: t, children: [] }),
+  };
+  try {
+    fn(/** @type {any} */ (globalThis).document);
+  } finally {
+    /** @type {any} */ (globalThis).document = prev;
+  }
+}
+
+test('decorate() inserts the ⓘ between the plain lead and the .tech-label, skips summary hosts, and is idempotent', () => {
+  withNodeDom(() => {
+    const glossary = createGlossary({ assumptions: liveAssumptions() });
+
+    // Inverted heading: <div .panel-title data-term><h2/><span .tech-label/></div>
+    const root = new Node('div');
+    const panelTitle = new Node('div');
+    panelTitle.className = 'panel-title';
+    panelTitle.dataset.term = 'entropy';
+    const h2 = new Node('h2');
+    const tech = new Node('span');
+    tech.className = 'tech-label';
+    panelTitle.append(h2, tech);
+
+    // Approval-stack disclosure: data-term ON a <summary> — must be SKIPPED.
+    const summary = new Node('summary');
+    summary.dataset.term = 'approvalStack';
+    root.append(panelTitle, summary);
+
+    glossary.decorate(/** @type {any} */ (root));
+
+    const info = panelTitle.querySelector(':scope > .term-pop');
+    assert.ok(info, 'ⓘ was inserted into the panel-title');
+    assert.ok(
+      panelTitle.children.indexOf(info) < panelTitle.children.indexOf(tech),
+      'ⓘ sits before the .tech-label',
+    );
+    assert.equal(summary.querySelector(':scope > .term-pop'), null, 'summary host was skipped (valid HTML)');
+
+    // Idempotent: a second decorate must not add a second ⓘ.
+    glossary.decorate(/** @type {any} */ (root));
+    const infos = panelTitle.children.filter((/** @type {any} */ c) => c && c._matches && c._matches('.term-pop'));
+    assert.equal(infos.length, 1, 'decorate is idempotent');
+  });
+});
+
 test('tag() builds a native <details> ⓘ whose <summary> carries an accessible name', () => {
   const prev = /** @type {any} */ (globalThis).document;
   /** @type {any} */ (globalThis).document = {
