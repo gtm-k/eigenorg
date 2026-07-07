@@ -19,6 +19,12 @@ function landingConfig() {
   return JSON.parse(JSON.stringify(preset.runs.sh3));
 }
 
+/** @returns {any} the coordinationCollapse flat-topology config (real preset), fresh copy */
+function flatConfig() {
+  const preset = JSON.parse(readFileSync(path.join(presetsDir, 'coordinationCollapse.json'), 'utf8'));
+  return JSON.parse(JSON.stringify(preset.runs.main));
+}
+
 /** @param {Array<{ text: string }>} parts */
 const joinText = (parts) => parts.map((p) => p.text).join('');
 
@@ -60,6 +66,25 @@ test('orgPrecisSentence authors no model number — every value maps to a plain 
   assert.deepEqual(numbers, ['40', '1']); // headcountStart + ownershipLayers ONLY
 });
 
+test('orgPrecisSentence names "a flat org" from the real coordinationCollapse (flat) preset', () => {
+  const text = joinText(orgPrecisSentence(flatConfig()));
+  assert.match(text, /wired as a flat org,/);
+});
+
+test('orgPrecisSentence names "a federation" for federated topology', () => {
+  const cfg = landingConfig();
+  cfg.org.topology = 'federated';
+  const text = joinText(orgPrecisSentence(cfg));
+  assert.match(text, /wired as a federation,/);
+});
+
+test('orgPrecisSentence falls back to "a custom shape" for an unrecognized topology', () => {
+  const cfg = landingConfig();
+  cfg.org.topology = 'mesh'; // not a key in TOPOLOGY_PRECIS
+  const text = joinText(orgPrecisSentence(cfg));
+  assert.match(text, /wired as a custom shape,/);
+});
+
 // ---- approvalStackSummary ---------------------------------------------------
 
 test('approvalStackSummary summarizes a single all-human layer', () => {
@@ -78,4 +103,11 @@ test('approvalStackSummary collapses three+ distinct seat types to a count', () 
   cfg.org.ownershipLayers = 3;
   cfg.org.layerTypes = ['humanPm', 'aiAgent', 'committee'];
   assert.equal(approvalStackSummary(cfg), '3 layers · 3 seat types');
+});
+
+test('approvalStackSummary lists a Human Director + Committee stack', () => {
+  const cfg = landingConfig();
+  cfg.org.ownershipLayers = 2;
+  cfg.org.layerTypes = ['humanDirector', 'committee'];
+  assert.equal(approvalStackSummary(cfg), '2 layers · Human Director, Committee');
 });
