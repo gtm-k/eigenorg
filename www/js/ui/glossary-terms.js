@@ -12,7 +12,9 @@
 // .github/workflows/ci.yml stay byte-untouched: P7b's new surfaces auto-join
 // JARGON_KNOWN_LIST, the glob-scanning gate auto-covers its files, and
 // glossary.decorate() decorates its `data-term` labels with the same mechanism.
-// "Add a mode = append data here."
+// "Add a mode = append data here." This is the ONLY sanctioned way to register a
+// term — there is deliberately NO runtime register() alternative (it was removed
+// in P10b-2 repair-1); a second path would let a term skip the coverage gate.
 //
 // Voice (spec §8.5 + AUTONOMY WINDOW #2 defaults, 2026-07-07):
 //   - plain-first, human units, non-judgmental (strained / sound — never

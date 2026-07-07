@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 import { CURATED_TERMS, JARGON_KNOWN_LIST } from '../ui/glossary-terms.js';
-import { buildTermIndex, resolveTerm, uncoveredTerms, register, createGlossary } from '../ui/glossary.js';
+import { buildTermIndex, resolveTerm, uncoveredTerms, createGlossary } from '../ui/glossary.js';
 
 const assumptionsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'assumptions.json');
 /** @returns {any} */
@@ -98,14 +98,9 @@ test('uncoveredTerms flags a surface with no term (red case)', () => {
   assert.deepEqual(uncoveredTerms(['Entropy', 'a term nobody registered'], index), ['a term nobody registered']);
 });
 
-test('register appends a new term (the P7b runtime path) resolvable by id + surface', () => {
-  const index = buildTermIndex({ assumptions: liveAssumptions() });
-  register(index, [{ id: 'cohesion', label: 'Cohesion', surfaces: ['Cohesion'], plain: 'p', why: 'w', assumptionsId: 'cohesionDynamics' }], liveAssumptions());
-  assert.ok(resolveTerm(index, 'cohesion'));
-  const bySurface = resolveTerm(index, 'Cohesion');
-  assert.ok(bySurface);
-  assert.equal(bySurface.id, 'cohesion');
-});
+// (The former `register` runtime-append test was removed with the export in
+// P10b-2 repair-1: appending to CURATED_TERMS is the ONLY sanctioned P7b path, so
+// there is no runtime registration path left to test.)
 
 test('buildTermIndex degrades gracefully when assumptions failed to load (no deep-dive, still resolves)', () => {
   const index = buildTermIndex({ assumptions: null });

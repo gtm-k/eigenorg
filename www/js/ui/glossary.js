@@ -98,23 +98,15 @@ export function uncoveredTerms(jargonList, index) {
   return jargonList.filter((surface) => !index.has(surface));
 }
 
-/**
- * Append curated entries into an existing index at runtime (the P7b path, if a
- * mode registers terms dynamically rather than via the data module). Optional
- * assumptions lets late entries resolve their deep-dive.
- * @param {Map<string, TermEntry>} index
- * @param {import('./glossary-terms.js').CuratedTerm[]} entries
- * @param {{ items?: any[] }} [assumptions]
- * @returns {Map<string, TermEntry>}
- */
-export function register(index, entries, assumptions) {
-  const items = Array.isArray(assumptions?.items) ? assumptions.items : [];
-  /** @type {Map<string, any>} */
-  const itemsById = new Map();
-  for (const it of items) if (it && typeof it.id === 'string') itemsById.set(it.id, it);
-  for (const term of entries) indexTerm(index, term, itemsById);
-  return index;
-}
+// THE ONE SANCTIONED P7b PATH (reuse contract): a new mode adds its terms by
+// APPENDING entries to CURATED_TERMS in glossary-terms.js — nothing else.
+// buildTermIndex reads that list, so the new terms auto-join the index, the
+// derived JARGON_KNOWN_LIST, the coverage gate, and decorate(). There is
+// deliberately NO runtime `register()` escape-hatch: a second registration path
+// would let terms enter the index WITHOUT the gate seeing them (they would not be
+// in CURATED_TERMS / JARGON_KNOWN_LIST), silently defeating the coverage gate.
+// (The earlier `register()` export had zero production call sites and was removed
+// in P10b-2 repair-1 to close that parallel path.)
 
 // ---- DOM controller (browser only) ------------------------------------------
 
