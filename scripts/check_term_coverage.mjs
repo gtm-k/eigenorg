@@ -14,32 +14,48 @@
 // labels are canvas strings, meaning.js builds sentences at runtime, and the
 // card is drawn on a canvas — none of that is a DOM heading, so none is swept.
 //
-// THREE checks:
+// FOUR checks:
+//   0. SPEC COVERAGE (registry vs the fixed §8.5 set). Every id in SPEC_TERMS —
+//      a HARDCODED constant, NOT derived from CURATED_TERMS — must be registered
+//      in CURATED_TERMS. This is the non-tautological guard: it catches a future
+//      de-registration (a §8.5 term dropped from glossary-terms.js) that the
+//      derived totality check (check 3), being self-referential, cannot. A
+//      present-but-unwired term (functionCoverage, whose on-screen surface
+//      arrives with P7b) still satisfies this — it need only be registered.
 //   1. NO DANGLING MODEL LINK. Every CURATED_TERMS[].assumptionsId (where
 //      present) must EXIST in the live www/assumptions.json. Existence only —
 //      the extractor drift gate owns content; this catches a renamed/removed
 //      mechanic id that would silently blank a ⓘ deep-dive (risk R7).
-//   2. HEADING-SURFACE SWEEP (index.html). Every <h2>/<h3> whose rendered text
-//      contains a JARGON_KNOWN_LIST surface MUST carry a `data-term` (or be a
-//      documented ALLOWLIST id). A bare jargon heading fails with file:line.
-//      Plus DATA-TERM VALIDITY across index.html + www/js/ui/*.js (GLOB, so a
-//      new mode's files auto-join — C2, P7b never edits this gate or ci.yml):
-//      every `data-term` marker must name a real term id.
-//   3. TOTALITY (spec's exact fail condition). uncoveredTerms(JARGON_KNOWN_LIST,
-//      index).length === 0 — every on-screen term maps to a curated entry (a
-//      registry self-consistency guard against a surface that fails to index).
+//   2. HEADING-SURFACE SWEEP (index.html) + DATA-TERM VALIDITY. Every <h2>/<h3>
+//      or `.panel-title` in index.html whose rendered text contains a
+//      JARGON_KNOWN_LIST surface MUST carry a `data-term` (or be a documented
+//      ALLOWLIST id) — a bare jargon heading fails with file:line. And every
+//      `data-term` marker across index.html + www/js/main.js + www/js/ui/*.js
+//      (the ui GLOB so a new mode's files auto-join — C2; P7b never edits this
+//      gate or ci.yml) must name a real term id.
+//   3. TOTALITY (registry self-consistency). uncoveredTerms(JARGON_KNOWN_LIST,
+//      index).length === 0. NOTE: JARGON_KNOWN_LIST is DERIVED from the same
+//      CURATED_TERMS the index is built from, so this can only fail if indexing
+//      drops a surface — it is a self-consistency guard, NOT (as the earlier
+//      comment over-claimed) "every on-screen term maps to a term". The real
+//      "no bare term ships" assurance is: the data-term marker convention (a
+//      surface's plain lead carries data-term) + check 2's validity + spec
+//      coverage (check 0), backed by the handoff jargon-sweep walkthrough.
 //
 // KNOWN OUT-OF-SCOPE (documented, same bar as the coefficient gate):
 //   1. PROSE. meaning.js / onboarding.js sentences legitimately contain
-//      "entropy", "coordination", etc. — the sweep is scoped to <h2>/<h3>
-//      HEADINGS in index.html, never body prose, stat-row <dt> labels, section
-//      eyebrows, chart aria-labels, or preset chips.
-//   2. NON-index.html term-bearing surfaces (the SH control label rendered by
-//      ui/org.js, the approval-stack <summary>): their coverage is enforced by
-//      the data-term VALIDITY check (their marker must name a real id) + the
-//      totality check (their surface must resolve), not by heading-text parsing
-//      of dynamically-built DOM. This is the same scope trade the coefficient
-//      gate makes: catch the common structural case, document the residue.
+//      "entropy", "coordination", etc. — the heading sweep is scoped to <h2>/<h3>
+//      + `.panel-title` in index.html, never body prose, section eyebrows, chart
+//      aria-labels, or preset chips.
+//   2. RUNTIME-BUILT term labels (the pane-stat <dt> "Coordination tax" /
+//      "Throughput", the legibility "Novel-task brittleness" row, the SH control
+//      label, the approval <summary>, the Faster-Dysfunction preset note): these
+//      are NOT in static index.html, so the heading-text sweep cannot see them.
+//      Their coverage is instead enforced STRUCTURALLY — the data-term VALIDITY
+//      check reads their markers from www/js/main.js + www/js/ui/*.js (their id
+//      must be real) and the totality check keeps their surfaces resolvable. Same
+//      scope trade the coefficient gate makes: catch the common structural case
+//      by marker, document the residue.
 //
 // Usage: node scripts/check_term_coverage.mjs
 //   (paths are resolved relative to the repo root; no args.)
@@ -61,6 +77,36 @@ const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
  * control, not on every value readout.
  */
 export const ALLOWLIST_HEADING_IDS = new Set(['pane-before-title', 'pane-after-title']);
+
+/**
+ * The ten §8.5 layer-ii curated terms — the spec's FIXED set, hardcoded here on
+ * PURPOSE (never derived from CURATED_TERMS) so the registry-vs-spec check
+ * (check 0) is non-tautological: it fails if any of these is dropped from
+ * glossary-terms.js. functionCoverage is registered but present-but-unwired
+ * until P7b renders its surface — registration alone satisfies this check.
+ * @type {string[]}
+ */
+export const SPEC_TERMS = [
+  'approvalStack',
+  'brittleness',
+  'cohesion',
+  'coordinationTax',
+  'decisionVelocity',
+  'entropy',
+  'fasterDysfunction',
+  'functionCoverage',
+  'structuralHealth',
+  'throughput',
+];
+
+/**
+ * SPEC_TERMS ids missing from the registry (the term ids present in CURATED_TERMS).
+ * @param {Set<string>} termIds
+ * @returns {string[]}
+ */
+export function missingSpecTerms(termIds) {
+  return SPEC_TERMS.filter((id) => !termIds.has(id));
+}
 
 /** Count 1-based line number at a character offset. @param {string} src @param {number} offset */
 function lineAt(src, offset) {
@@ -190,6 +236,7 @@ if (isMain) {
   const htmlPath = path.join(repoRoot, 'www', 'index.html');
   const assumptionsPath = path.join(repoRoot, 'www', 'assumptions.json');
   const uiDir = path.join(repoRoot, 'www', 'js', 'ui');
+  const mainPath = path.join(repoRoot, 'www', 'js', 'main.js');
 
   const html = readFileSync(htmlPath, 'utf8');
   /** @type {any} */
@@ -200,6 +247,11 @@ if (isMain) {
 
   /** @type {string[]} */
   const errors = [];
+
+  // Check 0 — registry covers the fixed §8.5 spec set (catches de-registration).
+  for (const id of missingSpecTerms(termIds)) {
+    errors.push(`glossary-terms.js: spec §8.5 term "${id}" (SPEC_TERMS) is not registered in CURATED_TERMS`);
+  }
 
   // Check 1 — no dangling model link.
   for (const id of danglingLinks(CURATED_TERMS, assumptionIds)) {
@@ -215,8 +267,14 @@ if (isMain) {
     );
   }
 
-  // Check 2b — data-term validity (index.html + www/js/ui/*.js glob).
-  const markerSources = [{ file: 'www/index.html', src: html }];
+  // Check 2b — data-term validity (index.html + www/js/main.js + www/js/ui/*.js
+  // glob). main.js is included explicitly because it renders the pane-stat labels
+  // + the Faster-Dysfunction note marker; the ui/*.js glob is what lets a new
+  // mode's files auto-join (C2).
+  const markerSources = [
+    { file: 'www/index.html', src: html },
+    { file: 'www/js/main.js', src: readFileSync(mainPath, 'utf8') },
+  ];
   for (const file of collectUiFiles(uiDir)) markerSources.push({ file: path.relative(repoRoot, file).replace(/\\/g, '/'), src: readFileSync(file, 'utf8') });
   for (const { file, src } of markerSources) {
     for (const marker of dataTermMarkers(src)) {
@@ -226,10 +284,11 @@ if (isMain) {
     }
   }
 
-  // Check 3 — totality.
+  // Check 3 — totality (registry self-consistency; see the header note — this
+  // only trips if indexing drops a derived surface).
   const uncovered = uncoveredTerms(JARGON_KNOWN_LIST, index);
   if (uncovered.length > 0) {
-    errors.push(`glossary-terms.js: ${uncovered.length} on-screen surface(s) resolve to no term: ${uncovered.join(', ')}`);
+    errors.push(`glossary-terms.js: ${uncovered.length} surface(s) failed to index (registry self-consistency): ${uncovered.join(', ')}`);
   }
 
   if (errors.length > 0) {
@@ -237,5 +296,9 @@ if (isMain) {
     console.error(`FAIL: ${errors.length} term-coverage issue(s)`);
     process.exit(1);
   }
-  console.log(`term-coverage gate clean: ${CURATED_TERMS.length} curated terms, ${JARGON_KNOWN_LIST.length} surfaces, all headings bound + all model links live`);
+  console.log(
+    `term-coverage gate clean: all ${SPEC_TERMS.length} §8.5 spec terms registered ` +
+      `(${CURATED_TERMS.length} curated total, ${JARGON_KNOWN_LIST.length} surfaces), ` +
+      `every data-term marker valid, all model links live`,
+  );
 }
