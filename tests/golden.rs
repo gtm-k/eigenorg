@@ -216,6 +216,10 @@ fn presets_are_plausible_and_drift_free() {
             .unwrap_or_else(|_| panic!("{what} must exist"))
             .map(|e| e.unwrap().path())
             .filter(|p| p.extension().map(|e| e == "json").unwrap_or(false))
+            // manifest.json is the P7b team-preset INDEX (INT-2), not a preset
+            // config — exclude it from the preset count/parse. Every other
+            // .json in these directories must still be a valid preset.
+            .filter(|p| p.file_name().map(|n| n != "manifest.json").unwrap_or(true))
             .collect();
         v.sort();
         v
