@@ -144,6 +144,15 @@ const state = {
   startingOver: false,
 };
 
+// True while an ORG plan is the caller's own run through the shared client —
+// requested but not yet settled (in flight OR queued behind a team run). The org
+// Run/Cancel toggle, requestRun and Start-over gate on THIS, never the shared
+// client.busy, so a team run in flight can't make an org click misfire and org
+// never sets pendingRerun/startingOver unless an org plan is actually its own in
+// flight (P7b R1 — symmetric to teamBusy). Cancellation is owner-scoped
+// (client.cancel('org')) so org can never cancel a team run and vice-versa.
+let orgBusy = false;
+
 // Probe hook for the scripted acceptance measurements (Playwright): exposes
 // the last plan's primary output + timings. Read-only diagnostics; carries
 // nothing that isn't already on the page.
@@ -233,13 +242,14 @@ function renderStats(dl, run) {
  * @returns {Promise<void>}
  */
 async function runAll() {
-  if (client.busy) {
-    // Run/Cancel toggle: an explicit click cancels the in-flight plan and
-    // drops any queued auto-rerun. (A preset pick uses requestRun('preset'),
+  if (orgBusy) {
+    // Run/Cancel toggle: an explicit click cancels the ORG plan (in flight or
+    // queued behind a team run) and drops any queued auto-rerun. Owner-scoped
+    // cancel never touches a team run. (A preset pick uses requestRun('preset'),
     // which sets pendingRerun BEFORE cancelling — decision 6.)
     state.pendingRerun = false;
     state.planCancelled = true;
-    client.cancel();
+    client.cancel('org');
     return;
   }
 
@@ -267,6 +277,12 @@ async function runAll() {
   const totalWork = iterations * totalRuns;
 
   state.planCancelled = false;
+  orgBusy = true;
+  // A team run in flight means this org plan queues behind it on the serialized
+  // client (org actions never cancel a team run — P7b R1). Show a truthful
+  // "waiting" status until the first progress tick fires (i.e. the org run has
+  // actually started); the onProgress handler then flips it to "running…".
+  const queuedBehindTeam = teamBusy;
   setRunButtons(true);
   progressBar.max = totalWork;
   progressBar.value = 0;
@@ -284,20 +300,26 @@ async function runAll() {
 
   const tPlan0 = performance.now();
   try {
-    setStatus(statusEl, `running… 0/${totalWork} iterations (${totalRuns} runs)`, '');
+    setStatus(
+      statusEl,
+      queuedBehindTeam
+        ? 'waiting for the current run to finish…'
+        : `running… 0/${totalWork} iterations (${totalRuns} runs)`,
+      '',
+    );
 
     const t0 = performance.now();
-    const primary = await client.run({ config: plan.primary, onProgress: onProgress(0) });
+    const primary = await client.run({ config: plan.primary, owner: 'org', onProgress: onProgress(0) });
     const primaryElapsedMs = performance.now() - t0;
 
     if (state.planCancelled) throw Object.assign(new Error('run cancelled'), { cancelled: true });
-    const contrast = await client.run({ config: plan.contrast, onProgress: onProgress(1) });
+    const contrast = await client.run({ config: plan.contrast, owner: 'org', onProgress: onProgress(1) });
 
     /** @type {any} */
     let aiOff = null;
     if (plan.aiOff) {
       if (state.planCancelled) throw Object.assign(new Error('run cancelled'), { cancelled: true });
-      aiOff = await client.run({ config: plan.aiOff, onProgress: onProgress(2) });
+      aiOff = await client.run({ config: plan.aiOff, owner: 'org', onProgress: onProgress(2) });
     }
 
     /** @type {any} */
@@ -307,7 +329,7 @@ async function runAll() {
       // allHumanTwin preserves replay/paramOverrides, so a replayed pair runs
       // on the same coefficients (twin philosophy — runplan.js). Its index is
       // plan.runCount (after primary/contrast/[aiOff]).
-      layerTwin = await client.run({ config: allHumanTwin(baseConfig), onProgress: onProgress(plan.runCount) });
+      layerTwin = await client.run({ config: allHumanTwin(baseConfig), owner: 'org', onProgress: onProgress(plan.runCount) });
     }
 
     const planElapsedMs = performance.now() - tPlan0;
@@ -339,6 +361,7 @@ async function runAll() {
       }
     }
   } finally {
+    orgBusy = false;
     setRunButtons(false);
     progressBar.value = 0;
     state.startingOver = false;
@@ -596,11 +619,11 @@ function stageConfigChange(interaction) {
  * @param {'preset' | 'run'} interaction
  */
 function requestRun(interaction) {
-  if (client.busy) {
+  if (orgBusy) {
     if (autoRunsOnInteraction(interaction)) {
       state.pendingRerun = true;
       state.planCancelled = true;
-      client.cancel();
+      client.cancel('org');
     }
     return;
   }
@@ -825,14 +848,16 @@ function markResultsFresh() {
  * flow replay is P10b; P10a just needs a coherent clean re-entry — M4.)
  */
 function resetToDefault() {
-  // Cancel an in-flight plan the same way the Run/Cancel toggle does, and bump
-  // the generation so any completion still in flight lands STALE and never
-  // paints a run the user abandoned (C2).
-  if (client.busy) {
+  // Cancel an in-flight ORG plan the same way the Run/Cancel toggle does, and
+  // bump the generation so any completion still in flight lands STALE and never
+  // paints a run the user abandoned (C2). Gated on orgBusy (not the shared
+  // client.busy) so a team run in flight is never cancelled by an org Start-over
+  // and startingOver is only set when an org plan is actually unwinding (P7b R1).
+  if (orgBusy) {
     state.pendingRerun = false;
     state.planCancelled = true;
     state.startingOver = true; // suppress the async "run cancelled" status (M4/C2)
-    client.cancel();
+    client.cancel('org');
   }
   state.generation += 1;
 
@@ -937,9 +962,11 @@ const teamState = {
   pendingRerun: false,
   startingOver: false,
 };
-// Team run is a SINGLE run, but `client.busy` is shared with org; this flag tracks
-// whether a TEAM run is the one in flight so the Run/Cancel toggle and pending
-// re-run belong to the team flow, never an org run.
+// Team run is a SINGLE run through the client org also uses. This flag tracks
+// whether a TEAM run is the caller's own — requested but not settled (in flight
+// OR queued behind an org run) — so the Run/Cancel toggle and pending re-run
+// belong to the team flow, never an org run. Symmetric to orgBusy; cancellation
+// is owner-scoped (client.cancel('team')) so team can never cancel an org run.
 let teamBusy = false;
 
 /** @type {{ setActive: (id: string) => void }} */
@@ -1078,10 +1105,11 @@ function teamSuccessLine(cov, stats, output) {
  */
 async function teamRunAll() {
   if (teamBusy) {
-    // Run/Cancel toggle on the in-flight team run.
+    // Run/Cancel toggle on the team run (in flight or queued behind an org run).
+    // Owner-scoped cancel never touches an org run.
     teamState.pendingRerun = false;
     teamState.planCancelled = true;
-    client.cancel();
+    client.cancel('team');
     return;
   }
   const config = teamState.config;
@@ -1089,6 +1117,10 @@ async function teamRunAll() {
   const planGeneration = teamState.generation;
   teamState.planCancelled = false;
   teamBusy = true;
+  // An org plan in flight means this team run queues behind it on the serialized
+  // client (team actions never cancel an org run — P7b R1). Show a truthful
+  // "waiting" status until the first progress tick fires.
+  const queuedBehindOrg = orgBusy;
   setTeamRunButtons(true);
   const iterations = Number(config.iterations);
   teamProgress.max = iterations;
@@ -1097,9 +1129,10 @@ async function teamRunAll() {
 
   const t0 = performance.now();
   try {
-    setStatus(teamStatusEl, `running… 0/${iterations} iterations`, '');
+    setStatus(teamStatusEl, queuedBehindOrg ? 'waiting for the current run to finish…' : `running… 0/${iterations} iterations`, '');
     const run = await client.run({
       config,
+      owner: 'team',
       onProgress: ({ completedCount }) => {
         if (teamState.planCancelled) return;
         teamProgress.value = completedCount;
@@ -1137,7 +1170,7 @@ function requestTeamRun() {
   if (teamBusy) {
     teamState.pendingRerun = true;
     teamState.planCancelled = true;
-    client.cancel();
+    client.cancel('team');
     return;
   }
   void teamRunAll();
@@ -1241,7 +1274,7 @@ function resetTeam() {
     teamState.pendingRerun = false;
     teamState.planCancelled = true;
     teamState.startingOver = true;
-    client.cancel();
+    client.cancel('team'); // owner-scoped — never cancels an org run
   }
   teamState.generation += 1;
   teamCard.disarm();
