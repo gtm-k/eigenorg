@@ -169,6 +169,160 @@ h1 {
   margin: 0 0 var(--space-3);
 }
 
+/* ==================================================================== */
+/* P10b §4d — plain-language layer: demoted .tech-label + inline ⓘ.      */
+/* The plain lead is the h2; the technical term demotes below it; a      */
+/* native-<details> ⓘ (the why-eigen idiom — keyboard + tap, never       */
+/* hover-only) carries the curated blurb + an opt-in model deep-dive.    */
+/* ==================================================================== */
+
+/* The technical term, demoted below the plain lead (§2b): not uppercase,
+   ink-subtle, block so it sits on its own line under the heading. */
+.tech-label {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--font-text);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--color-ink-subtle);
+}
+
+/* The inline ⓘ: a CSS-drawn serif "i" in a hairline circle (NOT an emoji —
+   emoji picks up a system colour and breaks the single accent). */
+.term-pop {
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 0.35em;
+}
+
+.term-info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: 50%;
+  font: italic 600 0.75rem/1 Georgia, 'Times New Roman', serif;
+  color: var(--color-ink-subtle);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.term-info::-webkit-details-marker {
+  display: none;
+}
+
+/* 44px tap target without disturbing inline layout (tap + keyboard). */
+.term-info::after {
+  content: '';
+  position: absolute;
+  inset: -13px;
+}
+
+.term-info:hover {
+  color: var(--color-ink);
+  border-color: var(--color-primary-hover);
+}
+
+.term-info:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.term-pop[open] > .term-info {
+  color: var(--color-ink);
+  border-color: var(--color-primary-hover);
+}
+
+/* Popover card — surface-2 hairline, mirrors .why-eigen-pop. Resets the
+   heading's weight/casing/tracking so body copy reads as prose. */
+.term-pop-body {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  display: block;
+  width: max-content;
+  max-width: min(24rem, 82vw);
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-text);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elev-key);
+  white-space: normal;
+}
+
+.term-pop-plain {
+  display: block;
+  color: var(--color-ink);
+}
+
+.term-pop-why {
+  display: block;
+  margin-top: var(--space-2);
+}
+
+.term-pop-why strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* Opt-in quantitative layer — the drift-gated model plainLanguage. */
+.term-pop-more {
+  margin-top: var(--space-3);
+}
+
+.term-pop-more-summary {
+  font-size: 0.75rem;
+  color: var(--color-primary-hover);
+  cursor: pointer;
+  list-style: none;
+}
+
+.term-pop-more-summary::-webkit-details-marker {
+  display: none;
+}
+
+.term-pop-more-summary::before {
+  content: '▸ ';
+}
+
+.term-pop-more[open] > .term-pop-more-summary::before {
+  content: '▾ ';
+}
+
+.term-pop-more-summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.term-pop-more-body {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--color-ink-subtle);
+}
+
+/* The approval-stack drawer-title carries its tech-label INLINE (the summary is
+   a flex row; a block tech-label would break its baseline). */
+.drawer-title .tech-label {
+  display: inline;
+  margin-left: 0.5em;
+}
+
 .panel-header {
   display: flex;
   align-items: baseline;

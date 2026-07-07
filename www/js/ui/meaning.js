@@ -46,7 +46,7 @@ const RULES = {
     const shSpan = `Structural Health ${ctx.beforeSh} vs ${ctx.afterSh}`;
     const ends =
       ctx.beforeFinal !== undefined && ctx.afterFinal !== undefined
-        ? ` entropy ends at ${fmt(/** @type {number} */ (ctx.beforeFinal))} vs ${fmt(/** @type {number} */ (ctx.afterFinal))}.`
+        ? ` Disorder ends at ${fmt(/** @type {number} */ (ctx.beforeFinal))} versus ${fmt(/** @type {number} */ (ctx.afterFinal))}.`
         : '';
     if (aiActive(config)) {
       return (

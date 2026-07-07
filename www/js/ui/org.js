@@ -24,7 +24,7 @@ export const CONTROL_DEFS = [
     min: 4,
     max: 500,
     step: 1,
-    hint: 'people at step 0 (4–500)',
+    hint: 'starting people (4–500)',
   },
   {
     id: 'headcountGrowthPerStep',

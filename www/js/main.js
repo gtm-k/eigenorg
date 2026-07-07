@@ -31,6 +31,7 @@ import { wireCard } from './share/card.js';
 import { fetchAssumptions, renderAssumptionsDrawer } from './ui/assumptions.js';
 import { modelVersionBanner, extractShareFragment } from './url-codec.js';
 import { createNavShell, createSetupStrip } from './ui/nav.js';
+import { createGlossary } from './ui/glossary.js';
 
 /** @param {string} sel @returns {HTMLElement} */
 function el(sel) {
@@ -395,10 +396,14 @@ function paintResults(r) {
   el('#ro-seed').textContent = `seed ${config.seed}`;
   el('#ro-iters').textContent = `${output.iterations} iterations × ${r.totalRuns} runs`;
   el('#ro-elapsed').textContent = `${(r.primaryElapsedMs / 1000).toFixed(2)} s/run · ${(r.planElapsedMs / 1000).toFixed(2)} s total`;
+  // Success line (P10b §4c copy): plain "runs · simulations" + "disorder settles
+  // around N". Every number is run-derived (never hardcoded): totalSims is the
+  // plan's run count × iterations, N is this run's settled entropy p50.
   const replayNote = r.replayPayload ? 'replayed from the shared link — ' : '';
+  const totalSims = r.totalRuns * output.iterations;
   setStatus(
     statusEl,
-    `${replayNote}${r.totalRuns} runs × ${output.iterations} iterations in ${(r.planElapsedMs / 1000).toFixed(2)} s — entropy p50 ends at ${finalP50(output.series.entropy).toFixed(1)}`,
+    `${replayNote}${r.totalRuns} runs · ${totalSims.toLocaleString('en-US')} simulations in ${(r.planElapsedMs / 1000).toFixed(1)} s — disorder settles around ${Math.round(finalP50(output.series.entropy))}.`,
     'ok',
   );
 
@@ -800,7 +805,7 @@ function resetToDefault() {
   configurator.refresh();
   refreshSetupChips();
   setRunButtons(false);
-  setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
+  setStatus(statusEl, 'Ready — 500 simulations, in your browser.', '');
 }
 
 // The two-altitude nav shell (spec §4). Doors are registered by { id, label,
@@ -923,7 +928,7 @@ async function boot() {
   // The shell's own status is always "ready" — a broken shared link is surfaced
   // on the LANDING notice (BLOCKER B), not in the hidden shell, so entering a
   // door later lands on a coherent fresh "ready" state.
-  setStatus(statusEl, 'ready — every run is 500 seeded Monte Carlo iterations, entirely in your browser', '');
+  setStatus(statusEl, 'Ready — 500 simulations, in your browser.', '');
 
   if (replayBoot) {
     // A shared link is an Organization run: open that door directly (skipping
@@ -948,19 +953,28 @@ boot().catch((err) => {
   setStatus(statusEl, `failed to start: ${err instanceof Error ? err.message : String(err)}`, 'error');
 });
 
-// ---- model assumptions drawer (independent of the run flow) ------------------------
+// ---- model assumptions drawer + glossary (independent of the run flow) --------------
 
 /**
- * Fetch www/assumptions.json and render the transparency drawer. Independent of
- * the engine run flow, so a drawer failure never blocks the simulator. The
- * drawer renders the artifact VERBATIM (PREMORTEM Story 3) — no coefficient is
- * authored here.
+ * Fetch www/assumptions.json ONCE and use it for BOTH the transparency drawer
+ * AND the plain-language glossary's deep-dive (integration point 5: no double
+ * fetch / race). Independent of the engine run flow, so a fetch failure never
+ * blocks the simulator: the drawer surfaces the error, and the glossary still
+ * decorates every heading — the curated ⓘ lede is self-contained, only the
+ * opt-in "Show the numbers" model reveal is omitted.
+ *
+ * The drawer renders the artifact VERBATIM (PREMORTEM Story 3) — no coefficient
+ * is authored here. The glossary decorates the org mount's [data-term] headings
+ * + the SH control; it is entirely data-term-driven, so P7b calls the same
+ * decorate on its team mount (mode-agnostic — §2b).
  */
-async function mountAssumptionsDrawer() {
+async function mountAssumptionsAndGlossary() {
   const mount = el('#assumptions-mount');
   const status = el('#assumptions-status');
+  /** @type {any} */
+  let data = null;
   try {
-    const data = await fetchAssumptions();
+    data = await fetchAssumptions();
     const { problems } = renderAssumptionsDrawer(mount, data);
     if (problems.length > 0) {
       // Shape drift in the extracted artifact — surface it rather than render a
@@ -972,6 +986,10 @@ async function mountAssumptionsDrawer() {
     status.textContent = `Could not load the model assumptions: ${err instanceof Error ? err.message : String(err)}`;
     status.hidden = false;
   }
+  // Build the glossary from the shared assumptions (or an empty stand-in when the
+  // fetch failed) and attach the inline ⓘ to every data-term host in the org mount.
+  const glossary = createGlossary({ assumptions: data ?? { items: [] } });
+  glossary.decorate(el('#org-mount'));
 }
 
-void mountAssumptionsDrawer();
+void mountAssumptionsAndGlossary();

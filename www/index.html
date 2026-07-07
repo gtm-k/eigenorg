@@ -158,13 +158,17 @@
                  Its results-shaped blocks (flow, all-human) are gated on hasRun via
                  the .pre-run class so they never sit empty in the setup. -->
             <details id="approval-drawer" class="drawer approval-drawer pre-run">
-              <summary class="drawer-summary">
-                <span class="drawer-title">Approval stack</span>
+              <!-- Plain-lead title + demoted tech-label + data-term (P10b §4d). No
+                   inline ⓘ here: nesting a <details> in a <summary> is invalid, and
+                   the drawer IS its own disclosure — opening it is the affordance.
+                   data-term is present for the coverage gate + glossary lookup. -->
+              <summary class="drawer-summary" data-term="approvalStack">
+                <span class="drawer-title">Who has to sign off <span class="tech-label">Approval stack</span></span>
                 <span class="drawer-value" id="approval-drawer-value"></span>
                 <span class="drawer-optional">optional</span>
               </summary>
               <div class="drawer-body">
-                <p class="note">Build the sign-off chain a decision must clear — 1 to 5 layers, each a Human PM, Human Director, AI Prioritization Agent, or Committee seat. This is the part that produces the decision-latency number. Tap a seat type to assign it; changes apply on the next run.</p>
+                <p class="note">Build the chain of sign-offs a decision clears — 1 to 5 seats, each a person, committee, or AI agent. Tap a seat to set it. This is what sets your decision-latency number.</p>
                 <div id="configurator" class="configurator"></div>
               </div>
             </details>
@@ -229,7 +233,11 @@
           <div class="charts-grid">
             <section class="panel reveal-item" aria-labelledby="entropy-heading">
               <p class="eyebrow">Disorder</p>
-              <h2 id="entropy-heading">Entropy</h2>
+              <!-- Plain-language header inversion (P10b §4d/M6): the plain lead is
+                   the h2 text; the technical term demotes to .tech-label; data-term
+                   wires the coverage gate + the inline ⓘ (attached by
+                   glossary.decorate). Same pattern on every results heading below. -->
+              <h2 id="entropy-heading" data-term="entropy">How chaotic things get<span class="tech-label">Disorder · entropy, 0–100</span></h2>
               <p id="meaning-entropy" class="meaning">Composite disorder index (0–100), p50 line inside the p10–p90 Monte Carlo band.</p>
               <div class="chart-box">
                 <canvas id="entropy-chart" role="img" aria-label="Entropy over time: median line with 10th to 90th percentile band; a labeled vertical line marks the AI injection step when active"></canvas>
@@ -239,7 +247,7 @@
             <section class="panel reveal-item" aria-labelledby="velocity-heading">
               <p class="eyebrow">Decisions</p>
               <div class="panel-header">
-                <h2 id="velocity-heading">Decision velocity</h2>
+                <h2 id="velocity-heading" data-term="decisionVelocity">How fast decisions get made<span class="tech-label">Decision velocity · 0–100</span></h2>
                 <span id="bottleneck-badge" class="badge" hidden></span>
               </div>
               <p id="meaning-velocity" class="meaning">A 0–100 speedometer for decisions: layers add friction, queues drag it lower.</p>
@@ -250,7 +258,7 @@
 
             <section class="panel reveal-item" aria-labelledby="comm-heading">
               <p class="eyebrow">Coordination</p>
-              <h2 id="comm-heading">Communication load</h2>
+              <h2 id="comm-heading" data-term="communicationLoad">How tangled coordination gets<span class="tech-label">Communication load · open channels</span></h2>
               <p id="meaning-communication" class="meaning">Open channels inside and between teams; labeled vertical lines mark cognitive band crossings.</p>
               <div class="chart-box">
                 <canvas id="comm-chart" role="img" aria-label="Communication channels over time: median line with 10th to 90th percentile band; labeled vertical lines mark cognitive band crossings"></canvas>
@@ -259,7 +267,7 @@
 
             <section class="panel reveal-item" aria-labelledby="delta-heading">
               <p class="eyebrow">Counterfactual</p>
-              <h2 id="delta-heading">AI injection delta</h2>
+              <h2 id="delta-heading" data-term="aiInjectionDelta">What the AI actually changed<span class="tech-label">AI injection delta · with-AI minus without</span></h2>
               <p id="meaning-delta" class="meaning">Pointwise difference, AI minus no-AI, on this exact org.</p>
               <div class="chart-box">
                 <canvas id="delta-chart" role="img" aria-label="AI injection delta: entropy difference (solid) and throughput difference (dashed) between the AI run and the no-AI counterfactual"></canvas>
@@ -269,7 +277,7 @@
 
             <section class="panel reveal-item" aria-labelledby="meetings-heading">
               <p class="eyebrow">Coordination</p>
-              <h2 id="meetings-heading">Meeting overhead</h2>
+              <h2 id="meetings-heading" data-term="meetingOverhead">Time in meetings, not the work<span class="tech-label">Meeting overhead · % of capacity</span></h2>
               <p id="meaning-meetings" class="meaning">Share of each step's capacity spent coordinating instead of working.</p>
               <div class="chart-box">
                 <canvas id="meetings-chart" role="img" aria-label="Meeting overhead as a percentage of capacity over time: median line with 10th to 90th percentile band"></canvas>
@@ -278,7 +286,7 @@
 
             <section class="panel reveal-item" aria-labelledby="health-heading">
               <p class="eyebrow">Multi-level health</p>
-              <h2 id="health-heading">Teams vs the org</h2>
+              <h2 id="health-heading" data-term="multiLevelHealth">Do the teams feel it too?<span class="tech-label">Multi-level health · org vs teams</span></h2>
               <p id="meaning-health" class="meaning">Team cohesion vs org-level health: divergence means healthy teams inside a sick org.</p>
               <div class="chart-box">
                 <canvas id="health-chart" role="img" aria-label="Org health (solid) versus mean team cohesion (dashed) over time"></canvas>

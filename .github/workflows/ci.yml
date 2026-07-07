@@ -164,3 +164,8 @@ jobs:
         run: |
           set -o pipefail
           node scripts/check_no_coefficient_literals.mjs
+
+      - name: Term-coverage gate — every on-screen term maps to a curated entry or a live assumptions id (PLAN P10b; spec 8.5)
+        run: |
+          set -o pipefail
+          node scripts/check_term_coverage.mjs
