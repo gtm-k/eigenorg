@@ -288,5 +288,15 @@ export function createStructuralHealthHelper(mount, opts) {
     toggle.focus();
   });
 
-  return { collapse: () => setExpanded(false), isExpanded: () => expanded };
+  return {
+    // Start over (resetToDefault → shHelper.collapse) must return the diagnostic
+    // to a fresh-boot state, so it resets the radios to their defaultChecked
+    // neutrals as well as collapsing. An in-session Close/Apply keeps the user's
+    // answers — those paths call setExpanded(false) directly, never this.
+    collapse: () => {
+      form.reset();
+      setExpanded(false);
+    },
+    isExpanded: () => expanded,
+  };
 }
