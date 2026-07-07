@@ -631,7 +631,7 @@ progress {
   font-size: 0.6875rem;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA batch (pre-flip audit): ink-tertiary 3.17:1 -> ink-subtle 5.63:1 */
   margin: 0 0 0.125rem;
 }
 
@@ -1123,7 +1123,7 @@ progress {
   text-align: left;
   margin-top: var(--space-2);
   font-size: 0.75rem;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA batch (pre-flip audit): ink-tertiary 3.17:1 -> ink-subtle 5.63:1 */
 }
 
 .cfg-flow-table th,
@@ -1138,7 +1138,7 @@ progress {
   font-size: 0.6875rem;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA batch (pre-flip audit): ink-tertiary 3.17:1 -> ink-subtle 5.63:1 */
   font-weight: 500;
 }
 
@@ -1248,7 +1248,7 @@ progress {
   font-size: 0.625rem;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA batch (pre-flip audit): ink-tertiary 3.17:1 -> ink-subtle 5.63:1 */
 }
 
 .cfg-cmp-val {
@@ -1346,7 +1346,7 @@ progress {
   font-weight: 600;
   letter-spacing: 0.4px;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA batch (pre-flip audit): ink-tertiary 3.17:1 -> ink-subtle 5.63:1 */
   margin: var(--space-3) 0 var(--space-2);
 }
 
@@ -1450,7 +1450,7 @@ progress {
   font-size: 0.6875rem;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA batch (pre-flip audit): ink-tertiary 3.17:1 -> ink-subtle 5.63:1 */
   margin: 0;
 }
 
@@ -1466,7 +1466,7 @@ progress {
   font-size: 0.6875rem;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA batch (pre-flip audit): ink-tertiary 3.17:1 -> ink-subtle 5.63:1 */
   margin: var(--space-3) 0 var(--space-1);
 }
 
@@ -1611,6 +1611,14 @@ progress {
   .diagnostic-options {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+/* Inside the narrow inline SH helper the 3-across layout clips its own labels
+   ("Somewhere in between" → "Some in bet") — the breakpoint keys off VIEWPORT
+   width, but the helper panel is ~19rem wide at any viewport. Stay one-per-row
+   there (pre-flip audit + beta feedback). */
+.sh-helper .diagnostic-options {
+  grid-template-columns: 1fr;
 }
 
 .diagnostic-option {
@@ -2172,7 +2180,7 @@ progress {
   font-size: 0.6875rem;
   letter-spacing: 0.3px;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA batch (pre-flip audit): ink-tertiary 3.17:1 -> ink-subtle 5.63:1 */
 }
 
 .setup-body[hidden] {

@@ -6,14 +6,15 @@ policy are defined here and nowhere else. `model/params.json`, `model/goldens.js
 `www/assumptions.json` are machine-extracted from this file by `scripts/extract_params.mjs`;
 `docs/CONTRACTS.md` is a derived operational copy. On any conflict, this document wins.
 
-**Status:** v2.2.0 — base v2.0.0 **USER-LOCKED 2026-07-05** (post-calibration lock gate;
-P3 phase gate); v2.1.0 within-range coefficient amendment (P4 engine calibration); v2.2.0
-two mini-G2 amendments (USER-APPROVED 2026-07-07): the `hmBrittlenessSpike` golden re-anchored
-to a pointwise difference (§11.6) and the M20 fractional-dwell semantics pinned to integer
-sojourn (§4 M20). §14 rows 2.1.0 / 2.2.0; each flagged in review per the amendment protocol.
-Post-lock changes only via the amendment protocol (§11.12 lock lifecycle): orchestrator
-single-writer, within-range coefficient changes flagged in review, range/parameter/
-tolerance/predicate changes require a mini-G2 user gate.
+**Status:** v2.2.0 — a **locked specification**. The base model (v2.0.0) was locked on
+2026-07-05 after its calibration gate; v2.1.0 is a within-range coefficient amendment
+(engine calibration); v2.2.0 carries two reviewed amendments (2026-07-07): the
+`hmBrittlenessSpike` golden re-anchored to a pointwise difference (§11.6) and the M20
+fractional-dwell semantics pinned to integer sojourn (§4 M20). Full history: §14.
+Post-lock changes flow **only** through the amendment protocol (§11.12 lock lifecycle):
+amendments are applied atomically with the re-extracted artifacts by a single maintainer;
+within-range coefficient changes are flagged in review; range, parameter, tolerance, or
+predicate changes require an explicit maintainer decision before they land.
 **Extraction:** fenced blocks tagged `json eigenorg:parameter`, `json eigenorg:mechanic`,
 `json eigenorg:golden`, and `json eigenorg:meta` are machine-extracted. Untagged `json`
 fences are illustrative only.
