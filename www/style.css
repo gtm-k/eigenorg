@@ -232,13 +232,17 @@ h1 {
   margin-bottom: var(--space-3);
 }
 
+/* Default button = neutral ghost (§2a accent budget): full-strength lavender is
+   reserved for the run CTAs, active/selected states, and the signature order
+   line, so ordinary commands (Copy share link, Download card, Set Structural
+   Health) sit at a quieter weight. Geometry unchanged from the P5b button. */
 button {
   font: inherit;
   font-size: 0.875rem;
   font-weight: 500;
-  color: #ffffff;
-  background: var(--color-primary);
-  border: 1px solid transparent;
+  color: var(--color-ink);
+  background: transparent;
+  border: 1px solid var(--color-hairline-strong);
   border-radius: 8px;
   padding: 0.625rem 1.25rem;
   min-height: 44px; /* tappable target (PLAN P5 mobile acceptance) */
@@ -247,7 +251,23 @@ button {
 }
 
 button:hover:not(:disabled) {
+  background: var(--color-surface-2); /* brighten the surface, not a lavender fill */
+}
+
+/* The run CTAs are the ONE full-strength lavender in the app shell (§2a). The
+   primary #run-button carries .cta; #run-button-2 ("Run again", in .run-strip)
+   shares the fill though it is not sized as a .cta. */
+.cta,
+#run-button-2 {
+  color: #ffffff;
+  background: var(--color-primary);
+  border-color: transparent;
+}
+
+.cta:hover:not(:disabled),
+#run-button-2:hover:not(:disabled) {
   background: var(--color-primary-hover);
+  border-color: transparent;
 }
 
 button:focus-visible {
@@ -274,7 +294,10 @@ button.ghost:hover:not(:disabled) {
 progress {
   flex: 1 1 10rem;
   height: 8px;
-  accent-color: var(--color-primary);
+  /* Filled track = low-alpha lavender (§2a), dialed back from the solid Run CTA
+     so it is no longer a full-strength competitor. The live status text carries
+     the run state in words, so the bar is never a colour-alone signal. */
+  accent-color: rgba(94, 106, 210, 0.5);
 }
 
 .status {
@@ -953,7 +976,10 @@ progress {
   right: var(--space-3);
   bottom: 4px;
   height: 3px;
-  background: var(--color-primary);
+  /* Utilization is pure data-viz, not one of §2a's sanctioned lavender
+     surfaces, so the bar is neutral ink — the accent stays on the busiest-row
+     cue. The .cfg-util-num readout carries the value (never colour-alone). */
+  background: var(--color-ink-subtle);
   border-radius: 2px;
   max-width: calc(100% - var(--space-6));
 }
