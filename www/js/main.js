@@ -666,9 +666,18 @@ const configurator = renderConfigurator(el('#configurator'), {
   },
 });
 
-/** @param {any} preset */
-function presetNote(preset) {
-  return `${preset.label} — materialized verbatim from ${String(preset.source).replace(' (normative scenario config, materialized verbatim)', '')}.`;
+/**
+ * The preset-note copy (§4d). The Faster Dysfunction default gets the approved
+ * plain-language line; every other preset gets a plain one-liner derived from its
+ * label. Neither cites the model source — the "MODEL.md §10.3" provenance now
+ * rides in the Faster Dysfunction ⓘ deep-dive copy (glossary-terms.js), not here.
+ * @param {any} preset @param {string} id
+ */
+function presetNote(preset, id) {
+  if (id === 'fasterDysfunction') {
+    return 'A small, healthy-looking org where adding AI speeds up the wrong things. Change anything below to make it yours.';
+  }
+  return `${preset.label} — a preset starting point. Change anything below to make it yours.`;
 }
 
 /**
@@ -682,7 +691,7 @@ function presetNote(preset) {
  */
 function setPresetNote(preset, id) {
   const note = el('#preset-note');
-  note.textContent = presetNote(preset); // clears children, incl. any prior ⓘ
+  note.textContent = presetNote(preset, id); // clears children, incl. any prior ⓘ
   if (id === 'fasterDysfunction') {
     note.dataset.term = 'fasterDysfunction';
     if (note.parentElement) glossary.decorate(note.parentElement);
