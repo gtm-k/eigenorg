@@ -133,6 +133,16 @@ const state = {
 const probe = { lastPlan: null, shareFragment: null, bootReadyMs: null };
 /** @type {any} */ (window).__eigenorg = probe;
 
+// The plain-language glossary, hoisted to module scope (real instance mounts in
+// mountAssumptionsAndGlossary once assumptions load). Held here — not local to
+// that async fn — so the run flow can RE-decorate dynamically-rendered
+// [data-term] hosts (pane stat labels, the legibility comparison row, the
+// fasterDysfunction preset note) after a paint, and so a future mode's onEnter
+// can reach decorate(). A no-op placeholder keeps every caller safe before the
+// fetch resolves (same pattern as shHelper below).
+/** @type {{ decorate: (root: HTMLElement) => void }} */
+let glossary = { decorate: () => {} };
+
 /** @param {string} id @param {string} text */
 function setMeaning(id, text) {
   el(`#meaning-${id}`).textContent = text;
@@ -149,20 +159,50 @@ function setRunButtons(running) {
   }
 }
 
-/** @param {any} run @param {HTMLElement} dl render the pane card stat row */
+/**
+ * Render the pane card stat row. The two §8.5 metric labels lead with the plain
+ * English and demote the technical term to a `.tech-label`, carrying the
+ * `data-term` glossary.decorate() turns into the inline ⓘ (§4d); paintResults
+ * re-decorates the mount after building these (the boot decorate ran before any
+ * stat existed). Decision latency stays a plain readout label — it is not one of
+ * the ten §8.5 curated terms, so it gets no ⓘ.
+ * @param {any} run @param {HTMLElement} dl
+ */
 function renderStats(dl, run) {
+  /** @type {Array<{ plain: string, tech?: string, term?: string, value: string }>} */
   const stats = [
-    ['Decision latency', `${finalP50(run.output.series.decisionLatency).toFixed(1)} days`],
-    ['Coordination tax', `${Math.round(finalP50(run.output.series.coordinationTax) * 100)}%`],
-    ['Throughput', `${finalP50(run.output.series.throughput).toFixed(1)}/step`],
+    { plain: 'Decision latency', value: `${finalP50(run.output.series.decisionLatency).toFixed(1)} days` },
+    {
+      plain: 'Time lost coordinating',
+      tech: 'Coordination tax',
+      term: 'coordinationTax',
+      value: `${Math.round(finalP50(run.output.series.coordinationTax) * 100)}%`,
+    },
+    {
+      plain: 'Work getting done',
+      tech: 'Throughput',
+      term: 'throughput',
+      value: `${finalP50(run.output.series.throughput).toFixed(1)}/step`,
+    },
   ];
   dl.textContent = '';
-  for (const [label, value] of stats) {
+  for (const stat of stats) {
     const div = document.createElement('div');
     const dt = document.createElement('dt');
-    dt.textContent = label;
+    if (stat.term && stat.tech) {
+      // Plain lead as a text node; the ⓘ (a <details>) decorate inserts before
+      // the .tech-label is valid flow content inside a <dt>.
+      dt.dataset.term = stat.term;
+      dt.appendChild(document.createTextNode(stat.plain));
+      const tech = document.createElement('span');
+      tech.className = 'tech-label';
+      tech.textContent = stat.tech;
+      dt.appendChild(tech);
+    } else {
+      dt.textContent = stat.plain;
+    }
     const dd = document.createElement('dd');
-    dd.textContent = value;
+    dd.textContent = stat.value;
     div.append(dt, dd);
     dl.appendChild(div);
   }
@@ -479,6 +519,11 @@ function paintResults(r) {
   state.hasRun = true;
   el('#run-button-2').hidden = false;
   el('#approval-drawer').classList.remove('pre-run'); // reveal the now-populated flow/legibility blocks
+  // Attach the inline ⓘ to the [data-term] labels this paint just rendered (the
+  // before/after pane stat labels + the legibility "Novel-task brittleness" row).
+  // The boot decorate ran before any of these DOM nodes existed; decorate is
+  // idempotent, so re-walking the whole mount only touches the new hosts.
+  glossary.decorate(el('#org-mount'));
   markResultsFresh();
 }
 
@@ -566,7 +611,9 @@ function stageAndRefresh(next) {
   // so the once-only diagnostic won't fire/consume on a custom first run and the
   // card scenario label reads "Custom configuration".
   picker.setActive('');
-  el('#preset-note').textContent = 'Custom configuration — changes apply on the next run.';
+  const noteEl = el('#preset-note');
+  noteEl.textContent = 'Custom configuration — changes apply on the next run.'; // clears any prior ⓘ child
+  delete noteEl.dataset.term; // and drop the Faster-Dysfunction marker so a later decorate can't re-attach it
   controls.refresh();
   configurator.refresh();
   setStatus(statusEl, 'configuration changed — run to update the charts', '');
@@ -622,6 +669,26 @@ const configurator = renderConfigurator(el('#configurator'), {
 /** @param {any} preset */
 function presetNote(preset) {
   return `${preset.label} — materialized verbatim from ${String(preset.source).replace(' (normative scenario config, materialized verbatim)', '')}.`;
+}
+
+/**
+ * Set the preset-note copy AND, on the Faster Dysfunction default, attach the
+ * inline ⓘ for that scenario retell term (§8.5 / F1): the note <div> carries
+ * data-term="fasterDysfunction" and glossary.decorate inserts the ⓘ (a
+ * <details>). Any other preset clears both — setting textContent drops the prior
+ * ⓘ child, and removing the marker keeps a later decorate from re-attaching it —
+ * so a stale Faster-Dysfunction ⓘ never lingers on another scenario's note.
+ * @param {any} preset @param {string} id
+ */
+function setPresetNote(preset, id) {
+  const note = el('#preset-note');
+  note.textContent = presetNote(preset); // clears children, incl. any prior ⓘ
+  if (id === 'fasterDysfunction') {
+    note.dataset.term = 'fasterDysfunction';
+    if (note.parentElement) glossary.decorate(note.parentElement);
+  } else {
+    delete note.dataset.term;
+  }
 }
 
 const share = wireShareButton(shareButton, shareStatusEl, {
@@ -762,7 +829,7 @@ function resetToDefault() {
   const ref = PRESET_REFS.find((p) => p.id === DEFAULT_PRESET_ID);
   state.config = primaryRunConfig(preset, /** @type {any} */ (ref));
   picker.setActive(DEFAULT_PRESET_ID);
-  el('#preset-note').textContent = presetNote(preset);
+  setPresetNote(preset, DEFAULT_PRESET_ID);
   configurator.setCompareDefault(false);
 
   // Reset the results region + setup strip to the pre-run state. Re-hiding
@@ -879,7 +946,7 @@ async function boot() {
       state.config = primaryRunConfig(preset, ref);
       stageConfigChange('preset');
       picker.setActive(ref.id);
-      el('#preset-note').textContent = presetNote(preset);
+      setPresetNote(preset, ref.id);
       controls.refresh();
       // Compare defaults ON for the layerConfigurator preset (mirrors the §10.6
       // aiMiddle/allHuman pair), OFF for the others — decision 3.
@@ -926,7 +993,7 @@ async function boot() {
     const ref = PRESET_REFS.find((p) => p.id === DEFAULT_PRESET_ID);
     state.config = primaryRunConfig(preset, /** @type {any} */ (ref));
     picker.setActive(DEFAULT_PRESET_ID);
-    el('#preset-note').textContent = presetNote(preset);
+    setPresetNote(preset, DEFAULT_PRESET_ID);
     // The landing default is fasterDysfunction (all-human) → single-run view;
     // compare defaults on only for the layerConfigurator preset (decision 3).
     configurator.setCompareDefault(false);
@@ -999,7 +1066,9 @@ async function mountAssumptionsAndGlossary() {
   }
   // Build the glossary from the shared assumptions (or an empty stand-in when the
   // fetch failed) and attach the inline ⓘ to every data-term host in the org mount.
-  const glossary = createGlossary({ assumptions: data ?? { items: [] } });
+  // Assigns the module-scope instance so the run flow can re-decorate the
+  // dynamically-rendered [data-term] labels after a paint.
+  glossary = createGlossary({ assumptions: data ?? { items: [] } });
   glossary.decorate(el('#org-mount'));
 }
 

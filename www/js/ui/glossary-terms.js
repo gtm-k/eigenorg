@@ -25,8 +25,18 @@
 //   - §8.5 sourceless correction: only THREE curated terms have no
 //     assumptions.json item (Structural Health, Throughput, Faster Dysfunction);
 //     every other term carries an `assumptionsId` linking it to the mechanic
-//     whose `plainLanguage` is its deep-dive. Of the three sourceless terms,
-//     Structural Health is the one wired on-screen in P10b (the SH control).
+//     whose `plainLanguage` is its deep-dive. All three sourceless terms are now
+//     wired on-screen in P10b — Structural Health on the SH control, Throughput
+//     on the before/after pane stat, Faster Dysfunction on the preset note ⓘ.
+//     `functionCoverage` is registered but present-but-unwired until P7b renders
+//     its surface (§8.5 allows this).
+//
+// SPEC COVERAGE: the ten §8.5 layer-ii terms — structuralHealth, entropy,
+// decisionVelocity, throughput, cohesion, brittleness, fasterDysfunction,
+// approvalStack, functionCoverage, coordinationTax — are ALL registered here.
+// The term-coverage gate pins that set (its SPEC_TERMS constant), so
+// de-registering any of them fails CI. communicationLoad / aiInjectionDelta /
+// meetingOverhead / multiLevelHealth are additional curated terms this UI renders.
 //
 // SHAPE (each entry): { id, label, surfaces, plain, why, assumptionsId? }
 //   id         — the `data-term` value a heading/control carries (NOT a surface).
@@ -113,6 +123,69 @@ export const CURATED_TERMS = [
     plain: 'The chain of sign-offs a decision clears before it can move — 1 to 5 seats, each a person, a committee, or an AI agent.',
     why: 'This chain is what sets your decision-latency number: more seats, and slower seats, mean more working days per decision.',
     assumptionsId: 'decisionPipeline',
+  },
+  {
+    id: 'coordinationTax',
+    label: 'Coordination tax',
+    // Near-synonym split (AUTONOMY WINDOW #2): tax = the TIME share; the door
+    // copy "coordination cost" is an alias of the same concept. Distinct from
+    // communication load (the channel COUNT) and meeting overhead (the calendar
+    // slice) — those are separate terms.
+    surfaces: ['Coordination tax', 'coordination cost'],
+    plain:
+      "The share of everyone's time spent coordinating — meetings, messages, handoffs — instead of doing the work, shown as a share of capacity.",
+    why: 'The higher it climbs, the less of each day reaches the actual backlog; meeting-heavy structures pay more of it for the same work.',
+    assumptionsId: 'coordinationTax',
+  },
+  {
+    id: 'throughput',
+    label: 'Throughput',
+    // §8.5 sourceless term: assumptions.json holds only conversions
+    // (execPointsPerThroughputPoint), never a definition of the output metric.
+    surfaces: ['Throughput'],
+    plain: 'How much work actually gets finished — the output side of the org, counted in items per step.',
+    why: 'Worth reading next to quality: pushing more through a strained structure faster can lift this number while disorder climbs underneath it.',
+  },
+  {
+    id: 'brittleness',
+    label: 'Brittleness',
+    // Borderline term (AUTONOMY WINDOW #2): curated short label; the recovery-
+    // focused mechanic `brittlenessRecovery` is the "Show the numbers" deep-dive.
+    // "Novel-task brittleness" is the legibility comparison-row surface.
+    surfaces: ['Brittleness', 'Novel-task brittleness'],
+    plain: "How easily work breaks when it hits something novel or high-stakes that an AI agent can't handle on its own.",
+    why: 'What turns one breakage into a wider slowdown is whether someone clearly owns the recovery.',
+    assumptionsId: 'brittlenessRecovery',
+  },
+  {
+    id: 'fasterDysfunction',
+    label: 'Faster Dysfunction',
+    // §8.5 sourceless scenario label (the phrase lives inside
+    // structuralHealthAmplification.plainLanguage, which has no id of its own).
+    // KEEPS the editorial edge per binding delta 7 (AUTONOMY WINDOW #2) — this is
+    // the one term allowed a pointed reading; the provenance rides in the ⓘ copy.
+    surfaces: ['Faster Dysfunction'],
+    plain: 'When AI is added to an already-strained org, it pushes work through the same weak points faster — throughput can rise while disorder rises with it.',
+    why: 'It names the trap the model warns about: speed without the structure to support it, so faster is not the same as better (MODEL.md §10.3).',
+  },
+  {
+    id: 'cohesion',
+    label: 'Cohesion',
+    surfaces: ['Cohesion'],
+    plain: 'Team trust — the shared context and willingness to flag problems early that holds a team together.',
+    why: 'It frays as teams outgrow the size where everyone knows everyone, or as more of the team is AI than people.',
+    assumptionsId: 'cohesionDynamics',
+  },
+  {
+    id: 'functionCoverage',
+    label: 'Function coverage',
+    // The on-screen surface for this term arrives with P7b (the team lens seeds
+    // the coverage read); P10b registers the curated entry now so the term is
+    // covered the moment P7b renders it. Present-but-unwired is allowed (§8.5).
+    surfaces: ['Function coverage'],
+    plain: 'Whether each essential job — building, reviewing, resolving ambiguity — actually has enough qualified attention on it.',
+    why: 'A gap means a job is effectively unowned, so work that needs it stalls or quietly degrades.',
+    assumptionsId: 'functionCoverage',
   },
 ];
 

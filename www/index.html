@@ -130,7 +130,10 @@
           <div id="org-setup-body" class="setup-body">
             <p class="eyebrow" id="setup-heading">Start from</p>
             <div id="preset-picker" class="chip-row" role="group" aria-label="scenario presets"></div>
-            <p id="preset-note" class="note"></p>
+            <!-- Flow <div> (not <p>): on the Faster Dysfunction default, main.js
+                 sets data-term="fasterDysfunction" here and glossary.decorate
+                 inserts the inline ⓘ — a <details> that is invalid inside a <p>. -->
+            <div id="preset-note" class="note"></div>
 
             <!-- Plain-English précis of the pre-filled org (M4). Editable values are
                  bold ink — the accent stays reserved for Run. Authored by the pure
