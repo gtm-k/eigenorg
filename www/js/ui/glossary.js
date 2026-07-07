@@ -152,7 +152,10 @@ export function createGlossary(opts = {}) {
     summary.setAttribute('aria-label', `What '${entry.label}' means`);
     pop.appendChild(summary);
 
-    const body = elc('span', 'term-pop-body');
+    // A <div> (not <span>): the body can hold the nested "Show the numbers"
+    // <details>, and a <details> inside a <span> is invalid HTML. .term-pop-body
+    // is already display:block, so this is a no-op visually.
+    const body = elc('div', 'term-pop-body');
     body.setAttribute('role', 'note');
     body.appendChild(elc('span', 'term-pop-plain', entry.plain));
     const why = elc('span', 'term-pop-why');

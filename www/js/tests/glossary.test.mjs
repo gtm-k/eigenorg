@@ -12,6 +12,7 @@ import path from 'node:path';
 
 import { CURATED_TERMS, JARGON_KNOWN_LIST } from '../ui/glossary-terms.js';
 import { buildTermIndex, resolveTerm, uncoveredTerms, createGlossary } from '../ui/glossary.js';
+import { dataTermMarkers, missingSpecTerms } from '../../../scripts/check_term_coverage.mjs';
 
 const assumptionsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'assumptions.json');
 /** @returns {any} */
@@ -321,4 +322,20 @@ test('tag() builds a native <details> ⓘ whose <summary> carries an accessible 
   } finally {
     /** @type {any} */ (globalThis).document = prev;
   }
+});
+
+// ---- term-coverage gate: check-2b (data-term validity) red case (LOW fold e) ---
+
+test('gate check-2b flags a data-term that names no registered term (red case)', () => {
+  const termIds = new Set(CURATED_TERMS.map((t) => t.id));
+  // A planted bogus marker parses out but resolves to no term → the gate's
+  // validity check would push an error and exit 1.
+  const bogus = dataTermMarkers('<div data-term="noSuchTerm"></div>');
+  assert.equal(bogus.length, 1);
+  assert.equal(bogus[0].id, 'noSuchTerm');
+  assert.equal(termIds.has(bogus[0].id), false, 'the gate would report this marker as invalid');
+  // A real id passes the same check; the JS-form markers parse too.
+  assert.ok(termIds.has(dataTermMarkers("el.dataset.term = 'entropy';")[0].id));
+  // And check-0 (spec coverage) is satisfied by the live registry.
+  assert.deepEqual(missingSpecTerms(termIds), []);
 });

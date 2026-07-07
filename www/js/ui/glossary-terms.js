@@ -15,6 +15,8 @@
 // "Add a mode = append data here." This is the ONLY sanctioned way to register a
 // term — there is deliberately NO runtime register() alternative (it was removed
 // in P10b-2 repair-1); a second path would let a term skip the coverage gate.
+// A term-bearing mode module must live DIRECTLY in www/js/ui/ (the gate's
+// data-term scan reads that directory FLAT, non-recursively) — no ui/ subdirs.
 //
 // Voice (spec §8.5 + AUTONOMY WINDOW #2 defaults, 2026-07-07):
 //   - plain-first, human units, non-judgmental (strained / sound — never

@@ -148,7 +148,12 @@ export function headingBlocks(html) {
 export function panelTitleBlocks(html) {
   /** @type {Array<{ tag: string, attrs: string, text: string, line: number }>} */
   const out = [];
-  const re = /<div class="panel-title"([^>]*)>([\s\S]*?)<\/div>/gi;
+  // Match `panel-title` as a class TOKEN in any position (e.g.
+  // class="reveal-item panel-title"), not only as the whole/first class — so a
+  // future utility class on the wrapper cannot slip a jargon surface past the
+  // sweep. The non-greedy body assumes panel-titles hold only their <h2> + a
+  // <span> (no nested <div>), which holds across the page.
+  const re = /<div\b([^>]*\bclass\s*=\s*["'][^"']*\bpanel-title\b[^"']*["'][^>]*)>([\s\S]*?)<\/div>/gi;
   let m;
   while ((m = re.exec(html)) !== null) {
     out.push({ tag: 'panel-title', attrs: m[1], text: stripTags(m[2]), line: lineAt(html, m.index) });
@@ -222,7 +227,14 @@ export function danglingLinks(curated, assumptionIds) {
   return out;
 }
 
-/** Collect www/js/ui/*.js (glob; a new mode's files auto-join). @param {string} root */
+/**
+ * Collect www/js/ui/*.js (glob; a new mode's files auto-join — C2). FLAT-ONLY BY
+ * DESIGN: ui/ is a flat directory of mode modules; the readdir is not recursive,
+ * so a term-bearing file must live directly in ui/ (mirrored in the
+ * glossary-terms.js escape-hatch note). If ui/ ever grows subdirectories, make
+ * this recursive.
+ * @param {string} root
+ */
 export function collectUiFiles(root) {
   return readdirSync(root)
     .filter((n) => /\.(js|mjs)$/.test(n) && !/\.test\./.test(n))

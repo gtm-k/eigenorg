@@ -12,7 +12,7 @@ import { deepCopy } from './runplan.js';
  * @typedef {{ id: string, label: string, kind: 'range' | 'number' | 'segmented',
  *             min?: number, max?: number, step?: number,
  *             options?: Array<{ value: string, label: string }>,
- *             hint?: string }} ControlDef
+ *             anchors?: { min: string, max: string }, hint?: string }} ControlDef
  */
 
 /** MODEL.md §3.3 input ranges. @type {ControlDef[]} */
@@ -42,6 +42,9 @@ export const CONTROL_DEFS = [
     min: 1,
     max: 6,
     step: 1,
+    // Directional anchors (same pattern as the SH control): a bare "3" carries
+    // no sense of which way is which.
+    anchors: { min: 'flat', max: 'deep' },
   },
   {
     id: 'ownershipLayers',
@@ -449,6 +452,20 @@ export function renderControls(root, opts) {
       });
       field.appendChild(labelRow);
       field.appendChild(input);
+      // Directional anchors under a range (SH-control pattern, §5) — a bare value
+      // carries no direction. Rendered only when the def opts in.
+      if (def.kind === 'range' && def.anchors) {
+        const anchors = document.createElement('div');
+        anchors.className = 'field-anchors';
+        const lo = document.createElement('span');
+        lo.className = 'field-anchor';
+        lo.textContent = def.anchors.min;
+        const hi = document.createElement('span');
+        hi.className = 'field-anchor';
+        hi.textContent = def.anchors.max;
+        anchors.append(lo, hi);
+        field.appendChild(anchors);
+      }
     }
 
     if (def.hint) {
