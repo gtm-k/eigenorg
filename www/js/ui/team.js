@@ -147,6 +147,7 @@ export function teamSetupChips(config, scenarioLabel) {
   const sh = config?.team?.structuralHealth;
   const mix = workMix(config);
   const cap = reviewCapacity(config);
+  const highStakes = highStakesSharePct(config);
   const modality = config?.team?.modality === 'meetingHeavy' ? 'Meeting-heavy' : 'Async-first';
   return [
     { label: 'Team', value: scenarioLabel },
@@ -154,6 +155,7 @@ export function teamSetupChips(config, scenarioLabel) {
     { label: 'Doing the work', value: `${c.humanWorkers} human · ${c.aiWorkers} AI` },
     { label: 'Reviewing', value: c.reviewers === 1 ? '1 reviewer' : `${c.reviewers} reviewers` },
     { label: 'Work', value: mix.label },
+    { label: 'High-stakes', value: `${highStakes}% high-stakes` },
     { label: 'Structural Health', value: `${sh ?? '—'} of 10` },
     { label: 'Review limit', value: cap.label },
     { label: 'Coordination', value: modality },
@@ -434,11 +436,35 @@ export function removeEntity(config, id) {
 }
 
 /**
- * Apply one guarded team-level field edit (SH / review capacity / modality). All
- * validate()-safe: integers or enum strings only, never a float. Strips replay
- * (an edit is authoring — the ui/org.js stripReplay discipline).
+ * The demanding-work share (complex + novel, as an integer percent) — what the
+ * "how much of the work is complex or novel" dial reads/writes. Routine is the
+ * remainder. Reads the config's mix; authors no number.
+ * @param {any} config @returns {number} 0–100
+ */
+export function demandingSharePct(config) {
+  const m = workMix(config);
+  return m.complexPct + m.novelPct;
+}
+
+/**
+ * The high-stakes work share as an integer percent (0–100) — what the high-stakes
+ * dial reads/writes. Reads workStream.highStakesShare (0 when absent).
+ * @param {any} config @returns {number}
+ */
+export function highStakesSharePct(config) {
+  const raw = Number(config?.team?.workStream?.highStakesShare);
+  return Number.isFinite(raw) ? Math.round(raw * 100) : 0;
+}
+
+/**
+ * Apply one guarded team-level field edit (SH / review capacity / modality /
+ * work-stream mix / high-stakes share). All validate()-safe: the numeric fields
+ * clamp to their schema bounds, and the work-mix edit always keeps the three
+ * fractions summing to 1 (validate() requires sum == 1 +/- 0.001) with every
+ * fraction non-negative. Strips replay (an edit is authoring — the ui/org.js
+ * stripReplay discipline).
  * @param {any} config
- * @param {'structuralHealth' | 'reviewCapacityPerStep' | 'modality'} field
+ * @param {'structuralHealth' | 'reviewCapacityPerStep' | 'modality' | 'mix' | 'highStakesShare'} field
  * @param {number | string | null} value
  * @returns {any} a new config
  */
@@ -453,6 +479,27 @@ export function applyTeamField(config, field, value) {
   } else if (field === 'modality') {
     const v = String(value);
     if (TEAM_MODALITIES.some((m) => m.value === v)) next.team.modality = v;
+  } else if (field === 'mix') {
+    // The user sets how much of the work is complex or novel — the "demanding"
+    // share, an integer percent; routine takes the rest. The demanding share is
+    // split between complex and novel preserving the config's current
+    // complex:novel ratio (preset-sourced — no authored fractions), so routine +
+    // complex + novel always == 1 exactly (validate()-safe) and each stays >= 0.
+    const ws = next.team.workStream;
+    const mix = ws.mix ?? {};
+    const demanding = Math.max(0, Math.min(100, Math.round(Number(value)))) / 100;
+    const c0 = Number(mix.complex) || 0;
+    const n0 = Number(mix.novel) || 0;
+    const denom = c0 + n0;
+    const complexShare = denom > 0 ? c0 / denom : 1 / 2;
+    ws.mix = {
+      routine: 1 - demanding,
+      complex: demanding * complexShare,
+      novel: demanding * (1 - complexShare),
+    };
+  } else if (field === 'highStakesShare') {
+    // Integer percent (0–100) → 0–1 fraction; a plain input the user sets.
+    next.team.workStream.highStakesShare = Math.max(0, Math.min(100, Math.round(Number(value)))) / 100;
   }
   return next;
 }

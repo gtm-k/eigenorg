@@ -166,3 +166,51 @@ test('applyTeamField strips replay/paramOverrides (authoring discipline)', () =>
   assert.equal(next.replay, undefined);
   assert.equal(next.paramOverrides, undefined);
 });
+
+// ---- work-stream dials (F2: mix + high-stakes — the brittleness stressor) -------
+
+/** @param {any} config @param {string} msg Assert the mix sums to 1 (engine tol +/-0.001) with non-negative fractions. */
+function assertMixValid(config, msg) {
+  const m = config.team.workStream.mix;
+  const sum = m.routine + m.complex + m.novel;
+  assert.ok(Math.abs(sum - 1) <= 0.001, `${msg}: mix sums to ${sum}, not 1`);
+  assert.ok(m.routine >= 0 && m.complex >= 0 && m.novel >= 0, `${msg}: fractions must be non-negative`);
+}
+
+test('applyTeamField mix sets the demanding (complex+novel) share; routine takes the rest, sum stays 1', () => {
+  // bh mix: routine 0.6, complex 0.25, novel 0.15 → 40% demanding by default.
+  const next = applyTeamField(bh, 'mix', 60); // push demanding to 60%
+  assert.equal(Math.round(next.team.workStream.mix.routine * 100), 40);
+  // The complex:novel ratio (0.25:0.15) is preserved through the redistribution.
+  const m = next.team.workStream.mix;
+  assert.ok(Math.abs(m.complex / (m.complex + m.novel) - 0.25 / 0.4) < 1e-9, 'complex:novel ratio preserved');
+  assertMixValid(next, '60% demanding');
+  assertValid(next, 'a demanding-share edit validates against the real schema');
+});
+
+test('applyTeamField mix clamps 0..100 and stays valid at both extremes', () => {
+  const allRoutine = applyTeamField(bh, 'mix', -10);
+  assert.deepEqual(allRoutine.team.workStream.mix, { routine: 1, complex: 0, novel: 0 });
+  assertMixValid(allRoutine, 'clamped low');
+  assertValid(allRoutine, 'all-routine validates');
+
+  const allDemanding = applyTeamField(bh, 'mix', 150);
+  assert.equal(allDemanding.team.workStream.mix.routine, 0);
+  assertMixValid(allDemanding, 'clamped high');
+  assertValid(allDemanding, 'all-demanding validates');
+});
+
+test('applyTeamField highStakesShare sets an integer-percent → 0..1 fraction, clamped + valid', () => {
+  const s = applyTeamField(bh, 'highStakesShare', 35);
+  assert.equal(s.team.workStream.highStakesShare, 35 / 100);
+  assertValid(s, 'a high-stakes edit validates');
+  assert.equal(applyTeamField(bh, 'highStakesShare', 150).team.workStream.highStakesShare, 1);
+  assert.equal(applyTeamField(bh, 'highStakesShare', -5).team.workStream.highStakesShare, 0);
+});
+
+test('applyTeamField mix strips replay/paramOverrides (authoring discipline)', () => {
+  const withReplay = { ...bh, replay: true, paramOverrides: { qualityBase: 1 } };
+  const next = applyTeamField(withReplay, 'mix', 50);
+  assert.equal(next.replay, undefined);
+  assert.equal(next.paramOverrides, undefined);
+});

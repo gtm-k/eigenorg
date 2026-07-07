@@ -22,6 +22,9 @@ import {
   applyTeamField,
   entitiesOf,
   reviewCapacity,
+  workMix,
+  demandingSharePct,
+  highStakesSharePct,
   TEAM_MODALITIES,
   MAX_ENTITIES,
 } from './team.js';
@@ -160,6 +163,60 @@ export function renderTeamComposer(container, coordinator) {
     }
   }
 
+  // ---- work stream (the demand coming in) — the brittleness stressor ----
+  // Novel/complex + high-stakes work is exactly what makes a team brittle
+  // (MODEL.md team mechanics), so the work profile is the composer's primary
+  // stressor, not a preset-only field. Two guarded, validate()-safe integer-
+  // percent dials; the mix dial keeps routine+complex+novel == 1.
+  const workSection = elc('div', 'tc-section');
+  workSection.append(elc('p', 'eyebrow', 'The work coming in'));
+  const workDials = elc('div', 'tc-dials');
+
+  // How much of the work is complex or novel (routine takes the rest).
+  const mixField = elc('div', 'field');
+  const mixRow = elc('div', 'field-label-row');
+  const mixLabel = elc('label', undefined, 'How much of the work is complex or novel');
+  mixLabel.setAttribute('for', 'tc-mix');
+  const mixOut = /** @type {HTMLOutputElement} */ (document.createElement('output'));
+  mixOut.className = 'field-value';
+  mixRow.append(mixLabel, mixOut);
+  const mixInput = /** @type {HTMLInputElement} */ (document.createElement('input'));
+  mixInput.id = 'tc-mix';
+  mixInput.type = 'range';
+  mixInput.min = '0';
+  mixInput.max = '100';
+  mixInput.step = '1';
+  mixInput.addEventListener('input', () => {
+    coordinator.onConfigChange(applyTeamField(coordinator.getConfig(), 'mix', mixInput.value));
+  });
+  const mixAnchors = elc('div', 'field-anchors');
+  mixAnchors.append(elc('span', 'field-anchor', 'all routine'), elc('span', 'field-anchor', 'all demanding'));
+  mixField.append(mixRow, mixInput, mixAnchors);
+
+  // How much of the work is high-stakes (the other brittleness trigger).
+  const stakesField = elc('div', 'field');
+  const stakesRow = elc('div', 'field-label-row');
+  const stakesLabel = elc('label', undefined, 'How much of the work is high-stakes');
+  stakesLabel.setAttribute('for', 'tc-stakes');
+  const stakesOut = /** @type {HTMLOutputElement} */ (document.createElement('output'));
+  stakesOut.className = 'field-value';
+  stakesRow.append(stakesLabel, stakesOut);
+  const stakesInput = /** @type {HTMLInputElement} */ (document.createElement('input'));
+  stakesInput.id = 'tc-stakes';
+  stakesInput.type = 'range';
+  stakesInput.min = '0';
+  stakesInput.max = '100';
+  stakesInput.step = '1';
+  stakesInput.addEventListener('input', () => {
+    coordinator.onConfigChange(applyTeamField(coordinator.getConfig(), 'highStakesShare', stakesInput.value));
+  });
+  const stakesAnchors = elc('div', 'field-anchors');
+  stakesAnchors.append(elc('span', 'field-anchor', 'none'), elc('span', 'field-anchor', 'all high-stakes'));
+  stakesField.append(stakesRow, stakesInput, stakesAnchors);
+
+  workDials.append(mixField, stakesField);
+  workSection.append(workDials);
+
   // ---- team dials (SH / review capacity / modality) — updated in place ----
   const dials = elc('div', 'tc-dials');
 
@@ -242,7 +299,7 @@ export function renderTeamComposer(container, coordinator) {
   dialsEyebrow.append(elc('span', 'optional-tag', '· optional'));
   dialsSection.append(dialsEyebrow, dials);
 
-  root.append(paletteSection, rosterSection, dialsSection, live);
+  root.append(paletteSection, rosterSection, workSection, dialsSection, live);
   container.append(root);
 
   /** Reflect the current config: rebuild the roster + set the dial values in place. */
@@ -250,6 +307,12 @@ export function renderTeamComposer(container, coordinator) {
     const config = coordinator.getConfig();
     if (!config) return;
     renderRoster();
+    const demanding = demandingSharePct(config);
+    mixInput.value = String(demanding);
+    mixOut.textContent = `${demanding}% complex or novel · ${workMix(config).label}`;
+    const stakes = highStakesSharePct(config);
+    stakesInput.value = String(stakes);
+    stakesOut.textContent = `${stakes}% high-stakes`;
     const sh = Number(config.team?.structuralHealth);
     shInput.value = String(sh);
     shOut.textContent = `${sh} of 10`;

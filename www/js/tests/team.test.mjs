@@ -13,6 +13,8 @@ import {
   rosterCounts,
   workMix,
   reviewCapacity,
+  demandingSharePct,
+  highStakesSharePct,
   teamSetupChips,
   teamPrecisSentence,
   functionCoverageRows,
@@ -63,6 +65,16 @@ test('reviewCapacity reads bounded vs unbounded', () => {
   assert.equal(rb.label, '1 reviewed / step');
 });
 
+test('work-stream dial readers report the demanding + high-stakes shares (F2)', () => {
+  // bh: routine 0.6 / complex 0.25 / novel 0.15 → 40% demanding; highStakesShare 0.2 → 20%.
+  assert.equal(demandingSharePct(bhCfg), 40);
+  assert.equal(highStakesSharePct(bhCfg), 20);
+  // reviewBottleneck: routine 0.8 / complex 0.15 / novel 0.05 → 20% demanding.
+  assert.equal(demandingSharePct(rbCfg), 20);
+  // Absent highStakesShare reads as 0, never NaN.
+  assert.equal(highStakesSharePct({ team: { workStream: { mix: { routine: 1, complex: 0, novel: 0 } } } }), 0);
+});
+
 // ---- setup digest + précis -----------------------------------------------------
 
 test('teamSetupChips leads with the scenario and carries the SH + work-split chips', () => {
@@ -73,6 +85,10 @@ test('teamSetupChips leads with the scenario and carries the SH + work-split chi
   assert.equal(sh?.value, '7 of 10');
   const work = chips.find((c) => c.label === 'Doing the work');
   assert.equal(work?.value, '2 human · 2 AI');
+  // The high-stakes share is surfaced when the setup is collapsed (F2 — the dial
+  // value stays observable, not only editable).
+  const stakes = chips.find((c) => c.label === 'High-stakes');
+  assert.equal(stakes?.value, '20% high-stakes');
 });
 
 test('teamPrecisSentence emphasises the team size + composition (bold value segments)', () => {
