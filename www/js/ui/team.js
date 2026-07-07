@@ -445,8 +445,12 @@ export function removeEntity(config, id) {
  * @param {any} config @returns {number} 0–100
  */
 export function demandingSharePct(config) {
-  const m = workMix(config);
-  return m.complexPct + m.novelPct;
+  // Round ONCE over the combined share — rounding complex% and novel% separately
+  // inflates the sum by 1 when both land on .5 halves (29/505 reachable combos
+  // read back v+1, e.g. balancedHybrid at 100 showed "101%"). Round-2 MED fix.
+  const mix = config?.team?.workStream?.mix ?? {};
+  const raw = (Number(mix.complex) || 0) + (Number(mix.novel) || 0);
+  return Math.round(Math.max(0, Math.min(1, raw)) * 100);
 }
 
 /**
@@ -498,23 +502,33 @@ export function applyTeamField(config, field, value) {
     // The user sets how much of the work is complex or novel — the "demanding"
     // share, an integer percent; routine takes the rest. The demanding share is
     // split between complex and novel preserving the config's current
-    // complex:novel ratio (preset-sourced — no authored fractions), so routine +
-    // complex + novel always == 1 exactly (validate()-safe) and each stays >= 0.
-    const ws = next.team.workStream;
-    const mix = ws.mix ?? {};
-    const demanding = Math.max(0, Math.min(100, Math.round(Number(value)))) / 100;
-    const c0 = Number(mix.complex) || 0;
-    const n0 = Number(mix.novel) || 0;
-    const denom = c0 + n0;
-    const complexShare = denom > 0 ? c0 / denom : 1 / 2;
-    ws.mix = {
-      routine: 1 - demanding,
-      complex: demanding * complexShare,
-      novel: demanding * (1 - complexShare),
-    };
+    // complex:novel ratio (preset-sourced — no authored fractions). novel is the
+    // REMAINDER (1 - routine - complex, clamped >= 0) so the three fractions sum
+    // to 1 without float drift (round-2 Codex LOW: the two-products form could
+    // sum to 0.9999999999999999). Non-finite input keeps the previous mix (the
+    // reviewCapacityPerStep guard pattern; unreachable from the range input).
+    if (Number.isFinite(Number(value))) {
+      const ws = next.team.workStream;
+      const mix = ws.mix ?? {};
+      const demanding = Math.max(0, Math.min(100, Math.round(Number(value)))) / 100;
+      const c0 = Number(mix.complex) || 0;
+      const n0 = Number(mix.novel) || 0;
+      const denom = c0 + n0;
+      const complexShare = denom > 0 ? c0 / denom : 1 / 2;
+      const routine = 1 - demanding;
+      const complex = demanding * complexShare;
+      ws.mix = {
+        routine,
+        complex,
+        novel: Math.max(0, 1 - routine - complex),
+      };
+    }
   } else if (field === 'highStakesShare') {
     // Integer percent (0–100) → 0–1 fraction; a plain input the user sets.
-    next.team.workStream.highStakesShare = Math.max(0, Math.min(100, Math.round(Number(value)))) / 100;
+    // Non-finite keeps the previous value (guard pattern, see above).
+    if (Number.isFinite(Number(value))) {
+      next.team.workStream.highStakesShare = Math.max(0, Math.min(100, Math.round(Number(value)))) / 100;
+    }
   }
   return next;
 }

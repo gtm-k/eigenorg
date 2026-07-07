@@ -22,6 +22,7 @@ import {
   qualityHistogramModel,
   teamRunStats,
   configWithRoster,
+  applyTeamField,
 } from '../ui/team.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -169,4 +170,44 @@ test('configWithRoster strips replay + keeps recoveryOwner valid', () => {
   const next2 = configWithRoster(bhCfg, dropPm);
   assert.equal(next2.team.recoveryOwner, dropPm[0].id);
   assert.notEqual(next2.team.recoveryOwner, 'pm');
+});
+
+// ---- round-2 repair-2 pins (dial read-back + mix sum + non-finite guards) -------
+
+const ALL_TEAM_PRESETS = [
+  'allHumanBaseline.json',
+  'autonomousSquad.json',
+  'balancedHybrid.json',
+  'hollowMiddle.json',
+  'reviewBottleneck.json',
+].map((f) => /** @type {any} */ (Object.values(load(`../../presets/team/${f}`).runs)[0]));
+
+test('mix dial round-trips EXACTLY for every preset x every integer percent (round-2 MED pin: "101%" read-back)', () => {
+  for (const cfg of ALL_TEAM_PRESETS) {
+    for (let v = 0; v <= 100; v += 1) {
+      const next = applyTeamField(cfg, 'mix', v);
+      assert.equal(demandingSharePct(next), v, `read-back != dial at v=${v}`);
+    }
+  }
+});
+
+test('mix fractions stay non-negative and sum to 1 within 1 ulp for every preset x dial value (round-2 Codex pin)', () => {
+  for (const cfg of ALL_TEAM_PRESETS) {
+    for (let v = 0; v <= 100; v += 1) {
+      const m = applyTeamField(cfg, 'mix', v).team.workStream.mix;
+      const sum = m.routine + m.complex + m.novel;
+      assert.ok(Math.abs(sum - 1) <= Number.EPSILON, `sum drift ${sum - 1} at v=${v}`);
+      assert.ok(m.routine >= 0 && m.complex >= 0 && m.novel >= 0, `negative fraction at v=${v}`);
+    }
+  }
+});
+
+test('non-finite mix / highStakesShare edits keep the previous values (the reviewCapacity guard pattern)', () => {
+  const cfg = ALL_TEAM_PRESETS[2]; // balancedHybrid
+  for (const bad of [NaN, Infinity, -Infinity, 'oops']) {
+    const m = applyTeamField(cfg, 'mix', /** @type {any} */ (bad));
+    assert.deepEqual(m.team.workStream.mix, cfg.team.workStream.mix, `mix mutated by ${bad}`);
+    const h = applyTeamField(cfg, 'highStakesShare', /** @type {any} */ (bad));
+    assert.equal(h.team.workStream.highStakesShare, cfg.team.workStream.highStakesShare, `stakes mutated by ${bad}`);
+  }
 });

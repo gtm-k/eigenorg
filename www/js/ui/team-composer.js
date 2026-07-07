@@ -335,6 +335,10 @@ export function renderTeamComposer(container, coordinator) {
   function refresh() {
     const config = coordinator.getConfig();
     if (!config) return;
+    // The roster/dials are rebuilt from a (possibly brand-new) config — a guard
+    // note about the PREVIOUS state (e.g. "team is full" surviving a preset
+    // switch to a smaller roster) would be stale. Round-2 LOW fix.
+    clearGuard();
     renderRoster();
     const demanding = demandingSharePct(config);
     mixInput.value = String(demanding);
