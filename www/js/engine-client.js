@@ -20,6 +20,7 @@
  *             config: any,
  *             seed?: number | bigint,
  *             chunkSize?: number,
+ *             owner?: string,
  *             onProgress?: (p: Progress) => void }} RunOptions
  * @typedef {{ output: any, outputJson: string }} RunResult
  */
@@ -139,16 +140,22 @@ export function createEngineClient(transport) {
   let nextId = 1;
   /** @type {number | null} */
   let inFlightId = null;
+  /** Owner tag of the in-flight run — the mode that requested it (P7b R1: org
+   *  and team share this one serialized client, so cancel MUST be owner-scoped
+   *  or one door can kill the other door's run). `null` for an unowned run. */
+  /** @type {string | null} */
+  let inFlightOwner = null;
   /** @type {Map<number, { resolve: (v: RunResult) => void, reject: (e: Error) => void, onProgress?: (p: Progress) => void }>} */
   const pending = new Map();
   /** @type {Promise<unknown>} serialization chain — next run waits for this */
   let tail = Promise.resolve();
-  /** Runs requested but not yet posted (they sit behind the chain). */
-  let queuedNotPosted = 0;
-  /** cancel() arrived while nothing was in flight but a run was queued —
-   *  honored before the next post (a same-tick run();cancel() must never be
-   *  silently lost). */
-  let cancelNextQueued = false;
+  /** Runs requested but not yet posted, in chain (FIFO) order. Each carries its
+   *  owner and a `cancelled` flag so an owner-scoped cancel drops exactly its own
+   *  queued run (rejecting it before it ever posts) without transport-cancelling
+   *  another owner's in-flight run. A same-tick run();cancel() flips the head
+   *  token's flag before its post, so a just-queued run is never silently lost. */
+  /** @type {Array<{ owner: string | null, cancelled: boolean }>} */
+  const queued = [];
 
   transport.onMessage((msg) => {
     const { id, type, payload } = msg;
@@ -159,6 +166,7 @@ export function createEngineClient(transport) {
       if (entry && inFlightId !== null) {
         pending.delete(inFlightId);
         inFlightId = null;
+        inFlightOwner = null;
         entry.reject(new EngineError(payload?.type ?? 'init', payload?.message ?? 'worker init failed'));
       }
       return;
@@ -170,7 +178,10 @@ export function createEngineClient(transport) {
       return;
     }
     pending.delete(id);
-    if (inFlightId === id) inFlightId = null;
+    if (inFlightId === id) {
+      inFlightId = null;
+      inFlightOwner = null;
+    }
     if (type === 'result') {
       entry.resolve({ output: JSON.parse(payload), outputJson: payload });
     } else if (type === 'error') {
@@ -184,28 +195,35 @@ export function createEngineClient(transport) {
     /**
      * Run one simulation. Queued behind any in-flight run (one in-flight run
      * per worker, CONTRACTS §2). `sim` and `seed` default from the config.
+     * Pass `owner` (e.g. 'org' | 'team') to tag the run so `cancel(owner)` can
+     * cancel only this mode's run — one door never cancels the other's (P7b R1).
      * @param {RunOptions} options
      * @returns {Promise<RunResult>}
      */
     run(options) {
       const { config } = options;
+      const owner = options.owner ?? null;
       const sim = options.sim ?? config.sim;
       const seed = options.seed ?? config.seed;
       const configJson = JSON.stringify(config);
-      queuedNotPosted += 1;
+      /** @type {{ owner: string | null, cancelled: boolean }} */
+      const token = { owner, cancelled: false };
+      queued.push(token);
       const result = tail.then(
         () =>
           new Promise((resolve, reject) => {
-            queuedNotPosted -= 1;
-            if (cancelNextQueued) {
+            // This run reached the head of the chain — pop it from the queue.
+            const idx = queued.indexOf(token);
+            if (idx !== -1) queued.splice(idx, 1);
+            if (token.cancelled) {
               // A cancel() raced ahead of this run's post — honor it here
               // instead of posting a run nobody can cancel any more.
-              cancelNextQueued = false;
               reject(new EngineError('cancelled', 'run cancelled'));
               return;
             }
             const id = nextId++;
             inFlightId = id;
+            inFlightOwner = owner;
             pending.set(id, { resolve, reject, onProgress: options.onProgress });
             transport.post({
               id,
@@ -220,23 +238,45 @@ export function createEngineClient(transport) {
     },
 
     /**
-     * Cancel the in-flight run, or — when nothing has been posted yet but a
-     * run is already queued (the same-tick run(); cancel() window) — the next
-     * run to post. No-op when fully idle. The cancelled run's promise rejects
-     * with an EngineError whose `.cancelled` is true. Runs already queued
-     * behind it still execute.
+     * Cancel a run. With no `owner` (legacy): the in-flight run, or — when
+     * nothing has been posted yet but a run is already queued (the same-tick
+     * run(); cancel() window) — the next run to post. With an `owner`: cancel
+     * ONLY runs that mode owns (its in-flight run AND any of its queued runs),
+     * never another owner's run — so org and team share one client without one
+     * door ever cancelling the other's run (P7b R1). No-op when nothing matches.
+     * A cancelled run's promise rejects with an EngineError whose `.cancelled`
+     * is true; other runs queued behind it still execute.
+     * @param {string} [owner]
      */
-    cancel() {
-      if (inFlightId !== null) {
-        transport.post({ id: inFlightId, type: 'cancel' });
+    cancel(owner) {
+      if (owner === undefined) {
+        // Legacy unscoped cancel: the in-flight run, else the next queued run.
+        if (inFlightId !== null) {
+          transport.post({ id: inFlightId, type: 'cancel' });
+        } else if (queued.length > 0) {
+          queued[0].cancelled = true;
+        }
         return;
       }
-      if (queuedNotPosted > 0) cancelNextQueued = true;
+      // Owner-scoped: cancel the in-flight run only if this owner owns it, and
+      // drop every queued run this owner requested. Another owner's in-flight or
+      // queued run is never touched.
+      if (inFlightId !== null && inFlightOwner === owner) {
+        transport.post({ id: inFlightId, type: 'cancel' });
+      }
+      for (const token of queued) {
+        if (token.owner === owner) token.cancelled = true;
+      }
     },
 
     /** @returns {boolean} whether a run is currently in flight */
     get busy() {
       return inFlightId !== null;
+    },
+
+    /** @returns {string | null} the owner tag of the in-flight run, or null when idle */
+    get busyOwner() {
+      return inFlightOwner;
     },
   };
 }

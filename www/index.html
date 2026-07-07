@@ -363,11 +363,168 @@
           <h2 class="mode-title">Will this team's makeup work?</h2>
           <p class="mode-sub">Compose one team — who does the work, humans and AI, and who reviews it — then see how much gets done, the quality it ships at, how the team holds together, and where essential work goes uncovered.</p>
         </header>
-        <section class="panel panel-lift placeholder">
-          <p class="placeholder-icon" aria-hidden="true">👥</p>
-          <h3 class="placeholder-title">Team Building — arriving in the beta</h3>
-          <p class="placeholder-body">The team composer and its charts are on the way. The simulation engine is already built and validated; the interface for it lands next. For now, switch back to <strong>Organization</strong> to explore how whole-org structure decides the outcome.</p>
+        <!-- SETUP — collapses to the "Your team" chip summary after a run,
+             reopens in place via Edit team (spec §6), mirroring the org setup. -->
+        <section class="panel panel-lift setup" aria-labelledby="team-setup-heading">
+          <div id="team-setup-summary" class="setup-summary" hidden>
+            <div class="setup-summary-head">
+              <p class="eyebrow">Your team</p>
+              <button id="team-edit-setup" class="ghost" type="button" aria-expanded="true" aria-controls="team-setup-body">Edit team</button>
+            </div>
+            <div id="team-setup-chips" class="setup-chips"></div>
+          </div>
+
+          <div id="team-setup-body" class="setup-body">
+            <p class="eyebrow" id="team-setup-heading">Start from</p>
+            <div id="team-preset-picker" class="chip-row" role="group" aria-label="team presets"></div>
+            <div id="team-preset-note" class="note"></div>
+
+            <!-- Plain-English précis of the composed team (M4). -->
+            <p id="team-precis" class="org-precis"></p>
+
+            <!-- Run dock (M4): one tap runs the composed team. -->
+            <div class="setup-run-dock">
+              <button id="team-run-button" class="cta" type="button" data-run-label="Run 500 simulations" disabled>Run 500 simulations</button>
+              <span class="run-dock-caption">~1 second · in your browser</span>
+            </div>
+
+            <!-- Composer mount (P7b polish layer fills this; presets-only floor
+                 leaves it empty). -->
+            <div id="team-composer"></div>
+          </div>
         </section>
+
+        <!-- RUN STRIP — always visible (mirrors org): feedback + persistent actions. -->
+        <div class="run-strip">
+          <div class="results-actions">
+            <button id="team-run-button-2" type="button" data-run-label="Run again" hidden disabled>Run again</button>
+            <progress id="team-run-progress" max="500" value="0" aria-label="team simulation progress"></progress>
+          </div>
+          <p id="team-stale" class="stale-badge" role="status" hidden><span class="stale-icon" aria-hidden="true">⟳</span> Results are out of date — run again to refresh the charts</p>
+          <p id="team-run-status" class="status" role="status" aria-live="polite">Ready — 500 simulations, in your browser.</p>
+        </div>
+
+        <!-- RESULTS — GATED on the team hasRun (main.js modes.team): hidden until
+             the first team run paints; re-hidden on team Start over. -->
+        <div id="team-results" class="results" hidden>
+          <p id="team-run-readout" class="readout" aria-label="run parameters">
+            <span id="team-ro-model">model —</span><span id="team-ro-seed"></span><span id="team-ro-iters"></span><span id="team-ro-elapsed"></span>
+          </p>
+
+          <!-- ============ coverage (the story: "will this makeup work?") ============ -->
+          <section class="panel panel-lift reveal-item" aria-labelledby="team-coverage-heading">
+            <p class="eyebrow">Coverage</p>
+            <div class="panel-title" data-term="functionCoverage">
+              <h2 id="team-coverage-heading">Is every essential job covered?</h2>
+              <span class="tech-label">Function coverage · build, review, resolve</span>
+            </div>
+            <p id="team-meaning-coverage" class="meaning">Whether each essential job — building, reviewing, resolving ambiguity — has enough qualified attention on it.</p>
+            <div id="team-coverage" class="fc-mount"></div>
+          </section>
+
+          <!-- ============ charts ============ -->
+          <div class="charts-grid">
+            <section class="panel reveal-item" aria-labelledby="team-throughput-heading">
+              <p class="eyebrow">Output</p>
+              <div class="panel-title" data-term="throughput">
+                <h2 id="team-throughput-heading">How much work gets done</h2>
+                <span class="tech-label">Throughput · items per step</span>
+              </div>
+              <p id="team-meaning-throughput" class="meaning">Completed work per step — the median line inside the 10th–90th percentile band.</p>
+              <div class="chart-box">
+                <canvas id="team-throughput-chart" role="img" aria-label="Team throughput over time: median completions per step inside the 10th to 90th percentile band"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="team-quality-heading">
+              <p class="eyebrow">Quality</p>
+              <div class="panel-title" data-term="qualityHistogram">
+                <h2 id="team-quality-heading">The quality of what ships</h2>
+                <span class="tech-label">Quality distribution · completed tasks</span>
+              </div>
+              <p id="team-meaning-quality" class="meaning">How the quality of completed work is spread across the run — taller bars on the right mean more high-quality output.</p>
+              <div class="chart-box">
+                <canvas id="team-quality-chart" role="img" aria-label="Quality distribution: a histogram of completed-task quality across ten score bins from 0 to 100"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="team-tax-heading">
+              <p class="eyebrow">Coordination</p>
+              <div class="panel-title" data-term="coordinationTax">
+                <h2 id="team-tax-heading">Time lost coordinating</h2>
+                <span class="tech-label">Coordination tax · % of capacity</span>
+              </div>
+              <p id="team-meaning-tax" class="meaning">The share of the team's time spent coordinating instead of doing the work.</p>
+              <div class="chart-box">
+                <canvas id="team-tax-chart" role="img" aria-label="Coordination tax over time as a percentage of capacity: median line with 10th to 90th percentile band"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="team-cohesion-heading">
+              <p class="eyebrow">Trust</p>
+              <div class="panel-title" data-term="cohesion">
+                <h2 id="team-cohesion-heading">How well the team holds together</h2>
+                <span class="tech-label">Cohesion · 0–100</span>
+              </div>
+              <p id="team-meaning-cohesion" class="meaning">Team trust over time — the shared context and willingness to flag problems early that holds a team together.</p>
+              <div class="chart-box">
+                <canvas id="team-cohesion-chart" role="img" aria-label="Team cohesion over time on a 0 to 100 scale: median line with 10th to 90th percentile band"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="team-brittleness-heading">
+              <p class="eyebrow">Fragility</p>
+              <div class="panel-title" data-term="brittleness">
+                <h2 id="team-brittleness-heading">How often work breaks</h2>
+                <span class="tech-label">Brittleness · cumulative breakages</span>
+              </div>
+              <p id="team-meaning-brittleness" class="meaning">Running total of breakages when work hits something novel or high-stakes an AI can't handle alone; whether one owns recovery decides if a break spreads.</p>
+              <div class="chart-box">
+                <canvas id="team-brittleness-chart" role="img" aria-label="Cumulative breakages over time: median line with 10th to 90th percentile band; labeled markers flag breakage steps"></canvas>
+              </div>
+              <p id="team-meaning-recovery" class="meaning" role="status">The recovery cost — how long routine decisions take to clear — surfaces here after a run.</p>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="team-health-heading">
+              <p class="eyebrow">Multi-level health</p>
+              <div class="panel-title" data-term="multiLevelHealth">
+                <h2 id="team-health-heading">The team vs its wider org</h2>
+                <span class="tech-label">Multi-level health · team vs org</span>
+              </div>
+              <p id="team-meaning-health" class="meaning">Team cohesion against the org-level health it implies: divergence means a sound team inside a strained structure, or the reverse.</p>
+              <div class="chart-box">
+                <canvas id="team-health-chart" role="img" aria-label="Org health proxy (solid) versus team cohesion (dashed) over time"></canvas>
+              </div>
+            </section>
+
+            <section class="panel reveal-item" aria-labelledby="team-review-heading">
+              <p class="eyebrow">Review</p>
+              <div class="panel-title" data-term="reviewBottleneck">
+                <h2 id="team-review-heading">Is review keeping up?</h2>
+                <span class="tech-label">Review queue · items waiting</span>
+              </div>
+              <p id="team-meaning-review" class="meaning">Work waiting on review each step. When a fixed reviewer can't keep pace with fast execution, the queue climbs and the wait grows.</p>
+              <div class="chart-box">
+                <canvas id="team-review-chart" role="img" aria-label="Review queue depth over time: items waiting on review, median line with 10th to 90th percentile band"></canvas>
+              </div>
+            </section>
+          </div>
+
+          <!-- ============ team result card (P8/INT-1: card-only, no share link) ============ -->
+          <section class="panel" aria-labelledby="team-card-heading">
+            <p class="eyebrow">Take it with you</p>
+            <h2 id="team-card-heading">Team result card</h2>
+            <p class="note">A 1200×628 image of this team run — the coverage headline, what shipped and at what quality, and the research-framing line, ready to post. Generated entirely in your browser; nothing is uploaded. (Team runs travel as a card — the exact-replay link is Organization-only.)</p>
+            <div class="card-preview">
+              <canvas id="team-card-canvas" width="1200" height="628" role="img" aria-label="Shareable team result card: how many of the seven essential jobs are covered, work shipped and its typical quality, team trust and fragility, and a coverage strip reading each job by shape and label."></canvas>
+            </div>
+            <div class="run-row">
+              <button id="team-card-download" type="button" disabled>Download card</button>
+              <button id="team-card-share" type="button" class="ghost" disabled>Share…</button>
+            </div>
+            <p id="team-card-status" class="status" role="status" aria-live="polite"></p>
+          </section>
+        </div>
       </div>
     </main>
 

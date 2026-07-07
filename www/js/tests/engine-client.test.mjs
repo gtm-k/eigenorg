@@ -178,6 +178,89 @@ test('engine error envelopes surface as typed EngineErrors (scripted transport)'
   });
 });
 
+// ---- owner-scoped cancellation (P7b R1: org + team share ONE client) ----------
+// These pin the cross-mode isolation contract: one door's cancel must never
+// cancel or corrupt the other door's run. Before the owner-scoped extension,
+// cancel() ignored its argument and cancelled whatever was in flight — so a team
+// cancel while an org run was in flight killed the org run (the HIGH finding).
+
+test('owner-scoped cancel: a TEAM cancel never cancels an in-flight ORG run; the queued team run is dropped (P7b R1)', async () => {
+  const client = createEngineClient(fixtureTransport());
+  let teamCancelIssued = false;
+  const orgRun = client.run({
+    config,
+    owner: 'org',
+    onProgress: ({ completedCount, totalIterations }) => {
+      // Mid-run, the OTHER door (team) issues its cancel — it must not touch org.
+      if (!teamCancelIssued && completedCount > 0 && completedCount < totalIterations) {
+        teamCancelIssued = true;
+        client.cancel('team');
+      }
+    },
+  });
+  const teamRun = client.run({ config, owner: 'team' }); // queued behind the org run
+
+  // The team run (owned by team) is dropped by team's own owner-scoped cancel…
+  await assert.rejects(teamRun, (/** @type {any} */ err) => {
+    assert.ok(err instanceof EngineError);
+    assert.equal(err.cancelled, true);
+    return true;
+  });
+  // …while the ORG run completes untouched (byte-identical to the fixture).
+  const org = await orgRun;
+  assert.ok(teamCancelIssued, 'the team cancel actually fired mid-org-run');
+  assert.equal(org.outputJson, outputJson, 'the org run completed despite the team cancel');
+});
+
+test('owner-scoped cancel: an ORG cancel never cancels an in-flight TEAM run; the queued org run is dropped (P7b R1, reverse)', async () => {
+  const client = createEngineClient(fixtureTransport());
+  let orgCancelIssued = false;
+  const teamRun = client.run({
+    config,
+    owner: 'team',
+    onProgress: ({ completedCount, totalIterations }) => {
+      if (!orgCancelIssued && completedCount > 0 && completedCount < totalIterations) {
+        orgCancelIssued = true;
+        client.cancel('org'); // the OTHER door (org) cancels — must not touch team
+      }
+    },
+  });
+  const orgRun = client.run({ config, owner: 'org' }); // queued behind the team run
+
+  await assert.rejects(orgRun, (/** @type {any} */ err) => {
+    assert.ok(err instanceof EngineError);
+    assert.equal(err.cancelled, true);
+    return true;
+  });
+  const team = await teamRun;
+  assert.ok(orgCancelIssued, 'the org cancel actually fired mid-team-run');
+  assert.equal(team.outputJson, outputJson, 'the team run completed despite the org cancel');
+});
+
+test('owner-scoped cancel DOES cancel the owner’s own in-flight run; busyOwner reflects the owner', async () => {
+  const client = createEngineClient(fixtureTransport());
+  assert.equal(client.busyOwner, null, 'an idle client has no busy owner');
+  const running = client.run({
+    config,
+    owner: 'team',
+    onProgress: ({ completedCount, totalIterations }) => {
+      assert.equal(client.busyOwner, 'team', 'busyOwner is the in-flight run’s owner');
+      // team cancels its OWN in-flight run — this one must be honored.
+      if (completedCount > 0 && completedCount < totalIterations) client.cancel('team');
+    },
+  });
+  await assert.rejects(running, (/** @type {any} */ err) => {
+    assert.ok(err instanceof EngineError);
+    assert.equal(err.cancelled, true);
+    return true;
+  });
+  assert.equal(client.busyOwner, null, 'busyOwner clears once the run settles');
+
+  // The client is not wedged: a fresh owned run still works.
+  const rerun = await client.run({ config, owner: 'team' });
+  assert.equal(rerun.outputJson, outputJson);
+});
+
 test('transport swap requires zero caller changes (stub-vs-stub; real-worker conformance runs in worker.test.mjs)', async () => {
   // The SAME caller function runs against two different STUB transport
   // instances — this proves the caller is transport-agnostic without a wasm

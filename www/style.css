@@ -2451,6 +2451,9 @@ progress {
   .charts-revealed .charts-grid .reveal-item:nth-child(4) { animation-delay: 465ms; }
   .charts-revealed .charts-grid .reveal-item:nth-child(5) { animation-delay: 520ms; }
   .charts-revealed .charts-grid .reveal-item:nth-child(6) { animation-delay: 575ms; }
+  /* The team charts-grid has 7 panels (org has 6); keep the left-to-right cadence
+     on the 7th (review-queue) chart instead of letting it fall back to 300ms. */
+  .charts-revealed .charts-grid .reveal-item:nth-child(7) { animation-delay: 630ms; }
 
   /* §6.5 — micro-interactions (the phone audience's only tactile feedback). */
   .door { transition: transform var(--dur-hover) var(--ease-standard), box-shadow var(--dur-hover) var(--ease-standard); }
@@ -2517,4 +2520,208 @@ progress {
   .setup-body {
     padding-bottom: var(--space-4);
   }
+}
+
+/* ====================================================================
+   Team Building (P7b) — the function-coverage heatmap. The setup, charts,
+   run-strip, results and card reuse the org classes (.setup, .charts-grid,
+   .chart-box, .results, .card-preview …); only the coverage heatmap is new.
+   State is carried by a shape GLYPH + a plain WORD + the score, so colour is
+   supplementary — a grayscale render stays fully readable (no colour-alone).
+   ==================================================================== */
+.fc-mount {
+  margin-top: var(--space-3);
+  overflow-x: auto; /* the small table scrolls inside itself, never the page */
+}
+
+.fc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.fc-caption {
+  caption-side: top;
+  text-align: left;
+  color: var(--color-ink-subtle);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin-bottom: var(--space-3);
+}
+
+.fc-table th[scope="col"] {
+  text-align: left;
+  color: var(--color-ink-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0 var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.fc-table th[scope="col"]:last-child { text-align: right; }
+
+.fc-row td,
+.fc-row th {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: baseline;
+}
+
+.fc-row th[scope="row"] { text-align: left; font-weight: 500; }
+
+.fc-job-plain { display: block; color: var(--color-ink); }
+.fc-job-tech {
+  display: block;
+  color: var(--color-ink-subtle);
+  font-size: 0.75rem;
+  margin-top: 1px;
+}
+
+.fc-cov { white-space: nowrap; }
+.fc-glyph {
+  display: inline-block;
+  margin-right: var(--space-2);
+  font-size: 1rem;
+  line-height: 1;
+}
+.fc-word { color: var(--color-ink-muted); }
+.fc-att {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+}
+
+/* Rating tint — supplementary to the glyph + word. Covered = accent (on-brand),
+   thin = amber status, gap = muted ink (non-alarmist / non-judgmental register,
+   matching the card's grey open cell). */
+.fc-green .fc-glyph { color: var(--color-primary-hover); }
+.fc-amber .fc-glyph { color: var(--color-stale); }
+.fc-red .fc-glyph { color: var(--color-ink-subtle); }
+.fc-red td, .fc-red th { background: color-mix(in srgb, var(--color-surface-2) 60%, transparent); }
+
+.fc-pending { color: var(--color-ink-subtle); font-size: 0.9375rem; }
+
+/* ====================================================================
+   Team composer (P7b polish) — tap-to-assign roster + team dials. Reuses the
+   .field / .segmented controls for the dials; the palette + roster are new.
+   Tap is primary; the drag affordance is a desktop enhancement (drop-zone tint).
+   ==================================================================== */
+.composer {
+  margin-top: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5, 1.25rem);
+}
+.tc-section { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Guard note: a blocked add/remove surfaces its reason VISIBLY here (F4 —
+   actor-observability, not sr-only). The descriptive text carries the meaning,
+   so the error tint is a secondary cue, never the only signal. Empty = hidden. */
+.tc-guard {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-error);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-error) 40%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+}
+.tc-guard:empty { display: none; }
+
+.tc-palette { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.tc-add-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.tc-add-chip:hover { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface-2)); }
+.tc-add-chip:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.tc-add-plus { color: var(--color-primary-hover); font-weight: 700; }
+.tc-kind {
+  font-size: 0.6875rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 1px var(--space-1);
+  border-radius: 4px;
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink-subtle);
+}
+.tc-kind-ai { color: var(--color-primary-hover); border-color: color-mix(in srgb, var(--color-primary) 40%, transparent); }
+
+.tc-roster {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-hairline);
+  border-radius: var(--radius-lg);
+}
+.tc-drop-active { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+
+/* Composer hover transitions live behind the reduced-motion guard (P10b §6.5
+   convention — even colour-only transitions stay inside the guard). */
+@media (prefers-reduced-motion: no-preference) {
+  .tc-add-chip { transition: border-color var(--dur-hover) var(--ease-standard), background var(--dur-hover) var(--ease-standard); }
+  .tc-roster { transition: border-color var(--dur-hover) var(--ease-standard), background var(--dur-hover) var(--ease-standard); }
+}
+.tc-role-head {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-ink-subtle);
+  margin-bottom: var(--space-2);
+}
+.tc-cards { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; }
+.tc-card {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+}
+.tc-card-name { font-size: 0.875rem; color: var(--color-ink); }
+.tc-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-ink-subtle);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.tc-remove:hover { background: color-mix(in srgb, var(--color-error) 18%, transparent); color: var(--color-ink); }
+.tc-remove:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; }
+
+.tc-dials { display: grid; grid-template-columns: 1fr; gap: var(--space-4); }
+.tc-cap { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.tc-cap-num {
+  width: 5rem;
+  padding: var(--space-2);
+  border: 1px solid var(--color-hairline-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-ink);
+  font: inherit;
+}
+
+@media (min-width: 640px) {
+  .tc-dials { grid-template-columns: repeat(3, 1fr); }
 }
