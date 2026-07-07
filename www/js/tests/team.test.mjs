@@ -140,6 +140,7 @@ test('teamRunStats reads settled series (balancedHybrid: unbounded review, no br
   assert.equal(Math.round(Number(s.cohesion)), 71);
   assert.equal(s.coordinationTaxPct, 13); // round(0.1339 × 100)
   assert.equal(s.reviewWaitDays, 1);
+  assert.equal(Math.round(Number(s.decisionLatencyDays)), 2); // decisionLatencyRoutine final p50 — the recovery-cost read (F3)
   assert.equal(s.brittleness, 0);
   assert.equal(s.coverage.gaps, 2);
 });

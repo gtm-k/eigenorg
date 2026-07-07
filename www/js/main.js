@@ -1092,6 +1092,20 @@ function reviewMeaning(stats) {
   return `By the end of the run, finished work waits about ${days} day${days === 1 ? '' : 's'} for review.`;
 }
 
+/**
+ * The recovery-cost "what this means" line, from settled routine-decision latency
+ * (decisionLatencyRoutine — MODEL.md §7.2 maps recovery cost onto its spikes). It
+ * makes the previously-unsurfaced latency series visible and names the cost of
+ * recovering from a break, so "brittleness + recovery" is fully observable.
+ * @param {any} stats
+ */
+function recoveryMeaning(stats) {
+  if (stats.decisionLatencyDays === null) return 'Routine decisions clear as work comes in.';
+  const days = Math.round(stats.decisionLatencyDays);
+  const cost = days === 1 ? 'about a day' : `about ${days} working days`;
+  return `Routine decisions take ${cost} to settle; when work breaks, that decision latency is the cost of recovering from it.`;
+}
+
 /** The success status line, all run-derived. @param {any} cov @param {any} stats @param {any} output */
 function teamSuccessLine(cov, stats, output) {
   const shipped = stats.shipped === null ? 0 : Math.round(stats.shipped);
@@ -1203,6 +1217,7 @@ function paintTeamResults(r) {
   const stats = teamRunStats(output);
   el('#team-meaning-coverage').textContent = coverageMeaning(cov);
   el('#team-meaning-review').textContent = reviewMeaning(stats);
+  el('#team-meaning-recovery').textContent = recoveryMeaning(stats);
 
   el('#team-ro-model').textContent = `model v${output.modelVersion}`;
   el('#team-ro-seed').textContent = `seed ${config.seed}`;

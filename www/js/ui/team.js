@@ -291,11 +291,13 @@ export function settledP50(output, seriesId) {
 /**
  * The card/results stat set, all run-derived. throughput total (cumThroughput
  * end), settled cohesion, settled coordination tax (fraction), settled review
- * wait, and cumulative brittleness — plus the coverage summary.
+ * wait, settled routine-decision latency (the recovery-cost signal, MODEL.md
+ * §7.2), and cumulative brittleness — plus the coverage summary.
  * @param {any} output
  * @returns {{ shipped: number | null, cohesion: number | null,
  *             coordinationTaxPct: number | null, reviewWaitDays: number | null,
- *             brittleness: number | null, coverage: ReturnType<typeof coverageSummary> }}
+ *             decisionLatencyDays: number | null, brittleness: number | null,
+ *             coverage: ReturnType<typeof coverageSummary> }}
  */
 export function teamRunStats(output) {
   const tax = settledP50(output, 'coordinationTax');
@@ -304,6 +306,7 @@ export function teamRunStats(output) {
     cohesion: settledP50(output, 'cohesion'),
     coordinationTaxPct: tax === null ? null : Math.round(tax * 100),
     reviewWaitDays: settledP50(output, 'reviewWaitDays'),
+    decisionLatencyDays: settledP50(output, 'decisionLatencyRoutine'),
     brittleness: settledP50(output, 'cumulativeBrittleness'),
     coverage: coverageSummary(output),
   };
