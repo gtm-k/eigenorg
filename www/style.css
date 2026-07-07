@@ -2005,7 +2005,7 @@ progress {
   font-size: 0.6875rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--color-ink-tertiary);
+  color: var(--color-ink-subtle); /* AA at 11px: ink-subtle 5.63:1, matching .optional-tag (was ink-tertiary 3.17:1) */
 }
 
 .approval-drawer .drawer-body {
