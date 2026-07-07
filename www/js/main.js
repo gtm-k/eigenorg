@@ -800,6 +800,22 @@ function resetToDefault() {
   setStatus(statusEl, 'Ready — 500 simulations, in your browser.', '');
 }
 
+// Mode registry (C5): per-door onEnter / reset behaviour, dispatched by the
+// active door id, so P7b adds the Team lens as ONE entry (modes.team) instead of
+// branching the shell callbacks. nav nulls its active door BEFORE onStartOver
+// fires, so the active mode is tracked here (set on entry) to route reset to the
+// right mode — "Start over" in Team mode must run the team reset, not the org one.
+let activeMode = 'org';
+/** @type {Record<string, { onEnter?: () => void, reset: () => void }>} */
+const modes = {
+  org: {
+    onEnter() {
+      resizeCharts(); // charts were sized while the mount was hidden
+    },
+    reset: resetToDefault,
+  },
+};
+
 // The two-altitude nav shell (spec §4). Doors are registered by { id, label,
 // question, desc, icon, mount }; the shell drives the landing cards + the
 // segmented toggle from this list, so P7b adds the Team door's real content by
@@ -834,9 +850,12 @@ const nav = createNavShell({
   ],
   onEnter(id) {
     el('#landing-notice').hidden = true; // clear any broken-link notice on entry (BLOCKER B)
-    if (id === 'org') resizeCharts(); // charts were sized while the mount was hidden
+    activeMode = id;
+    modes[id]?.onEnter?.();
   },
-  onStartOver: resetToDefault,
+  onStartOver() {
+    (modes[activeMode] ?? modes.org).reset();
+  },
 });
 
 for (const b of runButtons) b.addEventListener('click', () => void runAll());

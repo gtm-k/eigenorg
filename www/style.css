@@ -519,6 +519,15 @@ progress {
   font-weight: 500;
 }
 
+.chip.active:hover:not(:disabled) {
+  /* Class-completion (mirrors the R2-2 segmented fold): .chip:hover (0-3-1)
+     out-specifies .chip.active (0-2-0), so an active preset chip loses its
+     lavender fill on hover — re-assert the resting active tint. */
+  border-color: var(--color-primary);
+  background: rgba(94, 106, 210, 0.12);
+  color: var(--color-ink);
+}
+
 /* Active state is border + weight + background — plus aria-pressed. */
 
 /* ---- before/after pane ------------------------------------------------------- */
@@ -985,6 +994,14 @@ progress {
   background: rgba(94, 106, 210, 0.16);
   color: var(--color-ink);
   font-weight: 600;
+}
+
+.cfg-type.active:hover:not(:disabled) {
+  /* Class-completion (mirrors R2-2): .cfg-type:hover (0-3-1) out-specifies
+     .cfg-type.active (0-2-0) — re-assert the active seat tint on hover. */
+  border-color: var(--color-primary);
+  background: rgba(94, 106, 210, 0.16);
+  color: var(--color-ink);
 }
 
 .cfg-type:focus-visible {
