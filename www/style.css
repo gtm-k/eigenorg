@@ -468,7 +468,7 @@ progress {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-2);
 }
 
 .field label {
@@ -1432,7 +1432,6 @@ progress {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   padding: var(--space-8) var(--space-4) var(--space-10);
   overflow: hidden;
 }
@@ -1898,38 +1897,11 @@ progress {
   display: none;
 }
 
-.setup-title {
-  margin: 0 0 var(--space-3);
-}
-
 /* P10b §2c — chunked rhythm: loose between sub-groups (32 margin + 24 pad-top). */
 .setup-group {
   margin-top: var(--space-8);
   padding-top: var(--space-6);
   border-top: 1px solid var(--color-hairline);
-}
-
-.setup-subhead {
-  margin: 0 0 var(--space-1);
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  color: var(--color-ink);
-}
-
-.setup-subhead-note {
-  font-size: 0.8125rem;
-  font-weight: 400;
-  color: var(--color-ink-subtle);
-}
-
-.setup-subhead-note::before {
-  content: '\2014\00a0';
-}
-
-.setup-run {
-  margin-top: var(--space-6);
-  margin-bottom: 0;
 }
 
 /* Primary CTA: larger tap target + a quiet breathing focus halo (spec §6.6). */
