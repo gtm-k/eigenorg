@@ -12,8 +12,10 @@
 //! are now RE-PROVEN on the real engine (P7a acceptance; a misfit is a
 //! stop-and-surface, never a local retune). The normative exact identities hold
 //! (neutral-identity byte-parity + `mxTiebreakerRecovers` exact 1.0 +
-//! `hmReviewWaitNeutral` exact [1,1]). All v2 golden bounds are FINAL per the
-//! two mini-G2 decisions (2026-07-04); MODEL.md is not edited here.
+//! `hmReviewWaitNeutral` exact [1,1]). v2 golden bounds are FINAL per the
+//! mini-G2 decisions (2026-07-04 review-cap + rbThroughputPlateau; 2026-07-07
+//! hmBrittlenessSpike ratio -> difference re-anchor, MODEL.md v2.2.0); MODEL.md
+//! is not edited here.
 
 mod common;
 
@@ -389,23 +391,23 @@ fn team_composition_presets_run_plausibly() {
 }
 
 /// P7a hard gate — hollowMiddle on the real engine (seed 42, 500 iterations,
-/// ONE default coefficient set): 8 of the 9 §11.6 assertions (including the
-/// `hmReviewWaitNeutral` M20 neutral identity) GREEN via the generic evaluator.
+/// ONE default coefficient set): all 9 §11.6 assertions (including the
+/// `hmReviewWaitNeutral` M20 neutral identity and the re-anchored
+/// `hmBrittlenessSpike`) GREEN via the generic evaluator. hollowMiddle 9/9
+/// completes the launch stress suite 5/5.
 ///
-/// **`hmBrittlenessSpike` is excluded pending a mini-G2 decision
-/// (STOP-AND-SURFACE, P7a 2026-07-05):** the locked golden's own rationale
-/// documents that `cumulativeBrittleness@humanPm` can be 0 ("giving ratio =
-/// +infinity, which satisfies ratioAbove" — the v1 evaluator convention), but
-/// the P3 pre-lock addendum hardened ALL ratio-family comparators to FAIL
-/// loudly on a non-finite ratio (§11.1), and on the engine the humanPm median
-/// IS 0 at every probed seed ({42, 7, 123, 999, 2024}: hollow p50 = 2,
-/// humanPm p50 = 0). Two locked clauses of MODEL.md contradict on this input;
-/// resolving it (e.g. re-anchoring the metric to the pointwise difference, as
-/// was done for hmEarlyThroughputBoost and rbThroughputPlateau) is a predicate
-/// change = mini-G2 user gate, never a phase-local edit. The companion test
-/// below pins the CURRENT reality so the eventual amendment self-announces.
+/// **`hmBrittlenessSpike` was re-anchored by mini-G2 #1 (MODEL.md v2.2.0,
+/// USER-APPROVED 2026-07-07):** its metric moved from the pointwise ratio
+/// `cumulativeBrittleness@hollow / cumulativeBrittleness@humanPm` (`ratioAbove`)
+/// — structurally unpassable because the human-PM median is legitimately 0 at
+/// every probed seed ({42, 7, 123, 999, 2024}: hollow p50 = 2, humanPm p50 = 0),
+/// so the ratio is +inf and the P3 §11.1 hardening fails every ratio-family
+/// comparator loudly on a non-finite value — to the pointwise difference
+/// `cumulativeBrittleness@hollow - cumulativeBrittleness@humanPm` (`above` 1.5),
+/// which is always finite (measured 2.000 on all five seeds). The companion
+/// test below now asserts the re-anchored predicate PASSES on the engine.
 #[test]
-fn hollow_middle_goldens_green_except_surfaced_spike() {
+fn hollow_middle_goldens_green() {
     let runs = scenario_runs("hollowMiddle", &["hollow", "humanPm"]);
     let assertions = load_assertions();
     let mut checked = 0;
@@ -419,9 +421,6 @@ fn hollow_middle_goldens_green_except_surfaced_spike() {
             a.bound,
             a.tolerance
         );
-        if a.id == "hmBrittlenessSpike" {
-            continue; // asserted by the surfaced-state companion test below
-        }
         assert!(
             o.pass,
             "hollowMiddle golden {} FAILED: measured {} ({})",
@@ -429,7 +428,10 @@ fn hollow_middle_goldens_green_except_surfaced_spike() {
         );
         checked += 1;
     }
-    assert_eq!(checked, 8, "expected 8 asserted hollowMiddle assertions");
+    assert_eq!(
+        checked, 9,
+        "expected all 9 hollowMiddle assertions (incl. the re-anchored hmBrittlenessSpike)"
+    );
 
     // hmReviewWaitNeutral is an EXACT identity, not a tolerance pass: with
     // review capacity unbounded every realized sojourn equals reviewDwellDays,
@@ -454,34 +456,39 @@ fn hollow_middle_goldens_green_except_surfaced_spike() {
     }
 }
 
-/// Companion to the surfaced `hmBrittlenessSpike` mini-G2 (see the test above):
-/// pins today's state so the decision cannot be forgotten. The model DIRECTION
-/// holds — the hollow team's median brittleness (2 events) exceeds twice the
-/// human-PM team's (0) — but the §11.1 finite-ratio rule rejects the +inf
-/// ratio the golden's rationale relies on. When the amendment lands (any
-/// change to the hmBrittlenessSpike predicate/metric), this test FAILS and
-/// must be replaced by the plain green assertion in the suite above.
+/// Companion pin for the re-anchored `hmBrittlenessSpike` (mini-G2 #1,
+/// MODEL.md v2.2.0, USER-APPROVED 2026-07-07). Asserts the amendment landed
+/// (comparator `above`, difference metric) AND that the re-anchored predicate
+/// now PASSES on the real engine — the inverse of the earlier surfaced-state
+/// pin, which asserted the +inf `ratioAbove` collision. If the golden ever
+/// reverts to a ratio form this test fails loudly, re-surfacing the §11.1
+/// non-finite contradiction the re-anchor resolved.
 #[test]
-fn hm_brittleness_spike_surfaced_state_pending_mini_g2() {
+fn hm_brittleness_spike_reanchored_difference_passes() {
     let runs = scenario_runs("hollowMiddle", &["hollow", "humanPm"]);
     let a = load_assertions()
         .into_iter()
         .find(|a| a.id == "hmBrittlenessSpike")
         .expect("hmBrittlenessSpike exists");
     assert_eq!(
-        a.comparator, "ratioAbove",
-        "predicate changed — the mini-G2 amendment landed; fold this test back \
-         into the green suite"
+        a.comparator, "above",
+        "hmBrittlenessSpike must use the re-anchored finite `above` comparator \
+         (mini-G2 #1); a `ratioAbove` here means the re-anchor was reverted and \
+         the §11.1 non-finite collision is back"
+    );
+    assert_eq!(
+        a.metric, "cumulativeBrittleness@hollow - cumulativeBrittleness@humanPm",
+        "hmBrittlenessSpike must score the pointwise difference, not a ratio"
     );
     let o = evaluate(&a, &runs);
     assert!(
-        !o.pass && o.detail.contains("non-finite"),
-        "expected the documented non-finite failure, got pass={} detail={}",
         o.pass,
-        o.detail
+        "re-anchored hmBrittlenessSpike must PASS on the engine: measured {} ({})",
+        o.measured, o.detail
     );
-    // The substance behind the predicate holds: hollow ≥ bound × humanPm, with
-    // a strictly positive hollow numerator (hmBrittlenessFloorMc pins ≥ 1.5).
+    // Substance: the difference clears the bound at the final step, carried by a
+    // strictly positive hollow count (hmBrittlenessFloorMc pins ≥ 1.5), so the
+    // pass never depends on the human denominator being any particular value.
     let last = |run: &str, s: &str| {
         runs[run]
             .series_value(s, Quantile::P50, runs[run].horizon - 1)
@@ -489,11 +496,9 @@ fn hm_brittleness_spike_surfaced_state_pending_mini_g2() {
     };
     let hollow = last("hollow", "cumulativeBrittleness");
     let human = last("humanPm", "cumulativeBrittleness");
-    assert!(hollow >= 2.0 * human && hollow > 0.0);
-    assert_eq!(
-        human, 0.0,
-        "humanPm median brittleness became nonzero — re-evaluate the ratio \
-         (the +inf collision may have dissolved); surface to the orchestrator"
+    assert!(
+        hollow - human >= 1.5 && hollow > 0.0,
+        "expected hollow - humanPm >= 1.5 with hollow > 0, got hollow={hollow} human={human}"
     );
 }
 

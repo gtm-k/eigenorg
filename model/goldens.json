@@ -1,5 +1,5 @@
 {
-  "modelVersion": "2.1.0",
+  "modelVersion": "2.2.0",
   "assertions": [
     {
       "id": "ccThroughputPeakDecline",
@@ -353,14 +353,14 @@
     {
       "id": "hmBrittlenessSpike",
       "scenario": "hollowMiddle",
-      "metric": "cumulativeBrittleness@hollow / cumulativeBrittleness@humanPm",
-      "comparator": "ratioAbove",
-      "predicate": "Total brittleness events in the hollow team run at least 2x the human-PM team by the end.",
-      "bound": 2,
+      "metric": "cumulativeBrittleness@hollow - cumulativeBrittleness@humanPm",
+      "comparator": "above",
+      "predicate": "By the end, the hollow team has logged at least 1.5 more cumulative brittleness events than the human-PM team.",
+      "bound": 1.5,
       "tolerance": 0.1,
       "step": null,
       "instrument": "meanPath",
-      "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (red-team stress test 2). Zero-denominator convention (§11.1): the human-PM team's novel failures (humanNovelFailureBase) are sparse enough that its cumulative total can be 0, giving ratio = +infinity, which satisfies ratioAbove; the paired hmBrittlenessFloorMc pins the hollow numerator to >= 1.5 so the ratio is never the indeterminate 0/0."
+      "rationale": "Novel decisions hitting an AI router without human judgment is the failure mechanism (red-team stress test 2). Re-anchored (mini-G2 #1, USER-APPROVED 2026-07-07) from the pointwise RATIO cumulativeBrittleness@hollow over cumulativeBrittleness@humanPm (ratioAbove 2) to the pointwise DIFFERENCE hollow minus humanPm (above 1.5) at the final step: the ratio was structurally unpassable on the engine because the human-PM team's cumulative novel failures (humanNovelFailureBase) are legitimately 0 at every probed seed, so the ratio is +infinity and the P3 §11.1 hardening makes every ratio-family comparator FAIL loudly on a non-finite value - a direct collision between two locked clauses (the v1 '+inf satisfies ratioAbove' convention this rationale used to rely on, and the P3 non-finite-fails addendum). The finite difference preserves the model claim (the hollow team suffers materially more brittleness) and cannot be non-finite. Measured hollow minus humanPm = 2.000 at the final step on all five probe seeds {42, 7, 123, 999, 2024} (500 iterations each), clearing the raw bound 1.5 by 33% on every seed. Same twin mechanism, different operator - the identical re-anchor pattern the user approved for hmEarlyThroughputBoost (single step to window mean) and rbThroughputPlateau (per-step to cumulative ratio). The paired hmBrittlenessFloorMc still pins the hollow count to >= 1.5, so the difference is carried by a strictly positive hollow numerator, not a vanishing human denominator."
     },
     {
       "id": "hmStakeholderGap",
