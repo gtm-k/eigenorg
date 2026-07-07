@@ -1,0 +1,49 @@
+{
+  "id": "prioritizationTax",
+  "label": "The three-layer prioritization tax",
+  "source": "MODEL.md §10.2 (normative scenario config, materialized verbatim)",
+  "runs": {
+    "threeLayer": {
+      "schemaVersion": "1",
+      "modelVersion": "1.0.0",
+      "sim": "org",
+      "seed": 42,
+      "iterations": 500,
+      "horizon": 60,
+      "org": {
+        "headcountStart": 20,
+        "headcountGrowthPerStep": 0,
+        "topology": "hierarchical",
+        "hierarchyDepth": 3,
+        "ownershipLayers": 3,
+        "modality": "asyncFirst",
+        "structuralHealth": 6,
+        "aiInjection": {
+          "enabled": false,
+          "atStep": 0
+        }
+      }
+    },
+    "oneLayer": {
+      "schemaVersion": "1",
+      "modelVersion": "1.0.0",
+      "sim": "org",
+      "seed": 42,
+      "iterations": 500,
+      "horizon": 60,
+      "org": {
+        "headcountStart": 20,
+        "headcountGrowthPerStep": 0,
+        "topology": "hierarchical",
+        "hierarchyDepth": 3,
+        "ownershipLayers": 1,
+        "modality": "asyncFirst",
+        "structuralHealth": 6,
+        "aiInjection": {
+          "enabled": false,
+          "atStep": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "eigenorg",
+  "type": "module",
+  "description": "Browser-native organizational-dynamics simulator engine (Rust -> wasm).",
+  "version": "0.1.0",
+  "license": "MIT",
+  "files": [
+    "eigenorg_bg.wasm",
+    "eigenorg.js",
+    "eigenorg.d.ts"
+  ],
+  "main": "eigenorg.js",
+  "types": "eigenorg.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

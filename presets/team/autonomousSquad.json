@@ -1,0 +1,137 @@
+{
+  "id": "autonomousSquad",
+  "label": "Autonomous squad — a fully AI team, no human judgment",
+  "source": "P7a team preset — composed from the MODEL.md §3.2 default archetype table (not a §10 golden scenario)",
+  "runs": {
+    "main": {
+      "schemaVersion": "1",
+      "modelVersion": "2.1.0",
+      "sim": "team",
+      "seed": 42,
+      "iterations": 500,
+      "horizon": 60,
+      "team": {
+        "entities": [
+          {
+            "id": "aiPm",
+            "kind": "ai",
+            "archetype": "aiPrioritization",
+            "throughput": 9,
+            "judgmentQuality": 3,
+            "handoffFriction": 2,
+            "reliability": 8,
+            "rampTimeWeeks": 0,
+            "availability": 1,
+            "functions": [
+              "prioritization",
+              "coordination"
+            ],
+            "capabilities": {
+              "prioritization": 9,
+              "coordination": 8
+            }
+          },
+          {
+            "id": "aiExec1",
+            "kind": "ai",
+            "archetype": "aiExecution",
+            "throughput": 8,
+            "judgmentQuality": 3,
+            "handoffFriction": 2,
+            "reliability": 7,
+            "rampTimeWeeks": 0,
+            "availability": 1,
+            "functions": [
+              "execution"
+            ],
+            "capabilities": {
+              "execution": 8
+            }
+          },
+          {
+            "id": "aiExec2",
+            "kind": "ai",
+            "archetype": "aiExecution",
+            "throughput": 8,
+            "judgmentQuality": 3,
+            "handoffFriction": 2,
+            "reliability": 7,
+            "rampTimeWeeks": 0,
+            "availability": 1,
+            "functions": [
+              "execution"
+            ],
+            "capabilities": {
+              "execution": 8
+            }
+          },
+          {
+            "id": "aiExec3",
+            "kind": "ai",
+            "archetype": "aiExecution",
+            "throughput": 8,
+            "judgmentQuality": 3,
+            "handoffFriction": 2,
+            "reliability": 7,
+            "rampTimeWeeks": 0,
+            "availability": 1,
+            "functions": [
+              "execution"
+            ],
+            "capabilities": {
+              "execution": 8
+            }
+          },
+          {
+            "id": "aiRev",
+            "kind": "ai",
+            "archetype": "aiReview",
+            "throughput": 8,
+            "judgmentQuality": 4,
+            "handoffFriction": 2,
+            "reliability": 8,
+            "rampTimeWeeks": 0,
+            "availability": 1,
+            "functions": [
+              "review"
+            ],
+            "capabilities": {
+              "review": 7
+            }
+          },
+          {
+            "id": "aiSynth",
+            "kind": "ai",
+            "archetype": "aiSynthesis",
+            "throughput": 7,
+            "judgmentQuality": 4,
+            "handoffFriction": 2,
+            "reliability": 7,
+            "rampTimeWeeks": 0,
+            "availability": 1,
+            "functions": [
+              "synthesis",
+              "stakeholderCommunication"
+            ],
+            "capabilities": {
+              "synthesis": 8,
+              "stakeholderCommunication": 2
+            }
+          }
+        ],
+        "workStream": {
+          "arrivalPerStep": 1.5,
+          "mix": {
+            "routine": 0.6,
+            "complex": 0.25,
+            "novel": 0.15
+          },
+          "highStakesShare": 0.2
+        },
+        "modality": "asyncFirst",
+        "structuralHealth": 6,
+        "recoveryOwner": null
+      }
+    }
+  }
+}

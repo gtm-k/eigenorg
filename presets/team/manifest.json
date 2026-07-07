@@ -1,0 +1,11 @@
+{
+  "note": "INT-2 — committed enumeration of the team presets a static Pages host cannot list at runtime. team-presets.js fetches this to build the picker; team-manifest.test.mjs pins every entry against the files on disk (id → www/presets/team/<id>.json, runKey → that file's runs). label is the SHORT chip label (the preset file's own `label` is the long descriptor). default marks the one-tap landing preset.",
+  "default": "balancedHybrid",
+  "presets": [
+    { "id": "balancedHybrid", "runKey": "main", "label": "Balanced hybrid" },
+    { "id": "allHumanBaseline", "runKey": "main", "label": "All-human team" },
+    { "id": "autonomousSquad", "runKey": "main", "label": "Autonomous AI squad" },
+    { "id": "hollowMiddle", "runKey": "hollow", "label": "Hollow middle" },
+    { "id": "reviewBottleneck", "runKey": "bottleneck", "label": "Review bottleneck" }
+  ]
+}
