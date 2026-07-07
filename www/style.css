@@ -283,17 +283,6 @@ h1 {
   white-space: normal;
 }
 
-/* The relocated technical term at the top of a drawer body (the summary stays
-   plain-language-only — a closed <details> can't host a visible ⓘ). Mirrors
-   .tech-label's register at drawer-body scale. */
-.drawer-tech {
-  margin: 0 0 var(--space-2);
-  font-size: 0.75rem;
-  font-weight: 500;
-  letter-spacing: 0.3px;
-  color: var(--color-ink-subtle);
-}
-
 .term-pop-plain {
   display: block;
   color: var(--color-ink);
@@ -2256,6 +2245,34 @@ progress {
 
 .approval-drawer .drawer-body {
   padding: 0 var(--space-4) var(--space-4);
+}
+
+/* F9 — the approval-stack ⓘ. glossary.decorate mounts it as a sibling of the
+   drawer <details> inside this relative shell (a <details> ⓘ can't nest in a
+   <summary>, and content after the summary is hidden while the drawer is closed),
+   so it stays visible open or closed. It floats into the summary row's top-right;
+   the summary reserves padding-right so it never overlaps the "optional" tag
+   (which is pushed right by margin-left:auto). */
+.approval-shell {
+  position: relative;
+}
+
+.approval-drawer > summary.drawer-summary {
+  /* reserve a lane on the right for the absolutely-positioned ⓘ */
+  padding-right: calc(var(--space-4) + 1.75rem);
+}
+
+.approval-shell > .term-pop {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-4);
+  z-index: 5;
+}
+
+/* Right-edge ⓘ → open its popover leftward so it can't overflow the viewport. */
+.approval-shell > .term-pop > .term-pop-body {
+  left: auto;
+  right: 0;
 }
 
 /* Gate the results-shaped blocks (Prioritization flow, AI-seat-vs-all-human) on

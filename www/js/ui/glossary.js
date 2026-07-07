@@ -175,21 +175,37 @@ export function createGlossary(opts = {}) {
   /**
    * Walk `root` for `[data-term]` hosts and attach a ⓘ to each. Idempotent (a
    * re-decorate skips hosts already carrying a `.term-pop`). A host inside a
-   * <summary> is SKIPPED as a defensive guard — nesting <details> inside
-   * <summary> is invalid HTML AND a closed <details> hides non-summary children,
-   * so a summary can never host a working ⓘ. The shipped pattern therefore puts
-   * NO technical term in any summary: the term + its data-term host live in the
-   * drawer BODY (see index.html `.drawer-tech`), where decorate() reaches them.
-   * Do not add data-term to a <summary>; relocate the term to the body instead.
+   * <summary> host (the approval-stack disclosure) is handled EXPLICITLY, never
+   * silently skipped: a <details> ⓘ can't nest inside a <summary>, and an ⓘ
+   * placed as a sibling AFTER the summary but INSIDE the drawer <details> would be
+   * hidden while the drawer is closed (content-visibility on the details content).
+   * So the ⓘ is mounted as a sibling of the drawer <details>, inside its
+   * position:relative `.approval-shell`; CSS floats it into the summary row so it
+   * stays visible open or closed, and clicking it toggles only the ⓘ (a sibling of
+   * the drawer, not nested in it), never the drawer.
    * @param {HTMLElement} root
    */
   function decorate(root) {
     const hosts = /** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll('[data-term]'));
     for (const host of hosts) {
-      if (host.closest('summary')) continue;
-      if (host.querySelector(':scope > .term-pop')) continue;
       const key = host.dataset.term;
       if (!key) continue;
+
+      const summaryEl = host.closest('summary');
+      if (summaryEl) {
+        // Summary host: mount the ⓘ on the enclosing shell (sibling of the
+        // <details>), idempotent per shell. If the shell is missing (a data-term
+        // on a bare summary), there is nowhere valid to mount — skip rather than
+        // build invalid HTML.
+        const details = summaryEl.closest('details');
+        const shell = /** @type {HTMLElement | null} */ (details && details.parentNode);
+        if (!shell || shell.querySelector(':scope > .term-pop')) continue;
+        const info = tag(key);
+        if (info) shell.appendChild(info);
+        continue;
+      }
+
+      if (host.querySelector(':scope > .term-pop')) continue; // idempotent (flow hosts)
       const info = tag(key);
       if (!info) continue;
       // Place the ⓘ between the plain lead and the demoted tech-label (§4d).

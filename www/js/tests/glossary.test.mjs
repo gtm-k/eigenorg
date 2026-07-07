@@ -267,7 +267,7 @@ function withNodeDom(fn) {
   }
 }
 
-test('decorate() inserts the ⓘ between the plain lead and the .tech-label, skips summary hosts, and is idempotent', () => {
+test('decorate() inserts the ⓘ between the plain lead and the .tech-label, mounts a summary-host ⓘ on the shell, and is idempotent', () => {
   withNodeDom(() => {
     const glossary = createGlossary({ assumptions: liveAssumptions() });
 
@@ -281,10 +281,17 @@ test('decorate() inserts the ⓘ between the plain lead and the .tech-label, ski
     tech.className = 'tech-label';
     panelTitle.append(h2, tech);
 
-    // Approval-stack disclosure: data-term ON a <summary> — must be SKIPPED.
+    // Approval-stack disclosure (F9): data-term ON the <summary>, inside a
+    // <details> wrapped by a position:relative `.approval-shell`. The ⓘ must mount
+    // on the SHELL (sibling of the details) — never nested in the summary.
+    const shell = new Node('div');
+    shell.className = 'approval-shell';
+    const details = new Node('details');
     const summary = new Node('summary');
     summary.dataset.term = 'approvalStack';
-    root.append(panelTitle, summary);
+    details.append(summary);
+    shell.append(details);
+    root.append(panelTitle, shell);
 
     glossary.decorate(/** @type {any} */ (root));
 
@@ -294,12 +301,16 @@ test('decorate() inserts the ⓘ between the plain lead and the .tech-label, ski
       panelTitle.children.indexOf(info) < panelTitle.children.indexOf(tech),
       'ⓘ sits before the .tech-label',
     );
-    assert.equal(summary.querySelector(':scope > .term-pop'), null, 'summary host was skipped (valid HTML)');
+    // Summary host handled, not skipped: ⓘ on the shell, NOT nested in the summary.
+    assert.ok(shell.querySelector(':scope > .term-pop'), 'summary-host ⓘ mounted on the shell');
+    assert.equal(summary.querySelector(':scope > .term-pop'), null, 'ⓘ is NOT nested in the summary (valid HTML)');
 
-    // Idempotent: a second decorate must not add a second ⓘ.
+    // Idempotent: a second decorate must not add a second ⓘ to either host.
     glossary.decorate(/** @type {any} */ (root));
-    const infos = panelTitle.children.filter((/** @type {any} */ c) => c && c._matches && c._matches('.term-pop'));
-    assert.equal(infos.length, 1, 'decorate is idempotent');
+    const paneInfos = panelTitle.children.filter((/** @type {any} */ c) => c && c._matches && c._matches('.term-pop'));
+    const shellInfos = shell.children.filter((/** @type {any} */ c) => c && c._matches && c._matches('.term-pop'));
+    assert.equal(paneInfos.length, 1, 'decorate is idempotent (panel-title)');
+    assert.equal(shellInfos.length, 1, 'decorate is idempotent (approval shell)');
   });
 });
 

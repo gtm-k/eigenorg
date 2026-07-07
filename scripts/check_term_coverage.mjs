@@ -55,9 +55,11 @@
 //      check reads their markers from www/js/main.js + www/js/ui/*.js (their id
 //      must be real) and the totality check keeps their surfaces resolvable. Same
 //      scope trade the coefficient gate makes: catch the common structural case
-//      by marker, document the residue. (The approval-stack term is STATIC: it
-//      lives in the drawer BODY as `.drawer-tech[data-term]` — a <summary> can
-//      never host a working i-popover, so summaries carry NO technical terms.)
+//      by marker, document the residue. (The approval-stack term IS static in
+//      index.html: data-term="approvalStack" sits on the drawer <summary>; a
+//      <details> i-popover can't nest in a <summary>, so glossary.decorate mounts
+//      the i on the summary's `.approval-shell` sibling instead — the data-term
+//      marker is still swept by check 2b.)
 //   3. SURFACE INVENTORY — remaining term-bearing surfaces, each with its
 //      reader-path justification (reviewed at the P10b gate):
 //      a. PRESET CHIP labels ("Faster Dysfunction", ...): reader path = the

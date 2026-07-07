@@ -160,27 +160,26 @@
                  (actor-observability) written by prioritization.js on config change.
                  Its results-shaped blocks (flow, all-human) are gated on hasRun via
                  the .pre-run class so they never sit empty in the setup. -->
-            <details id="approval-drawer" class="drawer approval-drawer pre-run">
-              <!-- Plain-lead-only summary (R9/Codex round-1 #3): a <details> cannot
-                   nest in a <summary> AND a closed <details> hides non-summary
-                   children — so the CLOSED drawer shows NO technical term at all
-                   (plain language only), and the tech term + its inline ⓘ live at
-                   the top of the drawer body, where the term first becomes visible.
-                   The reader path: jargon appears → its ⓘ is beside it. -->
-              <summary class="drawer-summary">
-                <span class="drawer-title">Who has to sign off</span>
-                <span class="drawer-value" id="approval-drawer-value"></span>
-                <span class="drawer-optional">optional</span>
-              </summary>
-              <div class="drawer-body">
-                <!-- Flow <div>, not <p>: glossary.decorate appends the inline ⓘ
-                     (<details>) here, which is invalid inside a <p> — same reason
-                     #preset-note is a <div> (F1). -->
-                <div class="drawer-tech" data-term="approvalStack">Approval stack</div>
-                <p class="note">Build the chain of sign-offs a decision clears — 1 to 5 seats, each a person, committee, or AI agent. Tap a seat to set it. This is what sets your decision-latency number.</p>
-                <div id="configurator" class="configurator"></div>
-              </div>
-            </details>
+            <!-- Relative shell (F9): the approval-stack term keeps its plain lead +
+                 tech-label + data-term ON the summary (§4d, like every other panel,
+                 visible open or closed). glossary.decorate mounts the inline ⓘ as a
+                 SIBLING of the <details> in this shell — a <details> ⓘ can't nest in
+                 a <summary>, and an ⓘ placed after the summary INSIDE the drawer is
+                 hidden while the drawer is closed. CSS floats the ⓘ into the summary
+                 row's right edge; the summary reserves padding-right for it. -->
+            <div class="approval-shell">
+              <details id="approval-drawer" class="drawer approval-drawer pre-run">
+                <summary class="drawer-summary" data-term="approvalStack">
+                  <span class="drawer-title">Who has to sign off <span class="tech-label">Approval stack</span></span>
+                  <span class="drawer-value" id="approval-drawer-value"></span>
+                  <span class="drawer-optional">optional</span>
+                </summary>
+                <div class="drawer-body">
+                  <p class="note">Build the chain of sign-offs a decision clears — 1 to 5 seats, each a person, committee, or AI agent. Tap a seat to set it. This is what sets your decision-latency number.</p>
+                  <div id="configurator" class="configurator"></div>
+                </div>
+              </details>
+            </div>
           </div>
         </section>
 
