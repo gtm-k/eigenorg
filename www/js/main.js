@@ -46,8 +46,10 @@ import {
   qualityHistogramModel,
   coverageSummary,
   teamRunStats,
+  buildCatalog,
 } from './ui/team.js';
 import { wireTeamCard } from './ui/team-card.js';
+import { renderTeamComposer } from './ui/team-composer.js';
 
 /** @param {string} sel @returns {HTMLElement} */
 function el(sel) {
@@ -942,6 +944,8 @@ let teamBusy = false;
 
 /** @type {{ setActive: (id: string) => void }} */
 let teamPicker = { setActive: () => {} }; // real picker mounts in boot()
+/** @type {{ refresh: () => void }} */
+let teamComposer = { refresh: () => {} }; // real composer mounts in boot()
 
 const teamCard = wireTeamCard({
   canvas: /** @type {HTMLCanvasElement} */ (el('#team-card-canvas')),
@@ -1190,6 +1194,27 @@ function paintTeamResults(r) {
   markTeamFresh();
 }
 
+/**
+ * A staged team EDIT (a composer change): the team analogue of stageAndRefresh.
+ * Stages the config + prompts a re-run; it never auto-runs (the P5/P6 "edits
+ * stage, never auto-run" convention). Any in-flight team run keeps running but is
+ * now stale and re-asserts this warning on completion instead of painting.
+ * @param {any} next
+ */
+function stageTeamEdit(next) {
+  teamState.config = next;
+  teamState.generation += 1;
+  teamState.presetId = ''; // authoring a team = custom (no preset source)
+  teamState.pendingRerun = false;
+  teamCard.disarm();
+  teamPicker.setActive('');
+  el('#team-preset-note').textContent = 'Custom team — changes apply on the next run.';
+  refreshTeamSetup();
+  teamComposer.refresh();
+  markTeamStale();
+  setStatus(teamStatusEl, 'team changed — run to update the charts', '');
+}
+
 /** Pick a team preset: load it into the canonical team config + run (decision 6). @param {any} ref */
 function pickTeamPreset(ref) {
   const preset = teamState.presets.get(ref.id);
@@ -1201,6 +1226,7 @@ function pickTeamPreset(ref) {
   teamPicker.setActive(ref.id);
   setTeamPresetNote(preset);
   refreshTeamSetup();
+  teamComposer.refresh();
   markTeamStale();
   requestTeamRun();
 }
@@ -1245,6 +1271,7 @@ function resetTeam() {
   teamStrip.markFresh();
   teamStrip.expand();
   refreshTeamSetup();
+  teamComposer.refresh();
   setTeamRunButtons(false);
   setStatus(teamStatusEl, 'Ready — 500 simulations, in your browser.', '');
 }
@@ -1405,6 +1432,15 @@ async function boot() {
     const teamFiles = await Promise.all(refs.map((ref) => fetchTeamPreset(ref.id)));
     refs.forEach((ref, i) => teamState.presets.set(ref.id, teamFiles[i]));
     teamPicker = renderTeamPresetPicker(el('#team-preset-picker'), { refs, onPick: pickTeamPreset });
+    // The composer's add-a-seat catalog: one entity template per archetype, drawn
+    // from every surfaced preset's primary run — so every number a composed team
+    // carries comes from committed preset JSON, never a JS literal.
+    const catalog = buildCatalog(refs.map((ref) => teamPrimaryRunConfig(teamState.presets.get(ref.id), ref)));
+    teamComposer = renderTeamComposer(el('#team-composer'), {
+      getConfig: () => teamState.config,
+      onConfigChange: stageTeamEdit,
+      catalog,
+    });
     const defRef = refs.find((rr) => rr.id === defaultId) ?? refs[0];
     if (defRef) {
       const preset = teamState.presets.get(defRef.id);
@@ -1413,6 +1449,7 @@ async function boot() {
       teamPicker.setActive(defRef.id);
       setTeamPresetNote(preset);
       refreshTeamSetup();
+      teamComposer.refresh();
       setTeamRunButtons(false); // enable the (HTML-disabled) team Run once a config is loaded
     }
   } catch (err) {

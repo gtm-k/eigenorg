@@ -333,3 +333,126 @@ export function configWithRoster(config, entities) {
   }
   return next;
 }
+
+// ---- composer structural edits (validate()-safe; numbers preset-sourced) ------
+
+/** Schema bounds on the roster (config.v1.schema.json team.entities). */
+export const MIN_ENTITIES = 2;
+export const MAX_ENTITIES = 12;
+
+/** The two team coordination modalities (config schema enum). @type {ReadonlyArray<{ value: string, label: string }>} */
+export const TEAM_MODALITIES = [
+  { value: 'asyncFirst', label: 'Async-first' },
+  { value: 'meetingHeavy', label: 'Meeting-heavy' },
+];
+
+/** Plain archetype labels for the roster + palette (strings, never model numbers). @type {Record<string, string>} */
+export const ARCHETYPE_LABELS = {
+  pm: 'Product manager',
+  engineer: 'Engineer',
+  aiExecution: 'AI executor',
+  reviewer: 'Reviewer',
+  director: 'Director',
+};
+
+/** @param {string} archetype @returns {string} a plain label, humanising unknown archetypes */
+export function archetypeLabel(archetype) {
+  if (ARCHETYPE_LABELS[archetype]) return ARCHETYPE_LABELS[archetype];
+  const spaced = String(archetype).replace(/([a-z])([A-Z])/g, '$1 $2');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/**
+ * The role bucket an entity belongs to for the composer's who-does-what grouping:
+ * anyone covering execution is "work"; else review → "review"; else "lead".
+ * @param {any} entity @returns {'work' | 'review' | 'lead'}
+ */
+export function roleOf(entity) {
+  if (entityCovers(entity, 'execution')) return 'work';
+  if (entityCovers(entity, 'review')) return 'review';
+  return 'lead';
+}
+
+/**
+ * Build the add-a-seat catalog from the fetched team preset CONFIGS — one
+ * representative entity template per archetype (first seen). Every number in a
+ * template comes from the preset JSON (no coefficient literal is authored here);
+ * addEntity clones a template and assigns a fresh id.
+ * @param {any[]} configs team configs (each preset's primary run)
+ * @returns {Array<{ archetype: string, kind: string, label: string, template: any }>}
+ */
+export function buildCatalog(configs) {
+  /** @type {Map<string, any>} */
+  const byArchetype = new Map();
+  for (const config of configs) {
+    for (const entity of entitiesOf(config)) {
+      if (!byArchetype.has(entity.archetype)) byArchetype.set(entity.archetype, entity);
+    }
+  }
+  return [...byArchetype.entries()].map(([archetype, entity]) => ({
+    archetype,
+    kind: entity.kind,
+    label: archetypeLabel(archetype),
+    template: entity,
+  }));
+}
+
+/**
+ * Add a clone of a catalog template to the roster with a fresh unique id. Returns
+ * a new config, or null when the roster is already at MAX_ENTITIES.
+ * @param {any} config @param {any} template a catalog entity template
+ * @returns {any | null}
+ */
+export function addEntity(config, template) {
+  const entities = entitiesOf(config).map((e) => deepCopy(e));
+  if (entities.length >= MAX_ENTITIES) return null;
+  const ids = new Set(entities.map((e) => e.id));
+  const clone = deepCopy(template);
+  let n = 1;
+  let id = `${clone.archetype}${n}`;
+  while (ids.has(id)) {
+    n += 1;
+    id = `${clone.archetype}${n}`;
+  }
+  clone.id = id;
+  entities.push(clone);
+  return configWithRoster(config, entities);
+}
+
+/**
+ * Remove an entity by id. Guards the schema minimum (≥2 entities) and keeps at
+ * least one entity doing the work (execution) so the team can still run. Returns
+ * a new config, or null when a guard blocks the removal.
+ * @param {any} config @param {string} id
+ * @returns {any | null}
+ */
+export function removeEntity(config, id) {
+  const entities = entitiesOf(config).filter((e) => e.id !== id);
+  if (entities.length < MIN_ENTITIES) return null;
+  if (!entities.some((e) => entityCovers(e, 'execution'))) return null;
+  return configWithRoster(config, entities);
+}
+
+/**
+ * Apply one guarded team-level field edit (SH / review capacity / modality). All
+ * validate()-safe: integers or enum strings only, never a float. Strips replay
+ * (an edit is authoring — the ui/org.js stripReplay discipline).
+ * @param {any} config
+ * @param {'structuralHealth' | 'reviewCapacityPerStep' | 'modality'} field
+ * @param {number | string | null} value
+ * @returns {any} a new config
+ */
+export function applyTeamField(config, field, value) {
+  const next = deepCopy(config);
+  delete next.replay;
+  delete next.paramOverrides;
+  if (field === 'structuralHealth') {
+    next.team.structuralHealth = Math.max(1, Math.min(10, Math.round(Number(value))));
+  } else if (field === 'reviewCapacityPerStep') {
+    next.team.reviewCapacityPerStep = value === null ? null : Math.max(1, Math.round(Number(value)));
+  } else if (field === 'modality') {
+    const v = String(value);
+    if (TEAM_MODALITIES.some((m) => m.value === v)) next.team.modality = v;
+  }
+  return next;
+}
