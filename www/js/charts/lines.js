@@ -116,7 +116,7 @@ export function createHealthChart(canvas) {
       labels: [],
       datasets: [
         {
-          label: 'org health p50',
+          label: 'org health — typical run',
           data: [],
           borderColor: COLORS.accent,
           borderWidth: 2,
@@ -124,7 +124,7 @@ export function createHealthChart(canvas) {
           fill: false,
         },
         {
-          label: 'team cohesion p50 — dashed',
+          label: 'team cohesion — typical run (dashed)',
           data: [],
           borderColor: COLORS.contrast,
           borderWidth: 1.5,

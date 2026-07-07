@@ -12,7 +12,8 @@ import { deepCopy } from './runplan.js';
  * @typedef {{ id: string, label: string, kind: 'range' | 'number' | 'segmented',
  *             min?: number, max?: number, step?: number,
  *             options?: Array<{ value: string, label: string }>,
- *             anchors?: { min: string, max: string }, hint?: string }} ControlDef
+ *             anchors?: { min: string, max: string }, hint?: string,
+ *             enabledWhen?: (values: Record<string, number | string>) => boolean }} ControlDef
  */
 
 /** MODEL.md §3.3 input ranges. @type {ControlDef[]} */
@@ -75,6 +76,29 @@ export const CONTROL_DEFS = [
     ],
   },
   {
+    // Beta feedback 2026-07-07: AI injection was preset-only — no way to add or
+    // remove AI from a custom org. Two VIRTUAL controls write the one
+    // schema-required org.aiInjection object (see applyOrgValue special case).
+    id: 'aiInjectionEnabled',
+    label: 'AI agents',
+    kind: 'segmented',
+    options: [
+      { value: 'off', label: 'None' },
+      { value: 'on', label: 'Injected' },
+    ],
+  },
+  {
+    id: 'aiInjectionAtStep',
+    label: 'AI arrives at step',
+    kind: 'number',
+    min: 0,
+    max: 4294967295,
+    step: 1,
+    hint: 'working day the AI agents switch on (clamped to the horizon)',
+    enabledWhen: (/** @type {Record<string, number | string>} */ values) =>
+      values.aiInjectionEnabled === 'on',
+  },
+  {
     id: 'structuralHealth',
     label: 'Structural Health',
     kind: 'range',
@@ -100,6 +124,8 @@ export function readOrgValues(config) {
     topology: org.topology,
     modality: org.modality,
     structuralHealth: org.structuralHealth,
+    aiInjectionEnabled: org.aiInjection?.enabled ? 'on' : 'off',
+    aiInjectionAtStep: Number(org.aiInjection?.atStep ?? 0),
   };
 }
 
@@ -152,6 +178,31 @@ export function applyOrgValue(config, id, value) {
   const next = deepCopy(config);
   stripReplay(next);
   const org = next.org;
+
+  // aiInjection is ONE schema object ({enabled, atStep}, both required) edited
+  // through two virtual controls — never write org.aiInjectionEnabled etc.
+  // (deny_unknown_fields would reject it). Toggling ON without a prior step
+  // defaults to mid-horizon (the presets' "AI arrives mid-run" shape).
+  if (id === 'aiInjectionEnabled') {
+    const horizon = Math.max(1, Math.round(Number(next.horizon ?? 120)));
+    const prior = Number(org.aiInjection?.atStep);
+    org.aiInjection = {
+      enabled: String(value) === 'on',
+      atStep: Number.isFinite(prior) ? prior : Math.floor(horizon / 2),
+    };
+    return next;
+  }
+  if (id === 'aiInjectionAtStep') {
+    const horizon = Math.max(1, Math.round(Number(next.horizon ?? 120)));
+    const v = clampControlValue(def, Number(value));
+    org.aiInjection = {
+      enabled: Boolean(org.aiInjection?.enabled),
+      // An atStep at/after the horizon never fires (the précis drops its AI
+      // clause) — clamp to the last step that actually runs.
+      atStep: Math.max(0, Math.min(horizon - 1, v)),
+    };
+    return next;
+  }
 
   if (def.kind === 'segmented') {
     org[id] = String(value);
@@ -446,9 +497,12 @@ export function renderControls(root, opts) {
         change(def.id, input.value);
       });
       refreshers.push(() => {
-        const current = readOrgValues(opts.getConfig())[def.id];
+        const values = readOrgValues(opts.getConfig());
+        const current = values[def.id];
         input.value = String(current);
         valueOut.textContent = String(current);
+        // A def may gate itself on another control's value (AI step ↔ AI toggle).
+        if (def.enabledWhen) input.disabled = !def.enabledWhen(values);
       });
       field.appendChild(labelRow);
       field.appendChild(input);

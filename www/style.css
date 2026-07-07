@@ -283,6 +283,25 @@ h1 {
   white-space: normal;
 }
 
+/* An OPEN ⓘ must paint above sibling panels (beta feedback: popovers rendered
+   under adjacent cards). Panels create stacking contexts (z-index:1 on
+   panel-lift/reveal surfaces), so a child's z-index can't cross them — lift
+   the HOST panel's whole context while its popover is open. */
+.panel:has(.term-pop[open]),
+.pane-card:has(.term-pop[open]),
+.setup:has(.term-pop[open]),
+.approval-shell:has(.term-pop[open]) {
+  position: relative;
+  z-index: 30;
+}
+
+/* Right-column chart panels: open the popover leftward so it cannot overflow
+   the viewport edge (audit PRE-FLIP; 2-up grid at desktop widths). */
+.charts-grid > *:nth-child(even) .term-pop-body {
+  left: auto;
+  right: 0;
+}
+
 .term-pop-plain {
   display: block;
   color: var(--color-ink);
@@ -2377,6 +2396,18 @@ progress {
   to { stroke-dashoffset: 0; }
 }
 
+/* The looping Divergence (beta feedback 2026-07-07): draw in over the first
+   ~12%, hold drawn until ~86%, dissolve, then reset invisibly (at offset 100
+   the stroke has zero visible length, so opacity can return to 1 unseen). */
+@keyframes eig-draw-loop {
+  0% { stroke-dashoffset: 100; opacity: 1; }
+  12% { stroke-dashoffset: 0; }
+  86% { stroke-dashoffset: 0; opacity: 1; }
+  93% { stroke-dashoffset: 0; opacity: 0; }
+  94% { stroke-dashoffset: 100; opacity: 0; }
+  100% { stroke-dashoffset: 100; opacity: 1; }
+}
+
 @keyframes eig-fade {
   to { opacity: 1; }
 }
@@ -2398,10 +2429,11 @@ progress {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* §6.2 — The Divergence draws in once (the calm order line resolves first).
-     stroke-dasharray/offset live ONLY here, so the base state is fully drawn
-     (reduced-motion = instant). pathLength="100" ⇒ no JS measurement. */
-  .median { stroke-dasharray: 100; stroke-dashoffset: 100; animation: eig-draw 760ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards; }
+  /* §6.2 amended (beta feedback 2026-07-07): The Divergence LOOPS — draw in,
+     hold, dissolve, reset unseen (~10s cycle; the calm order line still leads
+     via its shorter delay). stroke-dasharray/offset live ONLY here, so the
+     base state stays fully drawn (reduced-motion = instant, static). */
+  .median { stroke-dasharray: 100; stroke-dashoffset: 100; animation: eig-draw-loop 10s cubic-bezier(0.2, 0.7, 0.2, 1) infinite; }
   .median-ord { animation-delay: 160ms; }
   .median-dis { animation-delay: 300ms; }
   .band, .seed { opacity: 0; animation: eig-fade 420ms ease forwards; }

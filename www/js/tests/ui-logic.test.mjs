@@ -404,3 +404,24 @@ test('pane heading names AI only when the pair actually has an active injection'
   assert.equal(paneHeading(landingConfig()), 'Same org, same AI — structure decides');
   assert.equal(paneHeading(noAi), 'Same org — structure decides');
 });
+
+// ---- aiInjection virtual controls (beta feedback 2026-07-07) --------------------
+
+test('aiInjectionEnabled toggles the ONE schema object; enabling without a prior step defaults to mid-horizon', () => {
+  // A config without the block at all: the toggle must still build a valid object.
+  const config = /** @type {any} */ ({ horizon: 60, org: {} });
+  const on = applyOrgValue(/** @type {any} */ (config), 'aiInjectionEnabled', 'on');
+  assert.deepEqual(on.org.aiInjection, { enabled: true, atStep: 30 });
+  // Disabling PRESERVES the step (re-enabling returns to where you were).
+  const off = applyOrgValue(on, 'aiInjectionEnabled', 'off');
+  assert.deepEqual(off.org.aiInjection, { enabled: false, atStep: 30 });
+  assert.equal(off.org.aiInjectionEnabled, undefined, 'never writes a phantom scalar (deny_unknown_fields)');
+});
+
+test('aiInjectionAtStep clamps to the last step that actually runs (horizon - 1)', () => {
+  const config = { horizon: 60, org: { aiInjection: { enabled: true, atStep: 10 } } };
+  assert.equal(applyOrgValue(/** @type {any} */ (config), 'aiInjectionAtStep', 500).org.aiInjection.atStep, 59);
+  assert.equal(applyOrgValue(/** @type {any} */ (config), 'aiInjectionAtStep', -5).org.aiInjection.atStep, 0);
+  const kept = applyOrgValue(/** @type {any} */ (config), 'aiInjectionAtStep', 24);
+  assert.deepEqual(kept.org.aiInjection, { enabled: true, atStep: 24 });
+});

@@ -85,7 +85,9 @@ export function createPercentileChart(canvas, opts = {}) {
           fill: false,
         },
         {
-          label: `${label} p10–p90 band`,
+          // Plain-language legend (beta feedback): "p10–p90 band" read as jargon.
+          // The quantitative names live in the ⓘ "Show the numbers" layer.
+          label: `${label} — range across runs`,
           data: [],
           borderWidth: 0,
           pointRadius: 0,
@@ -93,7 +95,7 @@ export function createPercentileChart(canvas, opts = {}) {
           fill: '-1', // fills down to the p10 dataset → the percentile band
         },
         {
-          label: `${label} p50`,
+          label: `${label} — typical run`,
           data: [],
           borderColor: COLORS.line,
           borderWidth: 2,

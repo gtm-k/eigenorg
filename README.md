@@ -57,6 +57,39 @@ Every run returns the story as probability ranges across 500 simulations: a befo
 - **Every run is reproducible.** The share link embeds the seed, the full config, and the resolved coefficient set — whoever opens it replays that exact run, byte for byte, in their own browser.
 - **Ranges, not point predictions.** Outputs are shown as a median line inside a 10th–90th percentile band, so you read a spread of plausible outcomes rather than a single false-precise number.
 
+### The flow, end to end
+
+```mermaid
+flowchart TB
+    subgraph MODEL["📖 The model — open by construction"]
+        MD["MODEL.md<br/>formulas · coefficients · golden predicates"]
+        EX["extractor<br/>(machine-reads the doc)"]
+        ART["params.json · goldens.json · assumptions.json<br/>(CI drift gate keeps these identical to MODEL.md)"]
+        MD --> EX --> ART
+    end
+
+    subgraph ENGINE["⚙️ The engine — Rust → WebAssembly"]
+        RS["simulation kernel<br/>(golden-tested against the model's predicates)"]
+        WASM["WebAssembly build"]
+        RS --> WASM
+    end
+
+    subgraph PAGE["🌐 Your browser — nothing leaves the page"]
+        WK["web worker<br/>(runs 500 simulations off the main thread)"]
+        EC["engine client<br/>(one run at a time, cancellable)"]
+        UI["two doors:<br/>🏢 Organization · 👥 One team"]
+        OUT["results<br/>charts · plain-language layer · ⓘ glossary"]
+        SHARE["share link (byte-for-byte replay)<br/>result card (PNG)"]
+        WK --> EC --> UI --> OUT --> SHARE
+    end
+
+    ART --> RS
+    ART -->|"assumptions drawer<br/>+ glossary deep-dives"| OUT
+    WASM --> WK
+```
+
+Change a coefficient in `MODEL.md` and CI fails until the extracted artifacts, the engine's golden tests, and the in-app assumptions drawer all agree again — the documentation *is* the implementation.
+
 ---
 
 ## The model is open
