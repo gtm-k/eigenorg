@@ -5,20 +5,21 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>eigenorg — structure, not headcount</title>
   <meta name="description" content="Test whether your org holds together before you build it. Shape an org, run 500 Monte Carlo simulations in your browser, and see whether structure — not headcount — decides the outcome.">
-  <!-- Open Graph / Twitter card. og:image is RELATIVE while the repo is private
-       (decision default 6); P9 finalizes the absolute Pages-origin URL at the
-       public flip (LinkedIn scrapers need an absolute URL, which requires the
-       live origin). Relative paths keep the zero-external-requests gate clean. -->
+  <!-- Open Graph / Twitter card. Absolute Pages-origin URLs: social scrapers
+       (LinkedIn, X) fetch og:image/og:url server-side and cannot resolve a
+       relative path. These are <meta content> values, not runtime request
+       sinks, so the zero-external-requests gate on the app is unaffected. -->
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://gtm-k.github.io/eigenorg/">
   <meta property="og:title" content="eigenorg — structure, not headcount">
   <meta property="og:description" content="Org performance is a property of structure, not headcount. Simulate coordination cost, decision latency and Faster Dysfunction — a thinking aid grounded in research, running entirely in your browser.">
-  <meta property="og:image" content="./og-image.png">
+  <meta property="og:image" content="https://gtm-k.github.io/eigenorg/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="eigenorg — structure, not headcount">
   <meta name="twitter:description" content="A thinking aid grounded in research — not a prediction engine. Shape an org, run 500 simulations in your browser, and see whether structure decides the outcome.">
-  <meta name="twitter:image" content="./og-image.png">
+  <meta name="twitter:image" content="https://gtm-k.github.io/eigenorg/og-image.png">
   <!-- Relative asset paths ONLY: this page must work under the /eigenorg/
        Pages project subpath (PLAN P2 / PREMORTEM T2). -->
   <link rel="stylesheet" href="./style.css">
