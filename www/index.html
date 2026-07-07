@@ -173,7 +173,10 @@
                 <span class="drawer-optional">optional</span>
               </summary>
               <div class="drawer-body">
-                <p class="drawer-tech" data-term="approvalStack">Approval stack</p>
+                <!-- Flow <div>, not <p>: glossary.decorate appends the inline ⓘ
+                     (<details>) here, which is invalid inside a <p> — same reason
+                     #preset-note is a <div> (F1). -->
+                <div class="drawer-tech" data-term="approvalStack">Approval stack</div>
                 <p class="note">Build the chain of sign-offs a decision clears — 1 to 5 seats, each a person, committee, or AI agent. Tap a seat to set it. This is what sets your decision-latency number.</p>
                 <div id="configurator" class="configurator"></div>
               </div>
