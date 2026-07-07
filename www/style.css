@@ -1,9 +1,9 @@
 /* eigenorg — visual pass (P5b) on the DESIGN.md Linear system.
    Near-black canvas, hairline-bordered charcoal panels, ONE lavender accent,
-   Inter (600 display / 400 body / 500 buttons) with negative tracking on
-   display sizes, mono reserved for run metadata (the reproducibility
-   readout — this page's status/ID tokens). Nothing signals by color alone:
-   states pair color with text, dashes or shape. */
+   a split system font stack (--font-display / --font-text, no webfont) with
+   negative tracking on display sizes, mono reserved for run metadata (the
+   reproducibility readout — this page's status/ID tokens). Nothing signals by
+   color alone: states pair color with text, dashes or shape. */
 
 :root {
   /* DESIGN.md colors */
@@ -912,7 +912,7 @@ progress {
 }
 
 .cfg-flow-seat {
-  font-family: Inter, sans-serif;
+  font-family: var(--font-text);
 }
 
 .cfg-flow-busiest {
@@ -926,7 +926,7 @@ progress {
 .cfg-busiest-badge {
   display: inline-block;
   margin-left: var(--space-2);
-  font-family: Inter, sans-serif;
+  font-family: var(--font-text);
   font-size: 0.625rem;
   font-weight: 600;
   letter-spacing: 0.3px;
