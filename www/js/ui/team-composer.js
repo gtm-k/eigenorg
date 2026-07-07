@@ -56,14 +56,30 @@ export function renderTeamComposer(container, coordinator) {
   container.textContent = '';
   const root = elc('div', 'composer');
 
-  // ---- polite announcements (assignments) — run state stays on #team-run-status ----
+  // ---- feedback: success announcements (SR-only) + guard blocks (VISIBLE) ----
+  // Successful assignments announce to screen readers only (run state stays on
+  // #team-run-status). A guard that BLOCKS an edit (roster at the max, the last
+  // two members, the last worker) must be observable to EVERY actor, not just SR
+  // users (F4 actor-observability) — before this, the block wrote only into the
+  // sr-only region, so a sighted user hit a remove/add that visibly did nothing.
+  // It now surfaces in a visible role=status note by the controls, cleared on the
+  // next successful edit (CSS hides it while empty).
   const live = elc('div', 'tc-live sr-only');
   live.setAttribute('aria-live', 'polite');
   /** @param {string} msg */
   const announce = (msg) => { live.textContent = msg; };
 
+  const guardNote = elc('p', 'tc-guard');
+  guardNote.setAttribute('role', 'status');
+  guardNote.setAttribute('aria-live', 'polite');
+  /** Show a blocked-edit reason visibly AND announce it once. @param {string} msg */
+  const blockGuard = (msg) => { guardNote.textContent = msg; };
+  /** Clear the guard note after a successful edit. */
+  const clearGuard = () => { if (guardNote.textContent) guardNote.textContent = ''; };
+
   const commit = (/** @type {any} */ next, /** @type {string} */ msg) => {
-    if (!next) { announce(msg); return; } // a guard blocked the edit — say why, change nothing
+    if (!next) { blockGuard(msg); return; } // a guard blocked the edit — show why, change nothing
+    clearGuard();
     coordinator.onConfigChange(next);
   };
 
@@ -145,9 +161,10 @@ export function renderTeamComposer(container, coordinator) {
         remove.addEventListener('click', () => {
           const next = removeEntity(coordinator.getConfig(), entity.id);
           if (!next) {
-            announce('A team needs at least two people and someone doing the work — keep this one.');
+            blockGuard('A team needs at least two people and someone doing the work — keep this one.');
             return;
           }
+          clearGuard();
           coordinator.onConfigChange(next);
           announce(`Removed a ${label}.`);
           // The roster was rebuilt by the refresh → move focus to a stable anchor
@@ -299,7 +316,7 @@ export function renderTeamComposer(container, coordinator) {
   dialsEyebrow.append(elc('span', 'optional-tag', '· optional'));
   dialsSection.append(dialsEyebrow, dials);
 
-  root.append(paletteSection, rosterSection, workSection, dialsSection, live);
+  root.append(paletteSection, guardNote, rosterSection, workSection, dialsSection, live);
   container.append(root);
 
   /** Reflect the current config: rebuild the roster + set the dial values in place. */

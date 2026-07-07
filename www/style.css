@@ -2614,6 +2614,20 @@ progress {
 }
 .tc-section { display: flex; flex-direction: column; gap: var(--space-3); }
 
+/* Guard note: a blocked add/remove surfaces its reason VISIBLY here (F4 —
+   actor-observability, not sr-only). The descriptive text carries the meaning,
+   so the error tint is a secondary cue, never the only signal. Empty = hidden. */
+.tc-guard {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-error);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--color-error) 40%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+}
+.tc-guard:empty { display: none; }
+
 .tc-palette { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .tc-add-chip {
   display: inline-flex;
