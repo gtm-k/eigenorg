@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import {
   stripTags,
   headingBlocks,
+  panelTitleBlocks,
   dataTermMarkers,
   sweepHeadings,
   danglingLinks,
@@ -43,16 +44,31 @@ test('stripTags flattens nested markup to text', () => {
 
 // ---- the heading sweep ---------------------------------------------------------
 
-test('sweep FIRES on a bare jargon heading (no data-term)', () => {
+test('sweep FIRES on a bare jargon heading (no wrapper, no data-term)', () => {
   const html = '<h2>Decision velocity</h2>';
   const v = sweepHeadings(html, ['Decision velocity']);
   assert.equal(v.length, 1);
   assert.equal(v[0].surface, 'Decision velocity');
 });
 
-test('sweep IGNORES a heading bound to a data-term', () => {
-  const html = '<h2 data-term="decisionVelocity">How fast decisions get made<span class="tech-label">Decision velocity · 0–100</span></h2>';
+test('sweep IGNORES an inverted heading bound via its .panel-title wrapper', () => {
+  const html =
+    '<div class="panel-title" data-term="decisionVelocity"><h2>How fast decisions get made</h2><span class="tech-label">Decision velocity · 0–100</span></div>';
   assert.deepEqual(sweepHeadings(html, ['Decision velocity']), []);
+});
+
+test('sweep FIRES on a .panel-title whose tech-label carries a surface but has no data-term', () => {
+  const html = '<div class="panel-title"><h2>How fast decisions get made</h2><span class="tech-label">Decision velocity · 0–100</span></div>';
+  const v = sweepHeadings(html, ['Decision velocity']);
+  assert.equal(v.length, 1);
+  assert.equal(v[0].surface, 'Decision velocity');
+});
+
+test('panelTitleBlocks captures the wrapper attrs + flattened text', () => {
+  const blocks = panelTitleBlocks('<div class="panel-title" data-term="entropy"><h2>How chaotic things get</h2><span class="tech-label">Disorder · entropy, 0–100</span></div>');
+  assert.equal(blocks.length, 1);
+  assert.match(blocks[0].attrs, /data-term="entropy"/);
+  assert.match(blocks[0].text, /Disorder · entropy/);
 });
 
 test('sweep IGNORES prose (only h2/h3 are swept — meaning.js sentences are out of scope)', () => {

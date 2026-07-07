@@ -176,6 +176,24 @@ h1 {
 /* hover-only) carries the curated blurb + an opt-in model deep-dive.    */
 /* ==================================================================== */
 
+/* The flow wrapper carrying data-term: the plain-lead <h2> + the ⓘ share line 1
+   (baseline-aligned), the demoted .tech-label wraps to line 2 (flex-basis:100%).
+   A flow element so the inserted <details> ⓘ is valid (it can't nest in an h2). */
+.panel-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0 0 var(--space-3);
+}
+
+.panel-title > h2 {
+  margin: 0;
+}
+
+.panel-title > .tech-label {
+  flex-basis: 100%;
+}
+
 /* The technical term, demoted below the plain lead (§2b): not uppercase,
    ink-subtle, block so it sits on its own line under the heading. */
 .tech-label {
@@ -1456,9 +1474,17 @@ progress {
 /* ==================================================================== */
 
 /* Plain-lead wrapper carrying data-term (the ⓘ mounts here, before the
-   .tech-label). A flex item in .field-label-row that may shrink. */
+   .tech-label). A flow div so the inline ⓘ <details> is valid; flow-flex so the
+   label + ⓘ share line 1 and the demoted .tech-label wraps to line 2. */
 .field-lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   min-width: 0;
+}
+
+.field-lead > .tech-label {
+  flex-basis: 100%;
 }
 
 /* Directional anchors under the SH slider — a bare "N" carries no direction.

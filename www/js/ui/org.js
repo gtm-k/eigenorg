@@ -293,7 +293,10 @@ function buildStructuralHealthField(root, def, opts, refreshers) {
 
   const labelRow = document.createElement('div');
   labelRow.className = 'field-label-row';
-  const lead = document.createElement('span');
+  // A flow element (div, not span) so the inline ⓘ (a <details>) decorate inserts
+  // here is valid HTML. Carries data-term; the ⓘ lands between the label and the
+  // demoted .tech-label.
+  const lead = document.createElement('div');
   lead.className = 'field-lead';
   lead.dataset.term = 'structuralHealth';
   const label = document.createElement('label');

@@ -90,6 +90,26 @@ export function headingBlocks(html) {
   return out;
 }
 
+/**
+ * Every `.panel-title` wrapper block. The inverted headings put the plain lead in
+ * the <h2> and the jargon in a sibling `.tech-label`, both inside this FLOW
+ * wrapper that carries the `data-term` (so the inserted ⓘ <details> is valid).
+ * Scanning the wrapper (not just the <h2>) is what keeps the surface — which now
+ * lives OUTSIDE the h2 — inside the coverage sweep.
+ * @param {string} html
+ * @returns {Array<{ tag: string, attrs: string, text: string, line: number }>}
+ */
+export function panelTitleBlocks(html) {
+  /** @type {Array<{ tag: string, attrs: string, text: string, line: number }>} */
+  const out = [];
+  const re = /<div class="panel-title"([^>]*)>([\s\S]*?)<\/div>/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    out.push({ tag: 'panel-title', attrs: m[1], text: stripTags(m[2]), line: lineAt(html, m.index) });
+  }
+  return out;
+}
+
 /** The `id="..."` of a heading's attribute string, or ''. @param {string} attrs */
 function attrId(attrs) {
   const m = /\bid\s*=\s*["']([^"']+)["']/.exec(attrs);
@@ -118,7 +138,10 @@ export function dataTermMarkers(src) {
 }
 
 /**
- * Sweep index.html headings for jargon surfaces not bound to a data-term.
+ * Sweep index.html headings + `.panel-title` wrappers for jargon surfaces not
+ * bound to a data-term. Both are scanned: a bare `<h2>Jargon</h2>` (a new heading
+ * that forgot the wrapper + ⓘ) AND a `.panel-title` whose tech-label carries a
+ * surface but whose wrapper has no data-term.
  * @param {string} html
  * @param {string[]} jargonList
  * @returns {Array<{ line: number, surface: string, text: string }>}
@@ -126,7 +149,7 @@ export function dataTermMarkers(src) {
 export function sweepHeadings(html, jargonList) {
   /** @type {Array<{ line: number, surface: string, text: string }>} */
   const violations = [];
-  for (const block of headingBlocks(html)) {
+  for (const block of [...headingBlocks(html), ...panelTitleBlocks(html)]) {
     const hasDataTerm = /\bdata-term\s*=/.test(block.attrs);
     if (hasDataTerm || ALLOWLIST_HEADING_IDS.has(attrId(block.attrs))) continue;
     for (const surface of jargonList) {
