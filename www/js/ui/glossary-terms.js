@@ -191,6 +191,25 @@ export const CURATED_TERMS = [
     why: 'A gap means a job is effectively unowned, so work that needs it stalls or quietly degrades.',
     assumptionsId: 'functionCoverage',
   },
+  {
+    // P7b team surface: the quality-histogram chart. Sourced (qualityModel), so
+    // the §8.5 three-sourceless pin is unaffected.
+    id: 'qualityHistogram',
+    label: 'Quality distribution',
+    surfaces: ['Quality distribution'],
+    plain: 'How the quality of finished work is spread out — from rushed-and-rough to polished — across everything the team completed.',
+    why: 'A long tail of low-quality work is the hidden cost of pushing volume through thin review; the spread shows it where a single average would hide it.',
+    assumptionsId: 'qualityModel',
+  },
+  {
+    // P7b team surface: the review-queue chart (M20). Sourced (reviewCapacityQueue).
+    id: 'reviewBottleneck',
+    label: 'Review bottleneck',
+    surfaces: ['Review queue'],
+    plain: 'Whether review can keep pace with how fast work is produced — the queue of finished work still waiting to be checked.',
+    why: "When a fixed reviewer can't keep up, the queue and the wait climb, and quality slips as unreviewed work ships anyway.",
+    assumptionsId: 'reviewCapacityQueue',
+  },
 ];
 
 /**

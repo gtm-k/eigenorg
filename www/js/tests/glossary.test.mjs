@@ -120,6 +120,8 @@ test('F6.2: each curated term keeps its distinctive plain-language copy (a swap 
     fasterDysfunction: /trap|weak points/i,
     cohesion: /trust/i,
     functionCoverage: /essential job|unowned/i,
+    qualityHistogram: /spread/i,
+    reviewBottleneck: /queue/i,
   };
   // Every registered term must have a defined anchor (a new term forces the pin).
   assert.deepEqual(CURATED_TERMS.map((t) => t.id).sort(), Object.keys(anchors).sort());

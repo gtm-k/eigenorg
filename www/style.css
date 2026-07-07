@@ -2518,3 +2518,85 @@ progress {
     padding-bottom: var(--space-4);
   }
 }
+
+/* ====================================================================
+   Team Building (P7b) — the function-coverage heatmap. The setup, charts,
+   run-strip, results and card reuse the org classes (.setup, .charts-grid,
+   .chart-box, .results, .card-preview …); only the coverage heatmap is new.
+   State is carried by a shape GLYPH + a plain WORD + the score, so colour is
+   supplementary — a grayscale render stays fully readable (no colour-alone).
+   ==================================================================== */
+.fc-mount {
+  margin-top: var(--space-3);
+  overflow-x: auto; /* the small table scrolls inside itself, never the page */
+}
+
+.fc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.fc-caption {
+  caption-side: top;
+  text-align: left;
+  color: var(--color-ink-subtle);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin-bottom: var(--space-3);
+}
+
+.fc-table th[scope="col"] {
+  text-align: left;
+  color: var(--color-ink-subtle);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0 var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.fc-table th[scope="col"]:last-child { text-align: right; }
+
+.fc-row td,
+.fc-row th {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-hairline);
+  vertical-align: baseline;
+}
+
+.fc-row th[scope="row"] { text-align: left; font-weight: 500; }
+
+.fc-job-plain { display: block; color: var(--color-ink); }
+.fc-job-tech {
+  display: block;
+  color: var(--color-ink-subtle);
+  font-size: 0.75rem;
+  margin-top: 1px;
+}
+
+.fc-cov { white-space: nowrap; }
+.fc-glyph {
+  display: inline-block;
+  margin-right: var(--space-2);
+  font-size: 1rem;
+  line-height: 1;
+}
+.fc-word { color: var(--color-ink-muted); }
+.fc-att {
+  text-align: right;
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+}
+
+/* Rating tint — supplementary to the glyph + word. Covered = accent (on-brand),
+   thin = amber status, gap = muted ink (non-alarmist / non-judgmental register,
+   matching the card's grey open cell). */
+.fc-green .fc-glyph { color: var(--color-primary-hover); }
+.fc-amber .fc-glyph { color: var(--color-stale); }
+.fc-red .fc-glyph { color: var(--color-ink-subtle); }
+.fc-red td, .fc-red th { background: color-mix(in srgb, var(--color-surface-2) 60%, transparent); }
+
+.fc-pending { color: var(--color-ink-subtle); font-size: 0.9375rem; }

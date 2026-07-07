@@ -32,6 +32,22 @@ import { fetchAssumptions, renderAssumptionsDrawer } from './ui/assumptions.js';
 import { modelVersionBanner, extractShareFragment } from './url-codec.js';
 import { createNavShell, createSetupStrip } from './ui/nav.js';
 import { createGlossary } from './ui/glossary.js';
+import { createQualityChart, updateQualityChart, renderFunctionCoverage } from './charts/team.js';
+import {
+  fetchTeamManifest,
+  fetchTeamPreset,
+  teamPrimaryRunConfig,
+  renderTeamPresetPicker,
+} from './ui/team-presets.js';
+import {
+  teamSetupChips,
+  teamPrecisSentence,
+  functionCoverageRows,
+  qualityHistogramModel,
+  coverageSummary,
+  teamRunStats,
+} from './ui/team.js';
+import { wireTeamCard } from './ui/team-card.js';
 
 /** @param {string} sel @returns {HTMLElement} */
 function el(sel) {
@@ -876,6 +892,365 @@ function resetToDefault() {
   setStatus(statusEl, 'Ready — 500 simulations, in your browser.', '');
 }
 
+// ====================================================================
+// Team Building (P7b) — the Team-door lens. Front-end only; a single run
+// through the SAME serialized engine-client `client` (org and team share it —
+// team runs queue safely behind org runs). SEPARATE state / charts / results /
+// card per mode so an org run never marks a team run fresh/stale and vice-versa
+// (§3c). INT-1: team = card-only — no share-link, no url-codec path here.
+// ====================================================================
+
+// Team charts: reuse the org percentile/health factories for the band + two-level
+// panels; the quality histogram is the one team-specific chart (charts/team.js).
+// Created into the hidden team mount at boot → resized on the first Team entry
+// (teamResizeCharts), exactly like the org charts (Chart.js reads zero while
+// display:none — R3).
+const teamCharts = {
+  throughput: createPercentileChart(/** @type {HTMLCanvasElement} */ (el('#team-throughput-chart')), { label: 'work done', unit: 'items/step' }),
+  quality: createQualityChart(/** @type {HTMLCanvasElement} */ (el('#team-quality-chart'))),
+  tax: createPercentileChart(/** @type {HTMLCanvasElement} */ (el('#team-tax-chart')), { label: 'coordination', unit: '% of capacity', percent: true }),
+  cohesion: createPercentileChart(/** @type {HTMLCanvasElement} */ (el('#team-cohesion-chart')), { label: 'cohesion', unit: 'index 0–100' }),
+  brittleness: createPercentileChart(/** @type {HTMLCanvasElement} */ (el('#team-brittleness-chart')), { label: 'breakages', unit: 'events (cumulative)' }),
+  health: createHealthChart(/** @type {HTMLCanvasElement} */ (el('#team-health-chart'))),
+  review: createPercentileChart(/** @type {HTMLCanvasElement} */ (el('#team-review-chart')), { label: 'review queue', unit: 'items waiting' }),
+};
+
+const teamRunButtons = [
+  /** @type {HTMLButtonElement} */ (el('#team-run-button')),
+  /** @type {HTMLButtonElement} */ (el('#team-run-button-2')),
+];
+const teamProgress = /** @type {HTMLProgressElement} */ (el('#team-run-progress'));
+const teamStatusEl = el('#team-run-status');
+
+/** @type {any} */
+const teamState = {
+  presetId: '',
+  defaultId: '',
+  /** @type {any[]} */ refs: [],
+  /** @type {Map<string, any>} */ presets: new Map(),
+  /** @type {any} */ config: null,
+  generation: 0,
+  hasRun: false,
+  planCancelled: false,
+  pendingRerun: false,
+  startingOver: false,
+};
+// Team run is a SINGLE run, but `client.busy` is shared with org; this flag tracks
+// whether a TEAM run is the one in flight so the Run/Cancel toggle and pending
+// re-run belong to the team flow, never an org run.
+let teamBusy = false;
+
+/** @type {{ setActive: (id: string) => void }} */
+let teamPicker = { setActive: () => {} }; // real picker mounts in boot()
+
+const teamCard = wireTeamCard({
+  canvas: /** @type {HTMLCanvasElement} */ (el('#team-card-canvas')),
+  downloadButton: /** @type {HTMLButtonElement} */ (el('#team-card-download')),
+  shareButton: /** @type {HTMLButtonElement} */ (el('#team-card-share')),
+  statusEl: el('#team-card-status'),
+});
+probe.renderTeamCard = (/** @type {number} */ w, /** @type {number} */ h) => teamCard.renderDataUrl(w, h);
+
+const teamStrip = createSetupStrip({
+  body: el('#team-setup-body'),
+  summary: el('#team-setup-summary'),
+  chipHost: el('#team-setup-chips'),
+  editButton: /** @type {HTMLButtonElement} */ (el('#team-edit-setup')),
+  staleBadge: el('#team-stale'),
+  focusTarget: () =>
+    /** @type {HTMLElement | null} */ (document.querySelector('#team-setup-body button, #team-setup-body input')),
+});
+
+/** @param {boolean} running */
+function setTeamRunButtons(running) {
+  for (const b of teamRunButtons) {
+    b.textContent = running ? 'Cancel run' : (b.dataset.runLabel ?? 'Run simulation');
+    b.disabled = false;
+  }
+}
+
+/** @returns {string} the active team scenario label (short) for chips + card */
+function currentTeamScenarioLabel() {
+  if (teamState.presetId) return teamState.refs.find((/** @type {any} */ r) => r.id === teamState.presetId)?.label ?? 'Custom team';
+  return 'Custom team';
+}
+
+/** Render the plain-English team précis into `host`, bolding editable values. @param {HTMLElement} host @param {any} config */
+function renderTeamPrecis(host, config) {
+  host.textContent = '';
+  for (const seg of teamPrecisSentence(config)) {
+    if (seg.value) {
+      const strong = document.createElement('strong');
+      strong.textContent = seg.text;
+      host.appendChild(strong);
+    } else {
+      host.appendChild(document.createTextNode(seg.text));
+    }
+  }
+}
+
+/** Refresh the "Your team" chips + the plain-English précis from the current config. */
+function refreshTeamSetup() {
+  if (!teamState.config) return;
+  teamStrip.setChips(teamSetupChips(teamState.config, currentTeamScenarioLabel()));
+  renderTeamPrecis(el('#team-precis'), teamState.config);
+}
+
+/** @param {any} preset set the team preset note (plain — no data-term; team has no Faster-Dysfunction retell). */
+function setTeamPresetNote(preset) {
+  el('#team-preset-note').textContent = `${preset.label} — a starting team. Change it below, or just Run.`;
+}
+
+/** A staged team edit: charts no longer match the setup — show the stale badge (M1: not before the first run). */
+function markTeamStale() {
+  refreshTeamSetup();
+  if (!teamState.hasRun) return;
+  el('#team-results').classList.add('is-stale');
+  teamStrip.markStale();
+}
+
+/** A completed team run: collapse the setup to the chips; keep keyboard focus. */
+function markTeamFresh() {
+  const focusWasInSetup = el('#team-setup-body').contains(document.activeElement);
+  el('#team-results').classList.remove('is-stale');
+  refreshTeamSetup();
+  teamStrip.markFresh();
+  const runAgain = /** @type {HTMLButtonElement} */ (el('#team-run-button-2'));
+  if (focusWasInSetup && !runAgain.hidden) runAgain.focus();
+}
+
+/** Resize every team chart to its (now-visible) container (R3). */
+function teamResizeCharts() {
+  for (const chart of Object.values(teamCharts)) chart.resize();
+}
+
+/** Empty every team chart's datasets (team Start over). */
+function resetTeamCharts() {
+  for (const chart of Object.values(teamCharts)) {
+    chart.data.labels = [];
+    for (const ds of chart.data.datasets) ds.data = [];
+    chart.update('none');
+  }
+}
+
+/** Labeled markers at the first breakage steps (recovery markers on the brittleness chart). @param {any} output */
+function brittlenessMarkers(output) {
+  const rate = Array.isArray(output?.series?.brittlenessRate) ? output.series.brittlenessRate : [];
+  /** @type {Array<{ t: number, label: string }>} */
+  const out = [];
+  for (const p of rate) {
+    if (p.p50 > 0) {
+      out.push({ t: p.t, label: 'breakage' });
+      if (out.length >= 3) break;
+    }
+  }
+  return out;
+}
+
+/** The coverage "what this means" line, from the run's coverage summary. @param {any} cov */
+function coverageMeaning(cov) {
+  if (cov.gaps === 0) return `All ${cov.total} essential jobs are covered — no work is left unowned.`;
+  const gapWord = cov.gaps === 1 ? 'one job has a gap' : `${cov.gaps} jobs have gaps`;
+  return `${cov.covered} of ${cov.total} jobs covered; ${gapWord}: ${cov.gapLabels.join(', ')}. Uncovered work stalls or quietly degrades.`;
+}
+
+/** The review "what this means" line, from the settled review wait. @param {any} stats */
+function reviewMeaning(stats) {
+  if (stats.reviewWaitDays === null) return 'Work waiting on review each step.';
+  const days = Math.round(stats.reviewWaitDays);
+  return `By the end of the run, finished work waits about ${days} day${days === 1 ? '' : 's'} for review.`;
+}
+
+/** The success status line, all run-derived. @param {any} cov @param {any} stats @param {any} output */
+function teamSuccessLine(cov, stats, output) {
+  const shipped = stats.shipped === null ? 0 : Math.round(stats.shipped);
+  return `Ran ${Number(output.iterations).toLocaleString('en-US')} simulations — this team ships about ${shipped} items with ${cov.covered} of ${cov.total} essential jobs covered.`;
+}
+
+/**
+ * Execute one team run and paint every team panel. Single run through the shared
+ * serialized client. Mirrors runAll's stale-generation + cancel discipline on
+ * team state.
+ */
+async function teamRunAll() {
+  if (teamBusy) {
+    // Run/Cancel toggle on the in-flight team run.
+    teamState.pendingRerun = false;
+    teamState.planCancelled = true;
+    client.cancel();
+    return;
+  }
+  const config = teamState.config;
+  if (!config) return;
+  const planGeneration = teamState.generation;
+  teamState.planCancelled = false;
+  teamBusy = true;
+  setTeamRunButtons(true);
+  const iterations = Number(config.iterations);
+  teamProgress.max = iterations;
+  teamProgress.value = 0;
+  teamCard.disarm();
+
+  const t0 = performance.now();
+  try {
+    setStatus(teamStatusEl, `running… 0/${iterations} iterations`, '');
+    const run = await client.run({
+      config,
+      onProgress: ({ completedCount }) => {
+        if (teamState.planCancelled) return;
+        teamProgress.value = completedCount;
+        setStatus(teamStatusEl, `running… ${completedCount}/${iterations} iterations`, '');
+      },
+    });
+    const elapsedMs = performance.now() - t0;
+    if (teamState.planCancelled) throw Object.assign(new Error('run cancelled'), { cancelled: true });
+    if (planGeneration !== teamState.generation) {
+      // The team changed while this run was in flight → stale; never paint over
+      // the current view (mirrors completionPolicy for the org side).
+      setStatus(teamStatusEl, 'team changed — run to update the charts', '');
+    } else {
+      paintTeamResults({ config, run, elapsedMs });
+    }
+  } catch (err) {
+    if (!teamState.startingOver) {
+      if (/** @type {any} */ (err)?.cancelled) setStatus(teamStatusEl, 'run cancelled', '');
+      else setStatus(teamStatusEl, `run failed: ${err instanceof Error ? err.message : String(err)}`, 'error');
+    }
+  } finally {
+    teamBusy = false;
+    setTeamRunButtons(false);
+    teamProgress.value = 0;
+    teamState.startingOver = false;
+    if (teamState.pendingRerun) {
+      teamState.pendingRerun = false;
+      window.queueMicrotask(() => void teamRunAll());
+    }
+  }
+}
+
+/** Run the team now, or cancel-and-auto-run when a team run is already in flight (preset pick / Run again). */
+function requestTeamRun() {
+  if (teamBusy) {
+    teamState.pendingRerun = true;
+    teamState.planCancelled = true;
+    client.cancel();
+    return;
+  }
+  void teamRunAll();
+}
+
+/** @param {{ config: any, run: any, elapsedMs: number }} r Paint every team panel from a completed run. */
+function paintTeamResults(r) {
+  const { config, run, elapsedMs } = r;
+  const output = run.output;
+
+  const resultsEl = el('#team-results');
+  const firstReveal = resultsEl.hidden;
+  resultsEl.hidden = false;
+  if (firstReveal) {
+    resultsEl.classList.add('charts-revealed');
+    teamResizeCharts();
+  }
+
+  updatePercentileChart(teamCharts.throughput, output.series.throughput);
+  updateQualityChart(teamCharts.quality, qualityHistogramModel(output));
+  updatePercentileChart(teamCharts.tax, output.series.coordinationTax);
+  updatePercentileChart(teamCharts.cohesion, output.series.cohesion);
+  updatePercentileChart(teamCharts.brittleness, output.series.cumulativeBrittleness, { markers: brittlenessMarkers(output) });
+  updateHealthChart(teamCharts.health, output.series.orgHealthProxy, output.series.cohesion);
+  updatePercentileChart(teamCharts.review, output.series.reviewQueueDepth);
+
+  renderFunctionCoverage(el('#team-coverage'), functionCoverageRows(output));
+
+  const cov = coverageSummary(output);
+  const stats = teamRunStats(output);
+  el('#team-meaning-coverage').textContent = coverageMeaning(cov);
+  el('#team-meaning-review').textContent = reviewMeaning(stats);
+
+  el('#team-ro-model').textContent = `model v${output.modelVersion}`;
+  el('#team-ro-seed').textContent = `seed ${config.seed}`;
+  el('#team-ro-iters').textContent = `${output.iterations} iterations × 1 run`;
+  el('#team-ro-elapsed').textContent = `${(elapsedMs / 1000).toFixed(2)} s`;
+  setStatus(teamStatusEl, teamSuccessLine(cov, stats, output), 'ok');
+
+  // INT-1: arm the CARD only — no share link, no url-codec (team = card-only).
+  teamCard.arm({ scenarioLabel: currentTeamScenarioLabel(), output });
+
+  probe.lastTeamRun = {
+    iterations: output.iterations,
+    elapsedMs,
+    primaryOutputJson: run.outputJson,
+    coverage: cov,
+  };
+
+  teamState.hasRun = true;
+  el('#team-run-button-2').hidden = false;
+  // Attach the inline ⓘ to any team [data-term] host now visible.
+  glossary.decorate(el('#team-mount'));
+  markTeamFresh();
+}
+
+/** Pick a team preset: load it into the canonical team config + run (decision 6). @param {any} ref */
+function pickTeamPreset(ref) {
+  const preset = teamState.presets.get(ref.id);
+  if (!preset) return;
+  teamState.presetId = ref.id;
+  teamState.config = teamPrimaryRunConfig(preset, ref);
+  teamState.generation += 1; // staged change → any in-flight team run lands stale
+  teamCard.disarm();
+  teamPicker.setActive(ref.id);
+  setTeamPresetNote(preset);
+  refreshTeamSetup();
+  markTeamStale();
+  requestTeamRun();
+}
+
+/**
+ * Team "Start over": return Team Building to a clean slate (mirrors resetToDefault,
+ * TEAM state only — never touches org state). Cancels any in-flight team run,
+ * reloads the default team preset, re-gates #team-results on the team hasRun.
+ */
+function resetTeam() {
+  if (teamBusy) {
+    teamState.pendingRerun = false;
+    teamState.planCancelled = true;
+    teamState.startingOver = true;
+    client.cancel();
+  }
+  teamState.generation += 1;
+  teamCard.disarm();
+
+  const ref = teamState.refs.find((/** @type {any} */ rr) => rr.id === teamState.defaultId);
+  const preset = teamState.presets.get(teamState.defaultId);
+  if (preset && ref) {
+    teamState.presetId = teamState.defaultId;
+    teamState.config = teamPrimaryRunConfig(preset, ref);
+    teamPicker.setActive(teamState.defaultId);
+    setTeamPresetNote(preset);
+  }
+
+  teamState.hasRun = false;
+  el('#team-results').hidden = true;
+  el('#team-results').classList.remove('charts-revealed', 'is-stale');
+  el('#team-run-button-2').hidden = true;
+  resetTeamCharts();
+  el('#team-coverage').textContent = '';
+  el('#team-ro-model').textContent = 'model —';
+  el('#team-ro-seed').textContent = '';
+  el('#team-ro-iters').textContent = '';
+  el('#team-ro-elapsed').textContent = '';
+  for (const open of el('#team-mount').querySelectorAll('.term-pop[open], .term-pop-more[open]')) {
+    open.removeAttribute('open');
+  }
+  teamStrip.markFresh();
+  teamStrip.expand();
+  refreshTeamSetup();
+  setTeamRunButtons(false);
+  setStatus(teamStatusEl, 'Ready — 500 simulations, in your browser.', '');
+}
+
+for (const b of teamRunButtons) b.addEventListener('click', () => void teamRunAll());
+
 // Mode registry (C5): per-door onEnter / reset behaviour, dispatched by the
 // active door id, so P7b adds the Team lens as ONE entry (modes.team) instead of
 // branching the shell callbacks. nav nulls its active door BEFORE onStartOver
@@ -889,6 +1264,13 @@ const modes = {
       resizeCharts(); // charts were sized while the mount was hidden
     },
     reset: resetToDefault,
+  },
+  team: {
+    onEnter() {
+      teamResizeCharts(); // charts were sized while the team mount was hidden (R3)
+      glossary.decorate(el('#team-mount')); // idempotent — attaches the ⓘ once glossary is live
+    },
+    reset: resetTeam,
   },
 };
 
@@ -1011,6 +1393,32 @@ async function boot() {
   configurator.refresh();
   setRunButtons(false);
   refreshSetupChips();
+
+  // Team Building (P7b): fetch the committed manifest (INT-2) + each team preset,
+  // build the picker, and load the default team into the canonical team config so
+  // entering the Team door is one tap to Run. A team fetch failure is surfaced on
+  // the team status line and never blocks the org flow.
+  try {
+    const { defaultId, refs } = await fetchTeamManifest();
+    teamState.refs = refs;
+    teamState.defaultId = defaultId;
+    const teamFiles = await Promise.all(refs.map((ref) => fetchTeamPreset(ref.id)));
+    refs.forEach((ref, i) => teamState.presets.set(ref.id, teamFiles[i]));
+    teamPicker = renderTeamPresetPicker(el('#team-preset-picker'), { refs, onPick: pickTeamPreset });
+    const defRef = refs.find((rr) => rr.id === defaultId) ?? refs[0];
+    if (defRef) {
+      const preset = teamState.presets.get(defRef.id);
+      teamState.presetId = defRef.id;
+      teamState.config = teamPrimaryRunConfig(preset, defRef);
+      teamPicker.setActive(defRef.id);
+      setTeamPresetNote(preset);
+      refreshTeamSetup();
+      setTeamRunButtons(false); // enable the (HTML-disabled) team Run once a config is loaded
+    }
+  } catch (err) {
+    setStatus(teamStatusEl, `Could not load the team presets: ${err instanceof Error ? err.message : String(err)}`, 'error');
+  }
+
   probe.bootReadyMs = performance.now(); // navigation start → Run clickable
   // The shell's own status is always "ready" — a broken shared link is surfaced
   // on the LANDING notice (BLOCKER B), not in the hidden shell, so entering a
