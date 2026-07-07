@@ -1077,12 +1077,14 @@ progress {
 
 .drawer > summary.drawer-summary::before {
   content: '▸';
+  content: '▸' / ''; /* empty alt text: decorative marker, kept out of the summary's accessible name */
   color: var(--color-ink-subtle);
   margin-right: var(--space-1);
 }
 
 .drawer[open] > summary.drawer-summary::before {
   content: '▾';
+  content: '▾' / '';
 }
 
 .drawer > summary.drawer-summary:hover {
@@ -1967,9 +1969,12 @@ progress {
   border-bottom: 1px solid var(--color-hairline);
 }
 
-/* Play glyph — survives main.js's textContent / data-run-label swap; AT ignores it. */
+/* Play glyph — survives main.js's textContent / data-run-label swap. The '/ '''
+   alternative-text form keeps it out of the CTA's accessible name (engines
+   without the '/' syntax fall back to the first, glyph-only declaration). */
 .setup-run-dock .cta::before {
   content: '\25B6';
+  content: '\25B6' / '';
   margin-right: 0.5em;
   font-size: 0.85em;
 }
